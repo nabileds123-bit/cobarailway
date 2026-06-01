@@ -107,7 +107,31 @@
 
         var spacePressed = false,
             qPressed = false,
-            wPressed = false;
+            wPressed = false,
+            ePressed = false,
+            eFeedInterval = null;
+
+        function sendFeed() {
+            sendMouseMove();
+            sendUint8(21);
+        }
+
+        function startEFeed() {
+            if (eFeedInterval || isTyping) {
+                return;
+            }
+
+            sendFeed();
+            eFeedInterval = setInterval(sendFeed, 85);
+        }
+
+        function stopEFeed() {
+            if (eFeedInterval) {
+                clearInterval(eFeedInterval);
+                eFeedInterval = null;
+            }
+        }
+
         wHandle.onkeydown = function (event) {
             switch (event.keyCode) {
                 case 32: // split
@@ -125,9 +149,14 @@
                     break;
                 case 87: // eject mass
                     if ((!wPressed) && (!isTyping)) {
-                        sendMouseMove();
-                        sendUint8(21);
+                        sendFeed();
                         wPressed = true;
+                    }
+                    break;
+                case 69: // hold E to eject mass repeatedly
+                    if ((!ePressed) && (!isTyping)) {
+                        ePressed = true;
+                        startEFeed();
                     }
                     break;
                 case 27: // quit
@@ -160,6 +189,10 @@
                 case 87:
                     wPressed = false;
                     break;
+                case 69:
+                    ePressed = false;
+                    stopEFeed();
+                    break;
                 case 81:
                     if (qPressed) {
                         sendUint8(19);
@@ -170,7 +203,8 @@
         };
         wHandle.onblur = function () {
             sendUint8(19);
-            wPressed = qPressed = spacePressed = false
+            stopEFeed();
+            wPressed = qPressed = spacePressed = ePressed = false
         };
 
         wHandle.onresize = canvasResize;
