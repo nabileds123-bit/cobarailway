@@ -3,9 +3,86 @@ var fs = require('fs');
 var path = require('path');
 
 var dbPath = path.join(__dirname, '..', 'data', 'users.json');
-var sessions = {};
+var memorySessions = {};
+var mysqlPool = null;
+var mysqlReady = null;
 
-function ensureDb() {
+function hasMysqlConfig() {
+    return !!(process.env.MYSQL_URL || process.env.MYSQLHOST || process.env.MYSQL_HOST);
+}
+
+function getMysqlPool() {
+    if (!hasMysqlConfig()) {
+        return null;
+    }
+
+    if (mysqlPool) {
+        return mysqlPool;
+    }
+
+    var mysql = require('mysql2/promise');
+
+    if (process.env.MYSQL_URL) {
+        mysqlPool = mysql.createPool(process.env.MYSQL_URL);
+    } else {
+        mysqlPool = mysql.createPool({
+            host: process.env.MYSQLHOST || process.env.MYSQL_HOST || 'localhost',
+            user: process.env.MYSQLUSER || process.env.MYSQL_USER || 'root',
+            password: process.env.MYSQLPASSWORD || process.env.MYSQL_PASSWORD || '',
+            database: process.env.MYSQLDATABASE || process.env.MYSQL_DATABASE || 'railway',
+            port: Number(process.env.MYSQLPORT || process.env.MYSQL_PORT || 3306),
+            waitForConnections: true,
+            connectionLimit: 10
+        });
+    }
+
+    return mysqlPool;
+}
+
+function ensureMysql() {
+    var pool = getMysqlPool();
+    if (!pool) {
+        return Promise.resolve(false);
+    }
+
+    if (mysqlReady) {
+        return mysqlReady;
+    }
+
+    mysqlReady = Promise.resolve()
+        .then(function() {
+            return pool.query(
+                'CREATE TABLE IF NOT EXISTS users (' +
+                'id VARCHAR(32) PRIMARY KEY,' +
+                'username VARCHAR(15) NOT NULL UNIQUE,' +
+                'email VARCHAR(255) NOT NULL UNIQUE,' +
+                'salt VARCHAR(64) NOT NULL,' +
+                'password_hash VARCHAR(256) NOT NULL,' +
+                'reset_token VARCHAR(64) NULL,' +
+                'reset_requested_at DATETIME NULL,' +
+                'created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP' +
+                ')'
+            );
+        })
+        .then(function() {
+            return pool.query(
+                'CREATE TABLE IF NOT EXISTS sessions (' +
+                'token VARCHAR(128) PRIMARY KEY,' +
+                'user_id VARCHAR(32) NOT NULL,' +
+                'created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,' +
+                'FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE' +
+                ')'
+            );
+        })
+        .then(function() {
+            console.log('[Auth] Using MySQL storage');
+            return true;
+        });
+
+    return mysqlReady;
+}
+
+function ensureJsonDb() {
     var dir = path.dirname(dbPath);
     if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir);
@@ -16,8 +93,8 @@ function ensureDb() {
     }
 }
 
-function readDb() {
-    ensureDb();
+function readJsonDb() {
+    ensureJsonDb();
     try {
         return JSON.parse(fs.readFileSync(dbPath, 'utf8'));
     } catch (e) {
@@ -25,8 +102,8 @@ function readDb() {
     }
 }
 
-function writeDb(db) {
-    ensureDb();
+function writeJsonDb(db) {
+    ensureJsonDb();
     fs.writeFileSync(dbPath, JSON.stringify(db, null, 2));
 }
 
@@ -44,6 +121,29 @@ function hashPassword(password, salt) {
 
 function makeToken() {
     return crypto.randomBytes(32).toString('hex');
+}
+
+function publicUser(user) {
+    return {
+        id: user.id,
+        username: user.username,
+        email: user.email
+    };
+}
+
+function mysqlUser(row) {
+    if (!row) {
+        return null;
+    }
+
+    return {
+        id: row.id,
+        username: row.username,
+        email: row.email,
+        salt: row.salt,
+        passwordHash: row.password_hash,
+        createdAt: row.created_at
+    };
 }
 
 function sendJson(res, statusCode, payload) {
@@ -75,7 +175,12 @@ function readBody(req, callback) {
     });
 }
 
-function findUserByLogin(db, login) {
+function handleError(res, err) {
+    console.error('[Auth] Error:', err && err.stack ? err.stack : err);
+    sendJson(res, 500, { ok: false, error: 'Server auth error.' });
+}
+
+function findJsonUserByLogin(db, login) {
     var value = String(login || '').trim().toLowerCase();
 
     for (var i = 0; i < db.users.length; i++) {
@@ -88,12 +193,113 @@ function findUserByLogin(db, login) {
     return null;
 }
 
-function publicUser(user) {
-    return {
-        id: user.id,
-        username: user.username,
-        email: user.email
-    };
+function findUserByLogin(login) {
+    return ensureMysql().then(function(usingMysql) {
+        if (usingMysql) {
+            return getMysqlPool()
+                .query('SELECT * FROM users WHERE LOWER(username) = ? OR LOWER(email) = ? LIMIT 1', [
+                    String(login || '').trim().toLowerCase(),
+                    String(login || '').trim().toLowerCase()
+                ])
+                .then(function(result) {
+                    return mysqlUser(result[0][0]);
+                });
+        }
+
+        return findJsonUserByLogin(readJsonDb(), login);
+    });
+}
+
+function findUserById(id) {
+    return ensureMysql().then(function(usingMysql) {
+        if (usingMysql) {
+            return getMysqlPool()
+                .query('SELECT * FROM users WHERE id = ? LIMIT 1', [id])
+                .then(function(result) {
+                    return mysqlUser(result[0][0]);
+                });
+        }
+
+        var db = readJsonDb();
+        for (var i = 0; i < db.users.length; i++) {
+            if (db.users[i].id == id) {
+                return db.users[i];
+            }
+        }
+
+        return null;
+    });
+}
+
+function createUser(user) {
+    return ensureMysql().then(function(usingMysql) {
+        if (usingMysql) {
+            return getMysqlPool()
+                .query(
+                    'INSERT INTO users (id, username, email, salt, password_hash) VALUES (?, ?, ?, ?, ?)',
+                    [user.id, user.username, user.email, user.salt, user.passwordHash]
+                )
+                .then(function() {
+                    return user;
+                });
+        }
+
+        var db = readJsonDb();
+        db.users.push(user);
+        writeJsonDb(db);
+        return user;
+    });
+}
+
+function createSession(token, userId) {
+    return ensureMysql().then(function(usingMysql) {
+        if (usingMysql) {
+            return getMysqlPool()
+                .query('INSERT INTO sessions (token, user_id) VALUES (?, ?)', [token, userId])
+                .then(function() {
+                    return token;
+                });
+        }
+
+        memorySessions[token] = userId;
+        return token;
+    });
+}
+
+function findUserByToken(token) {
+    return ensureMysql().then(function(usingMysql) {
+        if (usingMysql) {
+            return getMysqlPool()
+                .query(
+                    'SELECT users.* FROM sessions JOIN users ON sessions.user_id = users.id WHERE sessions.token = ? LIMIT 1',
+                    [token]
+                )
+                .then(function(result) {
+                    return mysqlUser(result[0][0]);
+                });
+        }
+
+        return findUserById(memorySessions[token]);
+    });
+}
+
+function setResetToken(userId, token) {
+    return ensureMysql().then(function(usingMysql) {
+        if (usingMysql) {
+            return getMysqlPool()
+                .query('UPDATE users SET reset_token = ?, reset_requested_at = NOW() WHERE id = ?', [token, userId]);
+        }
+
+        var db = readJsonDb();
+        for (var i = 0; i < db.users.length; i++) {
+            if (db.users[i].id == userId) {
+                db.users[i].resetToken = token;
+                db.users[i].resetRequestedAt = new Date().toISOString();
+                writeJsonDb(db);
+                return;
+            }
+        }
+    });
 }
 
 function handleRegister(req, res) {
@@ -127,31 +333,40 @@ function handleRegister(req, res) {
             return;
         }
 
-        var db = readDb();
-        if (findUserByLogin(db, username)) {
-            sendJson(res, 409, { ok: false, error: 'Username sudah dipakai.' });
-            return;
-        }
+        Promise.all([findUserByLogin(username), findUserByLogin(email)])
+            .then(function(results) {
+                if (results[0]) {
+                    sendJson(res, 409, { ok: false, error: 'Username sudah dipakai.' });
+                    return null;
+                }
 
-        if (findUserByLogin(db, email)) {
-            sendJson(res, 409, { ok: false, error: 'Email sudah dipakai.' });
-            return;
-        }
+                if (results[1]) {
+                    sendJson(res, 409, { ok: false, error: 'Email sudah dipakai.' });
+                    return null;
+                }
 
-        var salt = crypto.randomBytes(16).toString('hex');
-        var user = {
-            id: crypto.randomBytes(12).toString('hex'),
-            username: username,
-            email: email,
-            salt: salt,
-            passwordHash: hashPassword(password, salt),
-            createdAt: new Date().toISOString()
-        };
-
-        db.users.push(user);
-        writeDb(db);
-
-        sendJson(res, 201, { ok: true, user: publicUser(user) });
+                var salt = crypto.randomBytes(16).toString('hex');
+                return createUser({
+                    id: crypto.randomBytes(12).toString('hex'),
+                    username: username,
+                    email: email,
+                    salt: salt,
+                    passwordHash: hashPassword(password, salt),
+                    createdAt: new Date().toISOString()
+                });
+            })
+            .then(function(user) {
+                if (user) {
+                    sendJson(res, 201, { ok: true, user: publicUser(user) });
+                }
+            })
+            .catch(function(error) {
+                if (error && error.code == 'ER_DUP_ENTRY') {
+                    sendJson(res, 409, { ok: false, error: 'Username atau email sudah dipakai.' });
+                    return;
+                }
+                handleError(res, error);
+            });
     });
 }
 
@@ -164,18 +379,22 @@ function handleLogin(req, res) {
 
         var login = normalizeName(body.login || body.username);
         var password = String(body.password || '');
-        var db = readDb();
-        var user = findUserByLogin(db, login);
 
-        if (!user || hashPassword(password, user.salt) != user.passwordHash) {
-            sendJson(res, 401, { ok: false, error: 'Username/email atau password salah.' });
-            return;
-        }
+        findUserByLogin(login)
+            .then(function(user) {
+                if (!user || hashPassword(password, user.salt) != user.passwordHash) {
+                    sendJson(res, 401, { ok: false, error: 'Username/email atau password salah.' });
+                    return null;
+                }
 
-        var token = makeToken();
-        sessions[token] = user.id;
-
-        sendJson(res, 200, { ok: true, token: token, user: publicUser(user) });
+                var token = makeToken();
+                return createSession(token, user.id).then(function() {
+                    sendJson(res, 200, { ok: true, token: token, user: publicUser(user) });
+                });
+            })
+            .catch(function(error) {
+                handleError(res, error);
+            });
     });
 }
 
@@ -187,39 +406,47 @@ function handleForgotPassword(req, res) {
         }
 
         var email = normalizeEmail(body.email);
-        var db = readDb();
-        var user = findUserByLogin(db, email);
 
-        if (user) {
-            user.resetToken = crypto.randomBytes(16).toString('hex');
-            user.resetRequestedAt = new Date().toISOString();
-            writeDb(db);
-            console.log('[Auth] Reset password token for %s: %s', user.email, user.resetToken);
-        }
+        findUserByLogin(email)
+            .then(function(user) {
+                if (!user) {
+                    sendJson(res, 200, { ok: true, message: 'Jika email terdaftar, instruksi reset sudah dibuat.' });
+                    return null;
+                }
 
-        sendJson(res, 200, { ok: true, message: 'Jika email terdaftar, instruksi reset sudah dibuat.' });
+                var token = crypto.randomBytes(16).toString('hex');
+                return setResetToken(user.id, token).then(function() {
+                    console.log('[Auth] Reset password token for %s: %s', user.email, token);
+                    sendJson(res, 200, { ok: true, message: 'Jika email terdaftar, instruksi reset sudah dibuat.' });
+                });
+            })
+            .catch(function(error) {
+                handleError(res, error);
+            });
     });
 }
 
 function handleMe(req, res) {
     var header = req.headers.authorization || '';
     var token = header.replace(/^Bearer\s+/i, '');
-    var userId = sessions[token];
 
-    if (!userId) {
+    if (!token) {
         sendJson(res, 401, { ok: false, error: 'Belum login.' });
         return;
     }
 
-    var db = readDb();
-    for (var i = 0; i < db.users.length; i++) {
-        if (db.users[i].id == userId) {
-            sendJson(res, 200, { ok: true, user: publicUser(db.users[i]) });
-            return;
-        }
-    }
+    findUserByToken(token)
+        .then(function(user) {
+            if (!user) {
+                sendJson(res, 401, { ok: false, error: 'Session tidak valid.' });
+                return;
+            }
 
-    sendJson(res, 401, { ok: false, error: 'Session tidak valid.' });
+            sendJson(res, 200, { ok: true, user: publicUser(user) });
+        })
+        .catch(function(error) {
+            handleError(res, error);
+        });
 }
 
 module.exports = function handleAuth(req, res) {

@@ -21,8 +21,35 @@ Set `GAMEMODE_ID` to choose the single public mode:
 
 If `GAMEMODE_ID` is not set, the server uses `serverGamemode` from `src/gameserver.ini`.
 
+## MySQL accounts
+
+The auth backend uses Railway MySQL automatically when one of these variables exists:
+
+```txt
+MYSQL_URL
+```
+
+or Railway's split variables:
+
+```txt
+MYSQLHOST
+MYSQLUSER
+MYSQLPASSWORD
+MYSQLDATABASE
+MYSQLPORT
+```
+
+When MySQL is configured, the server creates these tables automatically:
+
+```txt
+users
+sessions
+```
+
+If MySQL variables are missing, the backend falls back to local `src/data/users.json`.
+
 ## Notes
 
 - Local development still starts multiple ports: `8080`, `8081`, `8082`, `8083`.
 - Railway public deployments use one port, so the client connects back to the same host with `wss://`.
-- The current account database is `src/data/users.json`. For production, move this to Railway MySQL/PostgreSQL so accounts survive redeploys.
+- For production, use Railway MySQL so accounts survive redeploys.
