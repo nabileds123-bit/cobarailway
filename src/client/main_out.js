@@ -122,7 +122,7 @@
             }
 
             sendFeed();
-            eFeedInterval = setInterval(sendFeed, 85);
+            eFeedInterval = setInterval(sendFeed, 140);
         }
 
         function stopEFeed() {
