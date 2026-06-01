@@ -73,13 +73,13 @@ function ensureMysql() {
         })
         .then(function() {
             var alters = [
-                'ALTER TABLE users ADD COLUMN IF NOT EXISTS account_type VARCHAR(16) NOT NULL DEFAULT \'Free\'',
-                'ALTER TABLE users ADD COLUMN IF NOT EXISTS level INT NOT NULL DEFAULT 1',
-                'ALTER TABLE users ADD COLUMN IF NOT EXISTS points DECIMAL(12,2) NOT NULL DEFAULT 0',
-                'ALTER TABLE users ADD COLUMN IF NOT EXISTS guild VARCHAR(32) NULL',
-                'ALTER TABLE users ADD COLUMN IF NOT EXISTS skin_url VARCHAR(255) NULL',
-                'ALTER TABLE users ADD COLUMN IF NOT EXISTS guild_skin_url VARCHAR(255) NULL',
-                'ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login DATETIME NULL'
+                'ALTER TABLE users ADD COLUMN account_type VARCHAR(16) NOT NULL DEFAULT \'Free\'',
+                'ALTER TABLE users ADD COLUMN level INT NOT NULL DEFAULT 1',
+                'ALTER TABLE users ADD COLUMN points DECIMAL(12,2) NOT NULL DEFAULT 0',
+                'ALTER TABLE users ADD COLUMN guild VARCHAR(32) NULL',
+                'ALTER TABLE users ADD COLUMN skin_url VARCHAR(255) NULL',
+                'ALTER TABLE users ADD COLUMN guild_skin_url VARCHAR(255) NULL',
+                'ALTER TABLE users ADD COLUMN last_login DATETIME NULL'
             ];
 
             return Promise.all(alters.map(function(sql) {
