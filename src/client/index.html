@@ -312,60 +312,70 @@
             margin-left: 8px;
         }
         .xp-panel {
+            --xp-star-size: clamp(44px, 10vw, 52px);
             display: none;
-            display: none;
-            margin: 8px 18px 6px 18px;
+            margin: 8px 4px 6px 4px;
+            padding-right: calc((var(--xp-star-size) / 2) + 2px);
         }
         .xp-panel.is-visible {
             display: block;
         }
-        .xp-track {
+        .xp-container {
             position: relative;
-            flex: 1;
-            height: 24px;
-            margin-right: 0;
-            border: 1px solid #2b6f8b;
-            border-radius: 3px;
-            overflow: hidden;
-            background: #f7f7f7;
-            box-shadow: inset 0 1px 2px rgba(0,0,0,.2);
+            height: 30px;
+            background: #f5f5f5;
+            border-radius: 5px;
+            border: 2px solid #154865;
         }
-        .xp-fill {
-            height: 100%;
-            width: 0%;
-            background: linear-gradient(#7fc4df, #3a95bc);
-            transition: width .25s ease;
-        }
-        .xp-text {
+        #indexXpBar {
             position: absolute;
+            top: 0;
             left: 0;
-            right: 0;
-            top: 4px;
+            bottom: 0;
+            width: 0%;
+            max-width: 100%;
+            border-radius: 3px;
+            background: repeating-linear-gradient(
+                -45deg,
+                rgb(91, 158, 190),
+                rgb(91, 158, 190) 10px,
+                rgb(116, 171, 208) 10px,
+                rgb(116, 171, 208) 20px
+            );
+            transition: width .25s ease;
+            z-index: 0;
+        }
+        #indexXpText {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1;
             color: #fff;
-            font-size: 12px;
-            font-weight: bold;
-            text-align: center;
-            text-shadow: 0 1px 2px rgba(0,0,0,.75);
+            font-size: 13px;
+            font-weight: 900;
+            white-space: nowrap;
+            font-family: Arial, sans-serif;
+            text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, -1px 0 0 #000, 1px 0 0 #000, 0 -1px 0 #000, 0 1px 0 #000;
         }
         .xp-star {
             position: absolute;
-            right: 10px;
             top: 50%;
-            width: 52px;
-            height: 52px;
-            margin: 0;
+            right: calc(var(--xp-star-size) / -2);
+            width: var(--xp-star-size);
+            height: var(--xp-star-size);
             display: flex;
             align-items: center;
             justify-content: center;
             transform: translateY(-50%);
-            background: linear-gradient(#ffe86b, #ffc700);
+            background: url('../img/star.png') center/contain no-repeat;
             color: #333;
             font-size: 15px;
-            font-weight: bold;
-            text-shadow: 0 1px 0 rgba(255,255,255,.8);
-            clip-path: polygon(50% 2%, 61% 34%, 95% 34%, 68% 55%, 78% 90%, 50% 70%, 22% 90%, 32% 55%, 5% 34%, 39% 34%);
+            font-weight: 900;
+            font-family: Arial, sans-serif;
+            text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff;
             filter: drop-shadow(0 1px 1px rgba(0,0,0,.45));
-            z-index: 2;
+            z-index: 3;
         }
         .profile-skin {
             width: 42px;
@@ -662,18 +672,10 @@
         </div>
         <br clear="both"/><br clear="both"/><br clear="both"/><br clear="both"/><br clear="both"/>
         <div id="helloXpPanel" class="xp-panel">
-            <div style="
-                                    background:#f5f5f5;
-                                    height:30px;
-                                    overflow:hidden;
-                                    position:relative;
-                                    border-radius:5px;
-                                    border:2px solid #154865;
-                                ">
-                <div id="indexXpBar" style="background: repeating-linear-gradient(-45deg, rgb(91, 158, 190), rgb(91, 158, 190) 10px, rgb(116, 171, 208) 10px, rgb(116, 171, 208) 20px); height: 100%; width: 0%; position: absolute; top: 0px; left: 0px; right: 0px;"></div>
-                <span id="indexXpText" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:13px; font-weight:900; color:#ffffff; white-space:nowrap; z-index:1;
-                            font-family: Arial, sans-serif;
-                            text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, -1px 0 0 #000, 1px 0 0 #000, 0 -1px 0 #000, 0 1px 0 #000;">0 / 450 XP</span>
+            <div class="xp-container">
+                <div id="indexXpBar"></div>
+                <span id="indexXpText">0 / 450 XP</span>
+                <div id="indexXpLevel" class="xp-star">1</div>
             </div>
         </div>
         <hr/>
@@ -1026,6 +1028,7 @@
             $('#helloXpPanel').removeClass('is-visible');
             $('#indexXpBar').css('width', '0%');
             $('#indexXpText').text('0 / 450 XP');
+            $('#indexXpLevel').text('1');
         }
 
         function refreshLoggedInUser() {
@@ -1211,6 +1214,7 @@
             $('#helloXpPanel').addClass('is-visible');
             $('#indexXpBar').css('width', percent + '%');
             $('#indexXpText').text(xp + ' / ' + nextLevelXp + ' XP');
+            $('#indexXpLevel').text(level);
         }
 
         function finishLogin(result, statusEl) {
