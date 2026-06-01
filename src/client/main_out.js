@@ -29,6 +29,19 @@
         leftTouchStartPos = new Vector2(0,0),
         leftVector = new Vector2(0,0);
 
+    var nonPassiveEventOptions = false;
+    try {
+        var passiveTestOptions = Object.defineProperty({}, "passive", {
+            get: function () {
+                nonPassiveEventOptions = { passive: false };
+            }
+        });
+        wHandle.addEventListener("testPassive", null, passiveTestOptions);
+        wHandle.removeEventListener("testPassive", null, passiveTestOptions);
+    } catch (e) {
+        nonPassiveEventOptions = false;
+    }
+
 
 
     function gameLoop() {
@@ -65,17 +78,18 @@
 
 
         if(touchable) {
-            mainCanvas.addEventListener( 'touchstart', onTouchStart, false );
-            mainCanvas.addEventListener( 'touchmove', onTouchMove, false );
-            mainCanvas.addEventListener( 'touchend', onTouchEnd, false );
+            mainCanvas.addEventListener( 'touchstart', onTouchStart, nonPassiveEventOptions );
+            mainCanvas.addEventListener( 'touchmove', onTouchMove, nonPassiveEventOptions );
+            mainCanvas.addEventListener( 'touchend', onTouchEnd, nonPassiveEventOptions );
              }
 
         mainCanvas.onmouseup = function () {
         };
         if (/firefox/i.test(navigator.userAgent)) {
-            document.addEventListener("DOMMouseScroll", handleWheel, false);
+            document.addEventListener("DOMMouseScroll", handleWheel, nonPassiveEventOptions);
         } else {
-            document.body.onmousewheel = handleWheel;
+            document.addEventListener("wheel", handleWheel, nonPassiveEventOptions);
+            document.addEventListener("mousewheel", handleWheel, nonPassiveEventOptions);
         }
 
         mainCanvas.onfocus = function () {
@@ -249,6 +263,10 @@
 
 
     function handleWheel(event) {
+    if (event && typeof event.preventDefault === 'function') {
+        event.preventDefault();
+    }
+
     // Normalisasi ke dy (px): dy>0 = scroll down
     var dy = 0;
     if (typeof event.deltaY === 'number') {
