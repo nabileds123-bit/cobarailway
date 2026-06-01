@@ -339,6 +339,15 @@
             margin-top: 8px;
             font-size: 12px;
         }
+        .footer-current {
+            color: #999;
+            cursor: default;
+            text-decoration: none;
+        }
+        .footer-current:hover {
+            color: #999;
+            text-decoration: none;
+        }
         #forgotPasswordLink {
             display: inline-block;
             margin: -2px 0 10px 0;
@@ -432,7 +441,7 @@
             <div>
                 <a href="index.html" class="text-primary">Home</a> |
                 <a href="#login" id="loginLink" class="text-primary">Login</a> |
-                <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">Changelog</a> |
+                <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">Community</a> |
                 <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">About</a>
             </div>
         </center>
@@ -450,7 +459,7 @@
         <div class="dialog-footer">
             <a href="#home" id="loginHomeLink" class="text-primary">Home</a> |
             <a href="#login" class="text-primary">Login</a> |
-            <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">Changelog</a> |
+            <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">Community</a> |
             <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">About</a>
         </div>
     </div>
@@ -465,7 +474,7 @@
         <div class="dialog-footer">
             <a href="#home" id="registerHomeLink" class="text-primary">Home</a> |
             <a href="#login" id="registerLoginLink" class="text-primary">Login</a> |
-            <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">Changelog</a> |
+            <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">Community</a> |
             <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">About</a>
         </div>
     </div>
@@ -477,7 +486,7 @@
         <div class="dialog-footer">
             <a href="#home" id="forgotHomeLink" class="text-primary">Home</a> |
             <a href="#login" id="forgotLoginLink" class="text-primary">Login</a> |
-            <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">Changelog</a> |
+            <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">Community</a> |
             <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">About</a>
         </div>
     </div>
@@ -513,7 +522,7 @@
         </div>
         <div class="profile-row">
             <span class="profile-label">Guild:</span>
-            <span id="profileGuild" class="profile-value">-</span>
+            <span id="profileGuild" class="profile-value">n/A - <a href="#guilds" id="joinGuildLink" class="text-primary">Join Guild</a></span>
         </div>
         <div class="profile-row">
             <span class="profile-label">Last Login:</span>
@@ -528,8 +537,8 @@
         <p id="uploadSkinStatus" class="text-muted"></p>
         <div class="dialog-footer">
             <a href="#home" id="accountHomeLink" class="text-primary">Home</a> |
-            <a href="#account" class="text-primary">Account</a> |
-            <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">Changelog</a> |
+            <a href="#account" class="footer-current">Account</a> |
+            <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">Community</a> |
             <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">About</a>
         </div>
     </div>
@@ -579,7 +588,11 @@
             }
             $('#profileLevel').text(user.level || 1);
             $('#profilePoints').text(Number(user.points || 0).toFixed(2));
-            $('#profileGuild').text(user.guild || '-');
+            if (user.guild) {
+                $('#profileGuild').text(user.guild);
+            } else {
+                $('#profileGuild').html('n/A - <a href="#guilds" id="joinGuildLink" class="text-primary">Join Guild</a>');
+            }
             $('#profileLastLogin').text(formatProfileDate(user.lastLogin));
 
             var hasSkin = !!user.skinUrl;
@@ -702,6 +715,10 @@
         $('#accountDialog').on('click', '#buyPremiumLink', function(e) {
             e.preventDefault();
             $('#uploadSkinStatus').removeClass('text-success').addClass('text-danger').text('Buy Premium belum tersedia.').show();
+        });
+        $('#accountDialog').on('click', '#joinGuildLink', function(e) {
+            e.preventDefault();
+            $('#uploadSkinStatus').removeClass('text-success').addClass('text-danger').text('List guild belum tersedia.').show();
         });
         $('#logoutLink').on('click', function(e) {
             e.preventDefault();
