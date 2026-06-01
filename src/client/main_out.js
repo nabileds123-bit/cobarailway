@@ -1235,36 +1235,52 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
     };
     wHandle.connect = wsConnect;
 
-    //This part is for loading custon skins
+    //This part is for loading custom skins from older PHP installs.
     var data = {"action": "test"};
-    var response = null;
-    wjQuery.ajax({
-        type: "POST",
-        dataType: "json",
-        url: "checkdir.php", //Relative or absolute path to response.php file
-        data: data,
-        success: function (data) {
-            //alert(data["names"]);
-            response = JSON.parse(data["names"]);
+    var response = [];
+    var skinDirectoryAvailable = true;
+    function updateSkinDirectory() {
+        if (!skinDirectoryAvailable) {
+            return;
         }
-    });
 
+        wjQuery.ajax({
+            type: "POST",
+            dataType: "json",
+            url: "checkdir.php",
+            data: data,
+            success: function (data) {
+                if (!data || !data["names"]) {
+                    response = [];
+                    return;
+                }
+
+                try {
+                    var parsedNames = typeof data["names"] === "string" ? JSON.parse(data["names"]) : data["names"];
+                    response = Array.isArray(parsedNames) ? parsedNames : [];
+                } catch (err) {
+                    response = [];
+                }
+            },
+            error: function () {
+                skinDirectoryAvailable = false;
+                response = [];
+            }
+        });
+    }
+
+    updateSkinDirectory();
 
     var interval1Id = setInterval(function () {
         //console.log("logging every 5 seconds");
         //console.log(Aa);
 
-        wjQuery.ajax({
-            type: "POST",
-            dataType: "json",
-            url: "checkdir.php", //Relative or absolute path to response.php file
-            data: data,
-            success: function (data) {
-                //alert(data["names"]);
-                response = JSON.parse(data["names"]);
-            }
-        });
+        updateSkinDirectory();
         //console.log(response);
+        if (!response || !response.length) {
+            return;
+        }
+
         for (var i = 0; i < response.length; i++) {
             //console.log(response[insert]);
             if (-1 == knownNameDict.indexOf(response[i])) {

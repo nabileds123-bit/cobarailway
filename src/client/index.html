@@ -1050,8 +1050,8 @@ $(function() {
 </script>
 <script>
 function setShowEnemyMass(val) {
-    if (typeof wHandle.setShowEnemyMass === 'function') {
-        wHandle.setShowEnemyMass(val);
+    if (window.wHandle && typeof window.wHandle.setShowEnemyMass === 'function') {
+        window.wHandle.setShowEnemyMass(val);
     } else {
         window.showEnemyMass = val;
     }
