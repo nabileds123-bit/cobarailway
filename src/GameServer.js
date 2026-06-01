@@ -114,7 +114,36 @@ GameServer.prototype.start = function() {
     
     var serve = serveStatic(__dirname);
     
+    var self = this;
     var hserver = http.createServer(function(req, res){
+      if (req.url == '/info.php' || req.url == '/api/regions') {
+        var region = 'SG-Singapore';
+        var count = self.clients.filter(function(client) {
+          return client && client.playerTracker && client.playerTracker.isOnline;
+        }).length;
+        var payload = {
+          regions: {},
+          totals: {
+            numPlayers: count,
+            numRealms: 1,
+            numServers: 1
+          }
+        };
+
+        payload.regions[region] = {
+          numPlayers: count,
+          numRealms: 1,
+          numServers: 1
+        };
+
+        res.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        });
+        res.end(JSON.stringify(payload));
+        return;
+      }
+
       if (handleAuth(req, res)) {
         return;
       }

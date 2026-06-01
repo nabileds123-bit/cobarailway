@@ -85,22 +85,86 @@
         #adsBottom { position:absolute; left:0; right:0; bottom:0; }
         #adsBottomInner { margin:0px auto; width:728px; height:50px; border:5px solid white; border-radius:5px px px px; background-color:#FFFFFF; box-sizing:content-box; }
         .region-message { display:none; margin-bottom:12px; margin-left:6px; margin-right:6px; text-align:center; }
-        #nick,#locationKnown #region { width:65%; float:left; }
+        #nick { width:65%; float:left; }
         #nick[readonly] {
             background-color: #f5f5f5;
             cursor: default;
         }
         #locationUnknown #region { margin-bottom:15px; }
-        #gamemode,#spectateBtn { width:33%; float:right; }
+        #gamemode { width:33%; float:right; }
+        #mainform {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 4px 0 6px 0;
+        }
+        #locationKnown {
+            flex: 1;
+        }
+        #locationKnown #region {
+            width: 100%;
+            height: 34px;
+            float: none;
+            margin: 0;
+        }
+        #spectateBtn {
+            width: 105px;
+            height: 34px;
+            float: none;
+            flex: 0 0 105px;
+        }
+        .settings-checkbox-grid {
+            display: grid;
+            grid-template-columns: 1fr 1.15fr 1.25fr;
+            column-gap: 12px;
+            row-gap: 6px;
+            margin: 6px 0 2px 0;
+            font-size: 12px;
+        }
+        .settings-checkbox-grid label {
+            margin: 0;
+            font-weight: normal;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            min-width: 0;
+        }
+        .settings-checkbox-grid input {
+            flex: 0 0 auto;
+            margin: 0 6px 0 0;
+        }
+        #mode-buttons {
+            display: flex;
+            gap: 4px;
+            margin: 4px 0 6px 0;
+            justify-content: center;
+        }
+        .mode-btn {
+            min-width: 58px;
+            height: 36px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            background: #fff;
+            color: #777;
+            font-size: 12px;
+            font-weight: 700;
+            padding: 0 14px;
+            cursor: pointer;
+            line-height: 32px;
+        }
+        .mode-btn:hover {
+            background: #f7f7f7;
+            border-color: #ccc;
+        }
         :root {
-            --dialog-width: 370px;
+            --dialog-width: 380px;
         }
         #helloDialog {
     width: var(--dialog-width);
     background-color: #FFFFFF;
     margin: 10px auto;
     border-radius: 15px;
-    padding: 10px 25px 10px 25px;
+    padding: 8px 25px 10px 25px;
     position: absolute;
     top: 50%;
     left: 50%;
@@ -109,6 +173,36 @@
     min-height: 400px; /* tinggi minimum, bisa diubah sesuai kebutuhan */
     /* height: auto;  default, biarkan otomatis */
 }
+        #helloDialog {
+            display: flex;
+            flex-direction: column;
+        }
+        #helloDialog form {
+            flex: 0 0 auto;
+        }
+        #helloDialog .hello-footer {
+            margin-top: auto;
+        }
+        #helloDialog .top-brand-row {
+            margin-bottom: 6px;
+        }
+        #helloDialog .main-input-row {
+            margin: 0 0 4px 0;
+        }
+        #helloDialog h2 {
+            margin: 0;
+            font-size: 26px;
+        }
+        #helloDialog .form-group {
+            margin-bottom: 6px;
+        }
+        #helloDialog #settings {
+            margin-top: 2px;
+            margin-bottom: 4px;
+        }
+        #helloDialog #instructions {
+            margin-top: 0;
+        }
         #chat_textbox {
         transition:all .5s ease-in-out;
         position:absolute;
@@ -603,6 +697,41 @@
             font-size: 12px;
             margin: 2px 0 10px 0;
         }
+        .invite-panel {
+            margin: 12px 0 8px 0;
+            padding: 12px;
+            border-radius: 10px;
+            background: #f7f9fb;
+            border: 1px solid #dce8f0;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.75);
+        }
+        .invite-title {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 4px;
+            color: #154865;
+            font-size: 14px;
+            font-weight: 900;
+        }
+        .invite-description {
+            margin: 0 0 8px 0;
+            color: #666;
+            font-size: 12px;
+            line-height: 1.35;
+        }
+        .invite-link {
+            min-height: 28px;
+            margin-bottom: 8px;
+            padding: 6px 8px;
+            border-radius: 7px;
+            background: #fff;
+            border: 1px solid #d9e3ea;
+            color: #23527c;
+            font-size: 12px;
+            font-weight: bold;
+            word-break: break-all;
+        }
     </style>
 </head>
 <body>
@@ -610,22 +739,13 @@
 <div id="overlays" style="display:none; position:absolute; left:0; right:0; top:0; bottom:0; background-color:rgba(0,0,0,0.7); z-index:300; background-image:linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url('../img/bg.png'); background-size:cover; background-position:center;">
         <div id="helloDialog">
         <form role="form">
-            <div class="form-group" style="display:flex; align-items:center; justify-content:space-between;">
-                <div><h2 style="margin: px;;">Bubble.am</h2></div>
-
-                <!-- ✅ Tombol Discord -->
-                <a href="https://discord.gg/SjKG6JHNg3" target="_blank"
-                   style="background-color:#5865F2; color:white; border-radius:6px; padding:5px 14px; font-weight:bold; font-size:14px; text-decoration:none;">
-                   Discord
-                </a>
-                <!-- ✅ Selesai -->
-
+            <div class="form-group top-brand-row" style="display:flex; align-items:center; justify-content:space-between;">
+                <div><h2>Bubble.am</h2></div>
                 <div class="fb-like" style="margin-top:5px;"
                      data-href="https://www.facebook.com/playagar.io" data-layout="button" data-action="like"
                      data-show-faces="true" data-share="true"></div>
             </div>
-        <br clear="both"/>
-            <div class="form-group">
+            <div class="form-group main-input-row">
                 <input id="nick" class="form-control" placeholder="Nick" maxlength="15"/>
                 <select id="gamemode" class="form-control" onchange="setGameMode($(this).val());" required>
                     <option selected value="">FFA</option>
@@ -635,7 +755,24 @@
                 </select>
                 <br clear="both"/>
             </div>
-            <div id="locationUnknown"><script>connect();</script></div>
+            <div id="mode-buttons">
+                <button class="mode-btn" type="button" data-mode="hc" data-server="bubbleam.site/hc" data-alt-server="bubbleam.site/hc">Hardcore</button>
+                <button class="mode-btn" type="button" data-mode="ms" data-server="bubbleam.site/hc2">x5</button>
+            </div>
+            <div id="locationUnknown">
+                <script>connect();</script>
+                <select id="region" class="form-control" onchange="setRegion($('#region').val());" required>
+                   <!--option value="US-Fremont">US West</option>   
+                    <option value="US-Atlanta">US East</option>
+                    <option value="BR-Brazil">South America</option>
+                    <option value="EU-London">Europe</option>
+                    <option value="RU-Russia">Russia</option>
+                    <option value="TK-Turkey">Turkey</option>
+                    <option value="JP-Tokyo">East Asia</option>
+                    <option value="CN-China">China</option>-->
+                    <option selected value="SG-Singapore">Oceania</option>
+                </select>
+            </div>
             <div><div class="text-muted region-message CN-China"></div></div>
             <div class="form-group">
                 <button type="submit" id="playBtn"
@@ -650,15 +787,20 @@
                     <div id="locationKnown"></div>
                     <button id="spectateBtn" onclick="spectate(); return false;" false
                             class="btn btn-warning btn-spectate btn-needs-server">Spectate</button>
-                    <br clear="both"/>
                 </div>
-                <div style="margin: 6px;">
+                <div class="settings-checkbox-grid">
                     <label><input type="checkbox" onchange="setSkins(!$(this).is(':checked'))"> No skins</label>
-                    <label><input type="checkbox" onchange="setNames(!$(this).is(':checked'))"> No names</label>
-                    <label><input type="checkbox" onchange="setDarkTheme($(this).is(':checked'))"> Dark Theme</label>
+                    <label><input type="checkbox" id="noLeaderboardCheckbox"> No Leaderboard</label>
+                    <label><input type="checkbox" onchange="setDarkTheme($(this).is(':checked'))"> Dark</label>
                     <label><input type="checkbox" onchange="setColors($(this).is(':checked'))"> No colors</label>
                     <label><input type="checkbox" onchange="setShowMass($(this).is(':checked'))"> Show mass</label>
-                    <label><input type="checkbox" id="showEnemyMassCheckbox" onchange="setShowEnemyMass($(this).is(':checked'))"> Show enemy mass</label>
+                    <label><input type="checkbox" id="showEnemyMassCheckbox" onchange="setShowEnemyMass($(this).is(':checked'))"> Show Other Mass</label>
+                    <label><input type="checkbox" id="smoothRenderCheckbox"> Smooth Render</label>
+                    <label><input type="checkbox" id="noChatCheckbox"> No Chat</label>
+                </div>
+                <div id="inviteFriendsPanel" class="invite-panel">
+                    <p class="invite-description">Share this link so your friends can join the same server.</p>
+                    <div id="inviteLinkText" class="invite-link">Join a server first to generate an invite link.</div>
                 </div>
             </div>
         </form>
@@ -670,7 +812,7 @@
                 Press <b>W</b> to eject some mass<br/>
             </span></center>
         </div>
-        <br clear="both"/><br clear="both"/><br clear="both"/><br clear="both"/><br clear="both"/>
+        <br clear="both"/>
         <div id="helloXpPanel" class="xp-panel">
             <div class="xp-container">
                 <div id="indexXpBar"></div>
@@ -678,6 +820,7 @@
                 <div id="indexXpLevel" class="xp-star">1</div>
             </div>
         </div>
+        <div class="hello-footer">
         <hr/>
         <center>
             <div>
@@ -687,6 +830,7 @@
                 <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">About</a>
             </div>
         </center>
+        </div>
     </div>
     <div id="loginDialog">
         <div class="form-group">
@@ -1175,6 +1319,7 @@
         function openAccountDialog() {
             closeSpaDialogs();
             $('#helloDialog').hide();
+            $('#overlays').addClass('only-dialog').show();
             $('#accountDialog').addClass('account-open');
         }
 
@@ -1650,7 +1795,10 @@ $(function() {
         { sel: 'input[onchange*="setDarkTheme"]', key: 'darkTheme' },
         { sel: 'input[onchange*="setColors"]', key: 'noColors' },
         { sel: 'input[onchange*="setShowMass"]', key: 'showMass' },
-        { sel: '#showEnemyMassCheckbox', key: 'showEnemyMass' }
+        { sel: '#showEnemyMassCheckbox', key: 'showEnemyMass' },
+        { sel: '#noLeaderboardCheckbox', key: 'noLeaderboard' },
+        { sel: '#smoothRenderCheckbox', key: 'smoothRender' },
+        { sel: '#noChatCheckbox', key: 'noChat' }
     ];
     // Set from localStorage on load
     checkboxes.forEach(function(cb) {
