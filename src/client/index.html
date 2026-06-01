@@ -304,7 +304,7 @@
         .xp-panel {
             display: none;
             align-items: center;
-            margin: 8px 0 12px 0;
+            margin: 8px 10px 6px 10px;
         }
         .xp-panel.is-visible {
             display: flex;
@@ -337,20 +337,22 @@
             text-shadow: 0 1px 2px rgba(0,0,0,.75);
         }
         .xp-star {
-            width: 48px;
-            height: 48px;
-            margin-left: -2px;
-            margin-top: -7px;
+            position: relative;
+            width: 46px;
+            height: 46px;
+            margin-left: -8px;
+            margin-top: -9px;
             display: flex;
             align-items: center;
             justify-content: center;
-            background: #ffd928;
+            background: linear-gradient(#ffe86b, #ffc700);
             color: #333;
-            font-size: 16px;
+            font-size: 14px;
             font-weight: bold;
             text-shadow: 0 1px 0 rgba(255,255,255,.8);
             clip-path: polygon(50% 0%, 61% 33%, 98% 35%, 68% 56%, 79% 91%, 50% 70%, 21% 91%, 32% 56%, 2% 35%, 39% 33%);
-            filter: drop-shadow(0 1px 1px rgba(0,0,0,.35));
+            filter: drop-shadow(0 1px 1px rgba(0,0,0,.45));
+            z-index: 2;
         }
         .profile-skin {
             width: 42px;
@@ -441,13 +443,6 @@
                      data-show-faces="true" data-share="true"></div>
             </div>
         <br clear="both"/>
-            <div id="helloXpPanel" class="xp-panel">
-                <div class="xp-track">
-                    <div id="profileXpFill" class="xp-fill"></div>
-                    <div id="profileXpText" class="xp-text">0/450 XP</div>
-                </div>
-                <div id="profileXpLevel" class="xp-star">1</div>
-            </div>
             <div class="form-group">
                 <input id="nick" class="form-control" placeholder="Nick" maxlength="15"/>
                 <select id="gamemode" class="form-control" onchange="setGameMode($(this).val());" required>
@@ -494,6 +489,13 @@
             </span></center>
         </div>
         <br clear="both"/><br clear="both"/><br clear="both"/><br clear="both"/><br clear="both"/>
+        <div id="helloXpPanel" class="xp-panel">
+            <div class="xp-track">
+                <div id="profileXpFill" class="xp-fill"></div>
+                <div id="profileXpText" class="xp-text">0/450 XP</div>
+            </div>
+            <div id="profileXpLevel" class="xp-star">1</div>
+        </div>
         <hr/>
         <center>
             <div>
