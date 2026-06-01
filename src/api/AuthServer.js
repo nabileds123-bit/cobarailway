@@ -9,6 +9,7 @@ var mysqlReady = null;
 var BUY_PREMIUM_COST = 2;
 var UPLOAD_SKIN_COST = 150;
 var CREATE_GUILD_COST = 50;
+var MAX_SKIN_UPLOAD_SIZE = 1024 * 1024 * 2;
 var allowedCellColors = [
     '#6FCA36',
     '#4379EF',
@@ -253,6 +254,116 @@ function readBody(req, callback) {
         } catch (e) {
             callback(e);
         }
+    });
+}
+
+function readRawBody(req, maxSize, callback) {
+    var chunks = [];
+    var size = 0;
+
+    req.on('data', function(chunk) {
+        size += chunk.length;
+        if (size > maxSize) {
+            req.connection.destroy();
+            callback(new Error('File terlalu besar. Maksimal 2MB.'));
+            return;
+        }
+
+        chunks.push(chunk);
+    });
+
+    req.on('end', function() {
+        callback(null, Buffer.concat(chunks));
+    });
+}
+
+function parseMultipartFile(req, body) {
+    var contentType = req.headers['content-type'] || '';
+    var boundaryMatch = contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/i);
+    if (!boundaryMatch) {
+        return null;
+    }
+
+    var boundary = Buffer.from('--' + (boundaryMatch[1] || boundaryMatch[2]));
+    var start = body.indexOf(boundary);
+    while (start !== -1) {
+        var next = body.indexOf(boundary, start + boundary.length);
+        if (next === -1) {
+            break;
+        }
+
+        var part = body.slice(start + boundary.length + 2, next - 2);
+        var headerEnd = part.indexOf(Buffer.from('\r\n\r\n'));
+        if (headerEnd !== -1) {
+            var headers = part.slice(0, headerEnd).toString('utf8');
+            var content = part.slice(headerEnd + 4);
+            if (/name="skin"/i.test(headers) && /filename="/i.test(headers)) {
+                var filenameMatch = headers.match(/filename="([^"]*)"/i);
+                var typeMatch = headers.match(/Content-Type:\s*([^\r\n]+)/i);
+                return {
+                    filename: filenameMatch ? filenameMatch[1] : 'skin.png',
+                    contentType: typeMatch ? typeMatch[1].trim().toLowerCase() : 'application/octet-stream',
+                    buffer: content
+                };
+            }
+        }
+
+        start = next;
+    }
+
+    return null;
+}
+
+function getSkinExtension(contentType) {
+    if (contentType == 'image/png') {
+        return 'png';
+    }
+
+    if (contentType == 'image/jpeg' || contentType == 'image/jpg') {
+        return 'jpg';
+    }
+
+    if (contentType == 'image/webp') {
+        return 'webp';
+    }
+
+    return null;
+}
+
+function uploadPlayerSkin(user, file) {
+    var supabaseUrl = String(process.env.SUPABASE_URL || '').replace(/\/+$/, '');
+    var serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+    var bucket = process.env.SUPABASE_BUCKET || 'skins';
+    var extension = getSkinExtension(file.contentType);
+
+    if (!supabaseUrl || !serviceKey) {
+        return Promise.reject(new Error('Supabase storage belum dikonfigurasi.'));
+    }
+
+    if (!extension) {
+        return Promise.reject(new Error('Format skin harus PNG, JPG, atau WEBP.'));
+    }
+
+    var objectPath = 'players/' + user.id + '-' + Date.now() + '.' + extension;
+    var uploadUrl = supabaseUrl + '/storage/v1/object/' + encodeURIComponent(bucket) + '/' + objectPath;
+
+    return fetch(uploadUrl, {
+        method: 'POST',
+        headers: {
+            apikey: serviceKey,
+            Authorization: 'Bearer ' + serviceKey,
+            'Content-Type': file.contentType,
+            'x-upsert': 'true'
+        },
+        body: file.buffer
+    }).then(function(response) {
+        if (!response.ok) {
+            return response.text().then(function(text) {
+                throw new Error(text || 'Upload Supabase gagal.');
+            });
+        }
+
+        return supabaseUrl + '/storage/v1/object/public/' + bucket + '/' + objectPath;
     });
 }
 
@@ -748,6 +859,47 @@ function handleBuyPremium(req, res) {
 }
 
 function handleUploadSkin(req, res) {
+    var contentType = req.headers['content-type'] || '';
+
+    if (contentType.indexOf('multipart/form-data') === 0) {
+        readRawBody(req, MAX_SKIN_UPLOAD_SIZE, function(err, body) {
+            if (err) {
+                sendJson(res, 400, { ok: false, error: err.message || 'Upload gagal.' });
+                return;
+            }
+
+            var file = parseMultipartFile(req, body);
+            if (!file || !file.buffer || !file.buffer.length) {
+                sendJson(res, 400, { ok: false, error: 'File skin wajib dipilih.' });
+                return;
+            }
+
+            requireUser(req, res)
+                .then(function(user) {
+                    if (!user) {
+                        return;
+                    }
+
+                    if (Number(user.points || 0) < UPLOAD_SKIN_COST) {
+                        sendJson(res, 400, { ok: false, error: 'Point tidak cukup. Upload skin membutuhkan 150 point.' });
+                        return;
+                    }
+
+                    return uploadPlayerSkin(user, file).then(function(skinUrl) {
+                        spendPoints(user, UPLOAD_SKIN_COST);
+                        user.skinUrl = skinUrl;
+                        return saveAccountFields(user).then(function(savedUser) {
+                            sendJson(res, 200, { ok: true, message: 'Skin berhasil diupload.', user: publicUser(savedUser) });
+                        });
+                    });
+                })
+                .catch(function(error) {
+                    handleError(res, error);
+                });
+        });
+        return;
+    }
+
     readBody(req, function(err, body) {
         if (err) {
             sendJson(res, 400, { ok: false, error: 'JSON tidak valid.' });

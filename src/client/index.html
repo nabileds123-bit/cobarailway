@@ -141,10 +141,10 @@
 #overlays.only-dialog {
     background: none !important;
 }
-#overlays.only-dialog > #helloDialog {
+        #overlays.only-dialog > #helloDialog {
     display: block;
 }
-        #overlays.only-dialog > *:not(#helloDialog):not(#loginDialog):not(#registerDialog):not(#forgotDialog):not(#accountDialog) {
+        #overlays.only-dialog > *:not(#helloDialog):not(#loginDialog):not(#registerDialog):not(#forgotDialog):not(#accountDialog):not(#uploadSkinDialog) {
     display: none !important;
 }
         #loginDialog,
@@ -171,13 +171,15 @@
             display: flex;
             flex-direction: column;
         }
-        #accountDialog {
+        #accountDialog,
+        #uploadSkinDialog {
             min-height: 520px;
         }
         #loginDialog h3,
         #registerDialog h3,
         #forgotDialog h3,
-        #accountDialog h3 {
+        #accountDialog h3,
+        #uploadSkinDialog h3 {
             margin: 0 0 14px 0;
             font-weight: bold;
             font-size: 12px;
@@ -185,14 +187,16 @@
         #loginDialog .dialog-brand,
         #registerDialog .dialog-brand,
         #forgotDialog .dialog-brand,
-        #accountDialog .dialog-brand {
+        #accountDialog .dialog-brand,
+        #uploadSkinDialog .dialog-brand {
             color: #337ab7;
             text-decoration: none;
         }
         #loginDialog .dialog-brand:hover,
         #registerDialog .dialog-brand:hover,
         #forgotDialog .dialog-brand:hover,
-        #accountDialog .dialog-brand:hover {
+        #accountDialog .dialog-brand:hover,
+        #uploadSkinDialog .dialog-brand:hover {
             color: #23527c;
             text-decoration: underline;
         }
@@ -233,7 +237,8 @@
         #loginDialog .dialog-footer,
         #registerDialog .dialog-footer,
         #forgotDialog .dialog-footer,
-        #accountDialog .dialog-footer {
+        #accountDialog .dialog-footer,
+        #uploadSkinDialog .dialog-footer {
             margin-top: auto;
             padding-top: 12px;
             border-top: 1px solid #eee;
@@ -430,6 +435,66 @@
             margin: 8px 0 0 0;
             font-size: 12px;
         }
+        #uploadSkinDialog {
+            display: none;
+            width: 350px;
+            background-color: #FFFFFF;
+            margin: 10px auto;
+            border-radius: 15px;
+            padding: 10px 25px 10px 25px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            margin-right: -50%;
+            transform: translate(-50%, -50%);
+        }
+        #uploadSkinDialog.upload-open {
+            display: flex;
+            flex-direction: column;
+        }
+        .upload-label {
+            font-size: 13px;
+            font-weight: bold;
+            margin: 10px 0 4px 0;
+        }
+        #uploadSkinFile {
+            display: block;
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+        #uploadSkinSubmit {
+            margin-bottom: 12px;
+        }
+        #uploadPreviewWrap {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-top: 1px solid #eee;
+            padding: 16px 0;
+        }
+        #uploadSkinPreview {
+            width: 220px;
+            height: 220px;
+            border-radius: 50%;
+            border: 2px solid #222;
+            background: #0a7f31;
+            object-fit: cover;
+        }
+        #uploadSkinDialog .upload-preview-empty {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 26px;
+            font-weight: bold;
+            text-transform: lowercase;
+        }
+        #uploadSkinDialog .upload-status {
+            display: none;
+            font-size: 12px;
+            margin: 2px 0 10px 0;
+        }
     </style>
 </head>
 <body>
@@ -615,6 +680,21 @@
             <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">About</a>
         </div>
     </div>
+    <div id="uploadSkinDialog">
+        <h3><a href="#account" id="uploadAccountLink" class="dialog-brand">Bubble.am</a> &raquo; Upload skin</h3>
+        <div class="upload-label">Upload skin</div>
+        <input id="uploadSkinFile" type="file" accept="image/png,image/jpeg,image/webp"/>
+        <button id="uploadSkinSubmit" class="btn btn-primary btn-block">Upload</button>
+        <p id="uploadSkinDialogStatus" class="upload-status text-muted"></p>
+        <div id="uploadPreviewWrap">
+            <div id="uploadSkinPreview" class="upload-preview-empty">skin</div>
+        </div>
+        <div class="dialog-footer">
+            <a href="#home" id="uploadHomeLink" class="text-primary">Home</a> |
+            <a href="#account" id="uploadAccountFooterLink" class="text-primary">Account</a> |
+            <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">Community</a>
+        </div>
+    </div>
 </div>
 <div id="connecting" style="display:none;position:absolute; left:0; right:0; top:0; bottom:0; z-index:100; background-color:rgba(0,0,0,0.5);">
     <div style="width:350px; background-color:#FFFFFF; margin:100px auto; border-radius:15px; padding:5px 15px 5px 15px;">
@@ -663,6 +743,20 @@
                     Authorization: 'Bearer ' + localStorage.getItem('authToken')
                 },
                 data: JSON.stringify(data)
+            });
+        }
+
+        function authUpload(path, formData) {
+            return $.ajax({
+                url: path,
+                method: 'POST',
+                dataType: 'json',
+                headers: {
+                    Authorization: 'Bearer ' + localStorage.getItem('authToken')
+                },
+                data: formData,
+                processData: false,
+                contentType: false
             });
         }
 
@@ -788,6 +882,28 @@
             $('#registerDialog').removeClass('register-open');
             $('#forgotDialog').removeClass('forgot-open');
             $('#accountDialog').removeClass('account-open');
+            $('#uploadSkinDialog').removeClass('upload-open');
+        }
+
+        function resetUploadSkinDialog() {
+            $('#uploadSkinFile').val('');
+            $('#uploadSkinDialogStatus').hide().removeClass('text-danger text-success').addClass('text-muted').text('');
+            $('#uploadSkinPreview')
+                .removeAttr('src')
+                .replaceWith('<div id="uploadSkinPreview" class="upload-preview-empty">skin</div>');
+        }
+
+        function openAccountDialog() {
+            closeSpaDialogs();
+            $('#helloDialog').hide();
+            $('#accountDialog').addClass('account-open');
+        }
+
+        function openUploadSkinDialog() {
+            closeSpaDialogs();
+            $('#helloDialog').hide();
+            resetUploadSkinDialog();
+            $('#uploadSkinDialog').addClass('upload-open');
         }
 
         function formatProfileDate(value) {
@@ -864,7 +980,7 @@
             $('#helloDialog').hide();
             closeSpaDialogs();
             if (currentUser) {
-                $('#accountDialog').addClass('account-open');
+                openAccountDialog();
             } else {
                 $('#loginDialog').addClass('login-open');
                 $('#loginName').focus();
@@ -886,6 +1002,15 @@
             e.preventDefault();
             closeSpaDialogs();
             $('#helloDialog').show();
+        });
+        $('#uploadHomeLink').on('click', function(e) {
+            e.preventDefault();
+            closeSpaDialogs();
+            $('#helloDialog').show();
+        });
+        $('#uploadAccountLink, #uploadAccountFooterLink').on('click', function(e) {
+            e.preventDefault();
+            openAccountDialog();
         });
         $('#accountDialog').on('click', '#buyPremiumLink', function(e) {
             e.preventDefault();
@@ -964,27 +1089,64 @@
         });
         $('#uploadSkinButton').on('click', function(e) {
             e.preventDefault();
-            $('#uploadSkinInput').click();
-        });
-        $('#uploadSkinInput').on('change', function() {
-            var file = this.files && this.files[0];
-            if (!file) {
+            var status = $('#uploadSkinStatus');
+            if (!currentUser) {
+                status.removeClass('text-success').addClass('text-danger').text('Login dulu untuk upload skin.').show();
                 return;
             }
 
-            var status = $('#uploadSkinStatus');
-            if (!currentUser || Number(currentUser.points || 0) < 150) {
+            if (Number(currentUser.points || 0) < 150) {
                 status.removeClass('text-success').addClass('text-danger').text('Point tidak cukup. Upload skin membutuhkan 150 point.').show();
                 return;
             }
 
-            authPost('/api/account/upload-skin', { skinUrl: '' })
+            openUploadSkinDialog();
+        });
+        $('#uploadSkinFile').on('change', function() {
+            var file = this.files && this.files[0];
+            var status = $('#uploadSkinDialogStatus');
+            if (!file) {
+                return;
+            }
+
+            if (!/^image\/(png|jpeg|jpg|webp)$/i.test(file.type)) {
+                status.removeClass('text-muted text-success').addClass('text-danger').text('Format harus PNG, JPG, atau WEBP.').show();
+                return;
+            }
+
+            var previewUrl = URL.createObjectURL(file);
+            $('#uploadSkinPreview')
+                .replaceWith('<img id="uploadSkinPreview" alt="Skin preview"/>');
+            $('#uploadSkinPreview').attr('src', previewUrl);
+            status.hide();
+        });
+        $('#uploadSkinSubmit').on('click', function(e) {
+            e.preventDefault();
+            var file = $('#uploadSkinFile')[0].files && $('#uploadSkinFile')[0].files[0];
+            var status = $('#uploadSkinDialogStatus');
+
+            if (!file) {
+                status.removeClass('text-muted text-success').addClass('text-danger').text('Pilih file skin dulu.').show();
+                return;
+            }
+
+            var formData = new FormData();
+            formData.append('skin', file);
+
+            status.removeClass('text-danger').addClass('text-success').text('Mengupload skin...').show();
+            $('#uploadSkinSubmit').prop('disabled', true);
+
+            authUpload('/api/account/upload-skin', formData)
                 .done(function(result) {
                     applyLoggedInUser(result.user);
-                    status.removeClass('text-danger').addClass('text-success').text(result.message || 'Skin berhasil disimpan.').show();
+                    $('#uploadSkinStatus').removeClass('text-danger').addClass('text-success').text(result.message || 'Skin berhasil diupload.').show();
+                    openAccountDialog();
                 })
                 .fail(function(xhr) {
-                    showAuthError(status, xhr, 'Upload skin belum bisa diproses.');
+                    showAuthError(status, xhr, 'Upload skin gagal.');
+                })
+                .always(function() {
+                    $('#uploadSkinSubmit').prop('disabled', false);
                 });
         });
         $('#registerHomeLink').on('click', function(e) {
