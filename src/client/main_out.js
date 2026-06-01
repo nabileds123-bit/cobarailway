@@ -1169,6 +1169,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         userScore = 0,
         showDarkTheme = false,
         showMass = false,
+        showEnemyMass = false,
         posX = nodeX = ~~((leftPos + rightPos) / 2),
         posY = nodeY = ~~((topPos + bottomPos) / 2),
         posSize = 1,
@@ -1215,6 +1216,9 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
     };
     wHandle.setShowMass = function (arg) {
         showMass = arg
+    };
+    wHandle.setShowEnemyMass = function (arg) {
+        showEnemyMass = arg
     };
     wHandle.spectate = function () {
         userNickName = null;
@@ -1560,12 +1564,12 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
                 if (null != e && c) {
                     ctx.drawImage(e, this.x - 2 * this.size, this.y - 2 * this.size, 4 * this.size, 4 * this.size);
                 }
-                c = -1 != playerCells.indexOf(this);
+                var isOwnCell = -1 != playerCells.indexOf(this);
                 var ncache;
                 //draw name
                 if (0 != this.id) {
                     var b = ~~this.y;
-                    if ((showName || c) && this.name && this.nameCache && (null == e || -1 == knownNameDict_noDisp.indexOf(skinName))) {
+                    if ((showName || isOwnCell) && this.name && this.nameCache && (null == e || -1 == knownNameDict_noDisp.indexOf(skinName))) {
                         ncache = this.nameCache;
                         ncache.setValue(this.name);
                         ncache.setSize(this.getNameSize());
@@ -1579,7 +1583,9 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
                     }
 
                     //draw mass
-                    if (showMass && (c || 0 == playerCells.length && (!this.isVirus || this.isAgitated) && 20 < this.size)) {
+                    var shouldShowOwnMass = showMass && (isOwnCell || 0 == playerCells.length);
+                    var shouldShowEnemyMass = showEnemyMass && !isOwnCell && 0 < playerCells.length && (!this.isVirus || this.isAgitated) && 20 < this.size;
+                    if (shouldShowOwnMass || shouldShowEnemyMass) {
                         if (null == this.sizeCache) {
                             this.sizeCache = new UText(this.getNameSize() / 2, "#FFFFFF", true, "#000000")
                         }
@@ -1785,10 +1791,8 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
 
     wjQuery(function () {
         function renderFavicon() {
-            if (0 < playerCells.length) {
-                redCell.color = playerCells[0].color;
-                redCell.setName(playerCells[0].name);
-            }
+            redCell.color = "#ED1C24";
+            redCell.setName("");
             ctx.clearRect(0, 0, 32, 32);
             ctx.save();
             ctx.translate(16, 16);

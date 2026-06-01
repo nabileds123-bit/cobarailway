@@ -28,7 +28,7 @@
     <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://code.jquery.com/jquery-1.11.3.min.js"></script>
     <script src="Vector2.js"></script>
-    <script src="main_out.js?543"></script>
+    <script src="main_out.js?544"></script>
     <script>
     'use strict';
     var SplitInterval;
@@ -160,14 +160,14 @@
         #a300x250 { width:300px; height:250px; background-repeat:no-repeat; background-size:contain; background-position:center center; }
         #overlays {
     /* Atur tingkat kegelapan overlay di sini: semakin besar alpha, semakin gelap */
-    background-color: rgba(0,0,0,0.7); /* sedikit gelap */
+    background-color: rgba(0,0,0,0.7); /* fallback */
     position: absolute;
     left: 0;
     right: 0;
     top: 0;
     bottom: 0;
     z-index: 100;
-    background-image: url('../img/bg.png');
+    background-image: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url('../img/bg.png');
     background-size: cover;
     background-position: center;
 }
@@ -430,7 +430,7 @@
 </head>
 <body>
 <div id="fb-root"></div>
-<div id="overlays" style="display:none; position:absolute; left:0; right:0; top:0; bottom:0; background-color:rgba(0,0,0,0.7); z-index:300; background-image:url('../img/bg.png'); background-size:cover; background-position:center;">
+<div id="overlays" style="display:none; position:absolute; left:0; right:0; top:0; bottom:0; background-color:rgba(0,0,0,0.7); z-index:300; background-image:linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url('../img/bg.png'); background-size:cover; background-position:center;">
         <div id="helloDialog">
         <form role="form">
             <div class="form-group" style="display:flex; align-items:center; justify-content:space-between;">
