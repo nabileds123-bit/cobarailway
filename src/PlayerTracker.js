@@ -10,6 +10,9 @@ function PlayerTracker(gameServer, socket) {
     this.visibleNodes = [];
     this.cells = [];
     this.score = 1; // Needed for leaderboard
+    this.authUserId = null;
+    this.authUsername = null;
+    this.lastPassiveXpTime = Date.now();
 
     this.mouse = {x: 0, y: 0};
     this.tickLeaderboard = 0; // 
@@ -81,6 +84,8 @@ PlayerTracker.prototype.getTeam = function() {
 // Functions
 
 PlayerTracker.prototype.update = function() {
+    this.updatePassiveXp();
+
 	// Actions buffer
     if (this.socket.packetHandler.pressSpace) {
         // Split cell
@@ -145,6 +150,20 @@ PlayerTracker.prototype.update = function() {
         this.tickLeaderboard--;
     }
     
+}
+
+PlayerTracker.prototype.updatePassiveXp = function() {
+    if (!this.authUserId) {
+        return;
+    }
+
+    var now = Date.now();
+    if ((now - this.lastPassiveXpTime) < 120000) {
+        return;
+    }
+
+    this.lastPassiveXpTime = now;
+    this.gameServer.awardPlayerXp(this, 1, '2min-online');
 }
 
 // Viewing box

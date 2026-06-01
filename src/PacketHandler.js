@@ -1,4 +1,5 @@
 var Packet = require('./packet');
+var Auth = require('./api/AuthServer');
 
 function PacketHandler(gameServer, socket) {
     this.gameServer = gameServer;
@@ -29,6 +30,19 @@ PacketHandler.prototype.handleMessage = function(message) {
     var packetId = view.getUint8(0, true);
 
     switch (packetId) {
+        case 101:
+            var token = "";
+            for (var i = 1; i < view.byteLength; i += 2) {
+                var charCode = view.getUint16(i, true);
+                if (charCode == 0) {
+                    break;
+                }
+
+                token += String.fromCharCode(charCode);
+            }
+
+            this.setAuthToken(token);
+            break;
         case 0:
             // Set Nickname
             var nick = "";
@@ -202,6 +216,30 @@ function hslToRgb(h, s, l) {
 default:
             break;
     }
+}
+
+PacketHandler.prototype.setAuthToken = function(token) {
+    var client = this.socket.playerTracker;
+    token = String(token || '').trim();
+
+    if (!token || !client) {
+        return;
+    }
+
+    Auth.getUserByToken(token)
+        .then(function(user) {
+            if (!user) {
+                return;
+            }
+
+            client.authUserId = user.id;
+            client.authUsername = user.username;
+            client.lastPassiveXpTime = Date.now();
+            console.log("[Auth] Bound player %s to account %s", client.getName() || "(no nick)", user.username);
+        })
+        .catch(function(error) {
+            console.log("[Auth] Token bind failed:", error && error.message ? error.message : error);
+        });
 }
 
 PacketHandler.prototype.setNickname = function(newNick) {

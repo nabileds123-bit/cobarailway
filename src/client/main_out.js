@@ -460,6 +460,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         msg.setUint8(0, 255);
         msg.setUint32(1, 1332175218, true);
         wsSend(msg);
+        sendAuthToken();
         sendNickName();
     }
 
@@ -778,6 +779,24 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
             for (var i = 0; i < userNickName.length; ++i) msg.setUint16(1 + 2 * i, userNickName.charCodeAt(i), true);
             wsSend(msg)
         }
+    }
+
+    function sendAuthToken() {
+        if (!wsIsOpen() || !wHandle.localStorage) {
+            return;
+        }
+
+        var token = wHandle.localStorage.getItem('authToken');
+        if (!token) {
+            return;
+        }
+
+        var msg = prepareData(1 + 2 * token.length);
+        msg.setUint8(0, 101);
+        for (var i = 0; i < token.length; ++i) {
+            msg.setUint16(1 + 2 * i, token.charCodeAt(i), true);
+        }
+        wsSend(msg);
     }
 
     function sendChat(str) {

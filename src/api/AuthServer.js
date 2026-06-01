@@ -372,6 +372,66 @@ function setResetToken(userId, token) {
     });
 }
 
+function applyXp(user, amount) {
+    var gained = Math.max(0, Math.floor(Number(amount || 0)));
+    var level = Math.max(1, Number(user.level || 1));
+    var xp = Math.max(0, Number(user.xp || 0)) + gained;
+
+    while (xp >= getNextLevelXp(level)) {
+        xp -= getNextLevelXp(level);
+        level++;
+    }
+
+    user.level = level;
+    user.xp = xp;
+    return user;
+}
+
+function saveUserXp(user) {
+    return ensureMysql().then(function(usingMysql) {
+        if (usingMysql) {
+            return getMysqlPool()
+                .query('UPDATE users SET level = ?, xp = ? WHERE id = ?', [user.level, user.xp, user.id])
+                .then(function() {
+                    return user;
+                });
+        }
+
+        var db = readJsonDb();
+        for (var i = 0; i < db.users.length; i++) {
+            if (db.users[i].id == user.id) {
+                db.users[i].level = user.level;
+                db.users[i].xp = user.xp;
+                writeJsonDb(db);
+                return user;
+            }
+        }
+
+        return user;
+    });
+}
+
+function awardXp(userId, amount, reason) {
+    if (!userId) {
+        return Promise.resolve(null);
+    }
+
+    return findUserById(userId)
+        .then(function(user) {
+            if (!user) {
+                return null;
+            }
+
+            applyXp(user, amount);
+            return saveUserXp(user).then(function(savedUser) {
+                if (amount > 0) {
+                    console.log('[Auth] XP +%d for %s (%s)', Math.floor(Number(amount || 0)), savedUser.username, reason || 'xp');
+                }
+                return publicUser(savedUser);
+            });
+        });
+}
+
 function handleRegister(req, res) {
     readBody(req, function(err, body) {
         if (err) {
@@ -530,7 +590,7 @@ function handleMe(req, res) {
         });
 }
 
-module.exports = function handleAuth(req, res) {
+function handleAuth(req, res) {
     if (req.method == 'OPTIONS' && req.url.indexOf('/api/') == 0) {
         sendJson(res, 204, {});
         return true;
@@ -557,4 +617,10 @@ module.exports = function handleAuth(req, res) {
     }
 
     return false;
-};
+}
+
+handleAuth.getUserByToken = findUserByToken;
+handleAuth.awardXp = awardXp;
+handleAuth.getNextLevelXp = getNextLevelXp;
+
+module.exports = handleAuth;

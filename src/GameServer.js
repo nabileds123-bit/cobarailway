@@ -335,6 +335,17 @@ GameServer.prototype.sendMessage = function(msg) {
     }
 }
 
+GameServer.prototype.awardPlayerXp = function(client, amount, reason) {
+    if (!client || !client.authUserId || !amount) {
+        return;
+    }
+
+    handleAuth.awardXp(client.authUserId, amount, reason)
+        .catch(function(error) {
+            console.log("[Auth] XP award failed:", error && error.message ? error.message : error);
+        });
+}
+
 GameServer.prototype.updateClients = function() {
     for (var i = 0; i < this.clients.length; i++) {
         if (typeof this.clients[i] == "undefined") {
@@ -473,6 +484,9 @@ GameServer.prototype.updateMoveEngine = function() {
             //if(!cell.firstSplit){ soon will be used
             // Consume effect
             check.onConsume(cell,this);
+            if (check.getType() == 1 || check.getType() == 3) {
+                this.awardPlayerXp(client, Math.max(1, Math.floor(check.mass / 10)), 'eatmass');
+            }
             /*cell.hasAte = true;
             setTimeout(function(){cell.hasAte = false},100);*/
             // Remove cell

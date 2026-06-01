@@ -621,6 +621,7 @@
     // Simpan dan load nick dari localStorage
     $(function() {
         var currentUser = null;
+        var accountSyncTimer = null;
 
         function authRequest(path, data) {
             return $.ajax({
@@ -678,12 +679,45 @@
 
         function clearLoggedInUser() {
             currentUser = null;
+            if (accountSyncTimer) {
+                clearInterval(accountSyncTimer);
+                accountSyncTimer = null;
+            }
             $('#loginLink').text('Login');
             $('#nick').prop('readonly', false);
             $('#helloXpPanel').removeClass('is-visible');
             $('#profileXpFill').css('width', '0%');
             $('#profileXpText').text('0/450 XP');
             $('#profileXpLevel').text('1');
+        }
+
+        function refreshLoggedInUser() {
+            var token = localStorage.getItem('authToken');
+            if (!token) {
+                clearLoggedInUser();
+                return;
+            }
+
+            $.ajax({
+                url: '/api/me',
+                method: 'GET',
+                dataType: 'json',
+                headers: {
+                    Authorization: 'Bearer ' + token
+                }
+            }).done(function(result) {
+                applyLoggedInUser(result.user);
+            }).fail(function() {
+                localStorage.removeItem('authToken');
+                clearLoggedInUser();
+            });
+        }
+
+        function startAccountSync() {
+            if (accountSyncTimer) {
+                return;
+            }
+            accountSyncTimer = setInterval(refreshLoggedInUser, 30000);
         }
 
         function closeSpaDialogs() {
@@ -753,19 +787,8 @@
         }
         var authToken = localStorage.getItem('authToken');
         if (authToken) {
-            $.ajax({
-                url: '/api/me',
-                method: 'GET',
-                dataType: 'json',
-                headers: {
-                    Authorization: 'Bearer ' + authToken
-                }
-            }).done(function(result) {
-                applyLoggedInUser(result.user);
-            }).fail(function() {
-                localStorage.removeItem('authToken');
-                clearLoggedInUser();
-            });
+            refreshLoggedInUser();
+            startAccountSync();
         }
         // Simpan nick ke localStorage hanya saat tombol Play diklik
         $('#playBtn').on('click', function() {
