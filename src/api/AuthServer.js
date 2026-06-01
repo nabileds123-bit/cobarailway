@@ -58,11 +58,38 @@ function ensureMysql() {
                 'email VARCHAR(255) NOT NULL UNIQUE,' +
                 'salt VARCHAR(64) NOT NULL,' +
                 'password_hash VARCHAR(256) NOT NULL,' +
+                'account_type VARCHAR(16) NOT NULL DEFAULT \'Free\',' +
+                'level INT NOT NULL DEFAULT 1,' +
+                'points DECIMAL(12,2) NOT NULL DEFAULT 0,' +
+                'guild VARCHAR(32) NULL,' +
+                'skin_url VARCHAR(255) NULL,' +
+                'guild_skin_url VARCHAR(255) NULL,' +
+                'last_login DATETIME NULL,' +
                 'reset_token VARCHAR(64) NULL,' +
                 'reset_requested_at DATETIME NULL,' +
                 'created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP' +
                 ')'
             );
+        })
+        .then(function() {
+            var alters = [
+                'ALTER TABLE users ADD COLUMN IF NOT EXISTS account_type VARCHAR(16) NOT NULL DEFAULT \'Free\'',
+                'ALTER TABLE users ADD COLUMN IF NOT EXISTS level INT NOT NULL DEFAULT 1',
+                'ALTER TABLE users ADD COLUMN IF NOT EXISTS points DECIMAL(12,2) NOT NULL DEFAULT 0',
+                'ALTER TABLE users ADD COLUMN IF NOT EXISTS guild VARCHAR(32) NULL',
+                'ALTER TABLE users ADD COLUMN IF NOT EXISTS skin_url VARCHAR(255) NULL',
+                'ALTER TABLE users ADD COLUMN IF NOT EXISTS guild_skin_url VARCHAR(255) NULL',
+                'ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login DATETIME NULL'
+            ];
+
+            return Promise.all(alters.map(function(sql) {
+                return pool.query(sql).catch(function(error) {
+                    if (error && error.code == 'ER_DUP_FIELDNAME') {
+                        return;
+                    }
+                    throw error;
+                });
+            }));
         })
         .then(function() {
             return pool.query(
@@ -127,7 +154,14 @@ function publicUser(user) {
     return {
         id: user.id,
         username: user.username,
-        email: user.email
+        email: user.email,
+        accountType: user.accountType || 'Free',
+        level: Number(user.level || 1),
+        points: Number(user.points || 0),
+        guild: user.guild || '',
+        skinUrl: user.skinUrl || '',
+        guildSkinUrl: user.guildSkinUrl || '',
+        lastLogin: user.lastLogin || null
     };
 }
 
@@ -142,6 +176,13 @@ function mysqlUser(row) {
         email: row.email,
         salt: row.salt,
         passwordHash: row.password_hash,
+        accountType: row.account_type,
+        level: row.level,
+        points: row.points,
+        guild: row.guild,
+        skinUrl: row.skin_url,
+        guildSkinUrl: row.guild_skin_url,
+        lastLogin: row.last_login,
         createdAt: row.created_at
     };
 }
@@ -266,6 +307,23 @@ function createSession(token, userId) {
     });
 }
 
+function updateLastLogin(userId) {
+    return ensureMysql().then(function(usingMysql) {
+        if (usingMysql) {
+            return getMysqlPool().query('UPDATE users SET last_login = NOW() WHERE id = ?', [userId]);
+        }
+
+        var db = readJsonDb();
+        for (var i = 0; i < db.users.length; i++) {
+            if (db.users[i].id == userId) {
+                db.users[i].lastLogin = new Date().toISOString();
+                writeJsonDb(db);
+                return;
+            }
+        }
+    });
+}
+
 function findUserByToken(token) {
     return ensureMysql().then(function(usingMysql) {
         if (usingMysql) {
@@ -352,6 +410,13 @@ function handleRegister(req, res) {
                     email: email,
                     salt: salt,
                     passwordHash: hashPassword(password, salt),
+                    accountType: 'Free',
+                    level: 1,
+                    points: 0,
+                    guild: '',
+                    skinUrl: '',
+                    guildSkinUrl: '',
+                    lastLogin: null,
                     createdAt: new Date().toISOString()
                 });
             })
@@ -388,7 +453,10 @@ function handleLogin(req, res) {
                 }
 
                 var token = makeToken();
-                return createSession(token, user.id).then(function() {
+                user.lastLogin = new Date().toISOString();
+                return updateLastLogin(user.id).then(function() {
+                    return createSession(token, user.id);
+                }).then(function() {
                     sendJson(res, 200, { ok: true, token: token, user: publicUser(user) });
                 });
             })
