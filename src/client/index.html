@@ -282,15 +282,18 @@
             padding: 7px 8px;
             border-top: 1px solid #ddd;
             font-size: 13px;
+            font-weight: bold;
         }
         .profile-label {
-            color: #777;
+            color: #333;
             display: inline-block;
             width: 78px;
             font-size: 13px;
+            font-weight: bold;
         }
         .profile-value {
             flex: 1;
+            font-weight: bold;
         }
         .profile-premium {
             color: #5cb85c;
@@ -489,8 +492,8 @@
         <div class="profile-row">
             <span class="profile-label">Skin:</span>
             <span class="profile-value">
-                <img id="profileGuildSkin" class="profile-skin" src="skins/Amruflxryns.png" alt="Guild skin"/>
-                <img id="profilePlayerSkin" class="profile-skin active" src="skins/Amruflxryns.png" alt="Player skin"/>
+                <img id="profileGuildSkin" class="profile-skin" alt="Guild skin" style="display:none"/>
+                <img id="profilePlayerSkin" class="profile-skin active" alt="Player skin" style="display:none"/>
             </span>
         </div>
         <div class="profile-row">
@@ -568,10 +571,14 @@
             $('#profileLastLogin').text(formatProfileDate(user.lastLogin));
 
             if (user.skinUrl) {
-                $('#profilePlayerSkin').attr('src', user.skinUrl);
+                $('#profilePlayerSkin').attr('src', user.skinUrl).show();
+            } else {
+                $('#profilePlayerSkin').removeAttr('src').hide();
             }
             if (user.guildSkinUrl) {
-                $('#profileGuildSkin').attr('src', user.guildSkinUrl);
+                $('#profileGuildSkin').attr('src', user.guildSkinUrl).show();
+            } else {
+                $('#profileGuildSkin').removeAttr('src').hide();
             }
         }
 
