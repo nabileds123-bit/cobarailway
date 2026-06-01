@@ -157,10 +157,6 @@ Cell.prototype.calcMove = function(x2, y2, gameServer) {
         }
 		
         if ((cell.recombineTicks > 0) || (this.recombineTicks > 0)) {
-            if (this.firstSplit || cell.firstSplit) {
-                continue;
-            }
-
             // Cannot recombine - Collision with your own cells
             var dist = Math.sqrt( Math.pow(cell.position.x - this.position.x, 2) +  Math.pow(cell.position.y - this.position.y, 2) );
             var collisionDist = cell.getSize() + this.getSize(); // Minimum distance between the 2 cells
