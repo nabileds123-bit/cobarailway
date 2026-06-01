@@ -298,6 +298,9 @@
         .profile-premium {
             color: #5cb85c;
         }
+        #buyPremiumLink {
+            margin-left: 8px;
+        }
         .profile-skin {
             width: 42px;
             height: 42px;
@@ -493,7 +496,7 @@
             <span class="profile-label">Nick:</span>
             <span class="profile-value"><span id="profileUsername">-</span></span>
         </div>
-        <div class="profile-row">
+        <div class="profile-row" id="profileSkinRow">
             <span class="profile-label">Skin:</span>
             <span class="profile-value">
                 <img id="profileGuildSkin" class="profile-skin" alt="Guild skin" style="display:none"/>
@@ -566,14 +569,21 @@
             $('#loginLink').text('Account');
             $('#profileUsername').text(user.username);
             $('#profileEmail').text(user.email);
-            $('#profileAccountType')
-                .text(user.accountType || 'Free')
-                .toggleClass('profile-premium', (user.accountType || '').toLowerCase() == 'premium');
+            var isPremium = (user.accountType || '').toLowerCase() == 'premium';
+            if (isPremium) {
+                $('#profileAccountType')
+                    .html('<span class="profile-premium">Premium</span>');
+            } else {
+                $('#profileAccountType')
+                    .html('Free <a href="#buy-premium" id="buyPremiumLink" class="text-primary">Buy Premium</a>');
+            }
             $('#profileLevel').text(user.level || 1);
             $('#profilePoints').text(Number(user.points || 0).toFixed(2));
             $('#profileGuild').text(user.guild || '-');
             $('#profileLastLogin').text(formatProfileDate(user.lastLogin));
 
+            var hasSkin = !!user.skinUrl;
+            var hasGuildSkin = !!user.guildSkinUrl;
             if (user.skinUrl) {
                 $('#profilePlayerSkin').attr('src', user.skinUrl).show();
             } else {
@@ -584,6 +594,7 @@
             } else {
                 $('#profileGuildSkin').removeAttr('src').hide();
             }
+            $('#profileSkinRow').toggle(hasSkin || hasGuildSkin);
         }
 
         function closeSpaDialogs() {
@@ -687,6 +698,10 @@
             e.preventDefault();
             closeSpaDialogs();
             $('#helloDialog').show();
+        });
+        $('#accountDialog').on('click', '#buyPremiumLink', function(e) {
+            e.preventDefault();
+            $('#uploadSkinStatus').removeClass('text-success').addClass('text-danger').text('Buy Premium belum tersedia.').show();
         });
         $('#logoutLink').on('click', function(e) {
             e.preventDefault();
