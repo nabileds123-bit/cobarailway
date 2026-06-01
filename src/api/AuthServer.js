@@ -318,8 +318,8 @@ function handleRegister(req, res) {
             return;
         }
 
-        if (!/^[a-z0-9]+$/.test(username)) {
-            sendJson(res, 400, { ok: false, error: 'Username hanya boleh huruf kecil a-z dan angka 0-9.' });
+        if (!/^[A-Za-z0-9]+$/.test(username)) {
+            sendJson(res, 400, { ok: false, error: 'Username hanya boleh huruf A-Z dan angka 0-9.' });
             return;
         }
 

@@ -655,8 +655,8 @@
                 status.removeClass('text-success').addClass('text-danger').text('Username wajib diisi.').show();
                 return;
             }
-            if (!/^[a-z0-9]+$/.test(name)) {
-                status.removeClass('text-success').addClass('text-danger').text('Username hanya boleh huruf kecil a-z dan angka 0-9.').show();
+            if (!/^[A-Za-z0-9]+$/.test(name)) {
+                status.removeClass('text-success').addClass('text-danger').text('Username hanya boleh huruf A-Z dan angka 0-9.').show();
                 return;
             }
             if (!email) {
