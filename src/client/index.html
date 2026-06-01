@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Eat cells smaller than you and don't get eaten by the bigger ones, as an MMO">
+    <meta name="keywords" content="agario, agar, io, cell, cells, virus, bacteria, blob, game, games, web game, html5, fun, flash">
+    <meta name="robots" content="index, follow">
+    <meta name="viewport" content="minimal-ui, width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta property="fb:app_id" content="677505792353827"/>
+    <meta property="og:title" content="Agar.io"/>
+    <meta property="og:description" content="Eat cells smaller than you and don't get eaten by the bigger ones, as an MMO"/>
+    <meta property="og:url" content="http://agar.io"/>
+    <meta property="og:image" content="http://agar.io/img/1200x630.png"/>
+    <meta property="og:image:width" content="1200"/>
+    <meta property="og:image:height" content="630"/>
+    <meta property="og:type" content="website"/>
+    <title>Bubble.am</title>
+    <link id="favicon" rel="icon" type="image/png" href="../img/favicon.png"/>
+    <style>
+        /* Force favicon to always be red, prevent JS/CSS from changing it */
+        /* If you have a static red favicon.png, this is enough. */
+    </style>
+    <link href='https://fonts.googleapis.com/css?family=Ubuntu:700' rel='stylesheet' type='text/css'>
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://code.jquery.com/jquery-1.11.3.min.js"></script>
+    <script src="Vector2.js"></script>
+    <script src="main_out.js?543"></script>
+    <script>
+    'use strict';
+    var SplitInterval;
+    var MacroInterval;
+    var SplitDebounce = false;
+    var MacroDebounce = false;
+    // Atur kecepatan (ms): Semakin kecil semakin cepat
+    var splitSpeed = 100; // ms, default 10x per detik
+    var macroSpeed = 150;  // ms, default 20x per detik
+
+    $(document).on('keydown', function(input) {
+        if (input.keyCode == 16) {
+            if (SplitDebounce) return;
+            SplitDebounce = true;
+            SplitInterval = setInterval(function() {
+                $("body").trigger($.Event("keydown", { keyCode: 32 }));
+                $("body").trigger($.Event("keyup", { keyCode: 32 }));
+            }, splitSpeed);
+        } else if (input.keyCode == 69) {
+            if (MacroDebounce) return;
+            MacroDebounce = true;
+            MacroInterval = setInterval(function() {
+                $("body").trigger($.Event("keydown", { keyCode: 87 }));
+                $("body").trigger($.Event("keyup", { keyCode: 87 }));
+            }, macroSpeed);
+        }
+    });
+    $(document).on('keyup', function(input) {
+        if (input.keyCode == 16) {
+            SplitDebounce = false;
+            clearInterval(SplitInterval);
+            return;
+        } else if (input.keyCode == 69) {
+            MacroDebounce = false;
+            clearInterval(MacroInterval);
+            return;
+        }
+    });
+    // Hide overlays background (but not helloDialog) when ESC is pressed
+    $(document).on('keydown', function(e) {
+        if (e.key === 'Escape' || e.keyCode === 27) {
+            // Only hide background if overlays is visible
+            var overlays = document.getElementById('overlays');
+            if (overlays && overlays.style.display !== 'none') {
+                overlays.classList.add('no-bg');
+            }
+        }
+    });
+    // Optionally, restore background when overlays is shown again
+    function showOverlays() {
+        var overlays = document.getElementById('overlays');
+        if (overlays) overlays.classList.remove('no-bg');
+        overlays.style.display = '';
+    }
+    // Hide overlays background and dark layer, show only helloDialog when ESC is pressed
+    $(document).on('keydown', function(e) {
+        if (e.key === 'Escape' || e.keyCode === 27) {
+            var overlays = document.getElementById('overlays');
+            if (overlays && overlays.style.display !== 'none') {
+                overlays.classList.add('only-dialog');
+            }
+        }
+    });
+    // Saat ESC ditekan, langsung tampilkan overlay dengan hanya kotak putih (helloDialog)
+    $(document).on('keydown', function(e) {
+        if (e.key === 'Escape' || e.keyCode === 27) {
+            var overlays = document.getElementById('overlays');
+            if (overlays) {
+                overlays.style.display = '';
+                overlays.classList.add('only-dialog');
+            }
+        }
+    });
+    function showOverlays() {
+        var overlays = document.getElementById('overlays');
+        if (overlays) overlays.classList.remove('only-dialog');
+        overlays.classList.remove('no-bg');
+        overlays.style.display = '';
+    }
+    </script>
+    <style>
+        body { padding:0; margin:0; overflow:hidden; }
+        #canvas { position:absolute; left:0; right:0; top:0; bottom:0; width:100%; height:100%; }
+        .checkbox label { margin-right:10px; }
+        form { margin-bottom:0px; }
+        .btn-play,.btn-settings,.btn-spectate { display:block; height:35px; }
+        .btn-play { width:85%; float:left; }
+        .btn-settings { width:13%; float:right; }
+        .btn-spectate { display:block; float:right; }
+        #adsBottom { position:absolute; left:0; right:0; bottom:0; }
+        #adsBottomInner { margin:0px auto; width:728px; height:50px; border:5px solid white; border-radius:5px px px px; background-color:#FFFFFF; box-sizing:content-box; }
+        .region-message { display:none; margin-bottom:12px; margin-left:6px; margin-right:6px; text-align:center; }
+        #nick,#locationKnown #region { width:65%; float:left; }
+        #nick[readonly] {
+            background-color: #f5f5f5;
+            cursor: default;
+        }
+        #locationUnknown #region { margin-bottom:15px; }
+        #gamemode,#spectateBtn { width:33%; float:right; }
+        #helloDialog {
+    width: 350px;
+    background-color: #FFFFFF;
+    margin: 10px auto;
+    border-radius: 15px;
+    padding: 10px 25px 10px 25px;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    margin-right: -50%;
+    transform: translate(-50%, -50%);
+    min-height: 400px; /* tinggi minimum, bisa diubah sesuai kebutuhan */
+    /* height: auto;  default, biarkan otomatis */
+}
+        #chat_textbox {
+        transition:all .5s ease-in-out;
+        position:absolute;
+        z-index:1001; /* pastikan di atas overlay */
+        bottom:10px;
+        background:rgba(0,0,0,.2);
+        border:0px;
+        outline:none;
+        color:#FFF;
+        height:30px;
+        text-indent:12px;
+        left:10px;
+        width:300px;
+    }
+        #chat_textbox:focus { background:rgba(0,0,0,.5); }
+        #a300x250 { width:300px; height:250px; background-repeat:no-repeat; background-size:contain; background-position:center center; }
+        #overlays {
+    /* Atur tingkat kegelapan overlay di sini: semakin besar alpha, semakin gelap */
+    background-color: rgba(0,0,0,0.7); /* sedikit gelap */
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 100;
+    background-image: url('../img/bg.png');
+    background-size: cover;
+    background-position: center;
+}
+#overlays.no-bg {
+    background-image: none !important;
+}
+#overlays.only-dialog {
+    background: none !important;
+}
+#overlays.only-dialog > #helloDialog {
+    display: block;
+}
+        #overlays.only-dialog > *:not(#helloDialog):not(#loginDialog):not(#registerDialog):not(#forgotDialog):not(#accountDialog) {
+    display: none !important;
+}
+        #loginDialog,
+        #registerDialog,
+        #forgotDialog,
+        #accountDialog {
+            display: none;
+            width: 350px;
+            background-color: #FFFFFF;
+            margin: 10px auto;
+            border-radius: 15px;
+            padding: 10px 25px 10px 25px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            margin-right: -50%;
+            transform: translate(-50%, -50%);
+            min-height: 400px;
+        }
+        #loginDialog.login-open,
+        #registerDialog.register-open,
+        #forgotDialog.forgot-open,
+        #accountDialog.account-open {
+            display: flex;
+            flex-direction: column;
+        }
+        #loginDialog h3,
+        #registerDialog h3,
+        #forgotDialog h3,
+        #accountDialog h3 {
+            margin: 0 0 14px 0;
+            font-weight: bold;
+            font-size: 12px;
+        }
+        #loginDialog .dialog-brand,
+        #registerDialog .dialog-brand,
+        #forgotDialog .dialog-brand,
+        #accountDialog .dialog-brand {
+            color: #337ab7;
+            text-decoration: none;
+        }
+        #loginDialog .dialog-brand:hover,
+        #registerDialog .dialog-brand:hover,
+        #forgotDialog .dialog-brand:hover,
+        #accountDialog .dialog-brand:hover {
+            color: #23527c;
+            text-decoration: underline;
+        }
+        #loginDialog .form-control,
+        #registerDialog .form-control,
+        #forgotDialog .form-control {
+            margin-bottom: 10px;
+        }
+        #loginDialog .login-actions,
+        #registerDialog .login-actions {
+            display: flex;
+            gap: 8px;
+        }
+        #loginDialog .login-actions .btn,
+        #registerDialog .login-actions .btn {
+            flex: 1;
+        }
+        #registerOpen,
+        #registerCreate {
+            background-color: #5bc0de;
+            border-color: #46b8da;
+            color: #fff;
+        }
+        #registerOpen:hover,
+        #registerCreate:hover {
+            background-color: #31b0d5;
+            border-color: #269abc;
+            color: #fff;
+        }
+        #registerDialog #registerCreate {
+            background-color: #5cb85c;
+            border-color: #4cae4c;
+        }
+        #registerDialog #registerCreate:hover {
+            background-color: #449d44;
+            border-color: #398439;
+        }
+        #loginDialog .dialog-footer,
+        #registerDialog .dialog-footer,
+        #forgotDialog .dialog-footer,
+        #accountDialog .dialog-footer {
+            margin-top: auto;
+            padding-top: 12px;
+            border-top: 1px solid #eee;
+            text-align: center;
+        }
+        .profile-row {
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+        .profile-label {
+            color: #777;
+            display: block;
+            font-size: 11px;
+        }
+        #forgotPasswordLink {
+            display: inline-block;
+            margin: -2px 0 10px 0;
+            font-size: 12px;
+        }
+        #loginStatus {
+            display: none;
+            margin: 8px 0 0 0;
+            font-size: 12px;
+        }
+        #registerStatus {
+            display: none;
+            margin: 8px 0 0 0;
+            font-size: 12px;
+        }
+        #forgotStatus {
+            display: none;
+            margin: 8px 0 0 0;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+<div id="fb-root"></div>
+<div id="overlays" style="display:none; position:absolute; left:0; right:0; top:0; bottom:0; background-color:rgba(0,0,0,0.7); z-index:300; background-image:url('../img/bg.png'); background-size:cover; background-position:center;">
+        <div id="helloDialog">
+        <form role="form">
+            <div class="form-group" style="display:flex; align-items:center; justify-content:space-between;">
+                <div><h2 style="margin: px;;">Bubble.am</h2></div>
+
+                <!-- ✅ Tombol Discord -->
+                <a href="https://discord.gg/SjKG6JHNg3" target="_blank"
+                   style="background-color:#5865F2; color:white; border-radius:6px; padding:5px 14px; font-weight:bold; font-size:14px; text-decoration:none; margin-right:-100px;">
+                   Discord
+                </a>
+                <!-- ✅ Selesai -->
+
+                <div class="fb-like" style="margin-top:5px;"
+                     data-href="https://www.facebook.com/playagar.io" data-layout="button" data-action="like"
+                     data-show-faces="true" data-share="true"></div>
+            </div>
+            <br clear="both"/>
+            <div class="form-group">
+                <input id="nick" class="form-control" placeholder="Nick" maxlength="15"/>
+                <select id="gamemode" class="form-control" onchange="setGameMode($(this).val());" required>
+                    <option selected value="">FFA</option>
+                    <option value=":teams">Teams</option>
+                    <option value=":hardcore">Hardcore</option>
+                    <option value=":tournament">Tournament</option>
+                </select>
+                <br clear="both"/>
+            </div>
+            <div id="locationUnknown"><script>connect();</script></div>
+            <div><div class="text-muted region-message CN-China"></div></div>
+            <div class="form-group">
+                <button type="submit" id="playBtn"
+                        onclick="setNick(document.getElementById('nick').value); return false;"
+                        class="btn btn-play btn-primary btn-needs-server">Play</button>
+                <button onclick="$('#settings, #instructions').toggle();return false;"
+                        class="btn btn-info btn-settings"><i class="glyphicon glyphicon-cog"></i></button>
+                <br clear="both"/>
+            </div>
+            <div id="settings" class="checkbox" style="display:none;">
+                <div class="form-group" id="mainform">
+                    <div id="locationKnown"></div>
+                    <button id="spectateBtn" onclick="spectate(); return false;" false
+                            class="btn btn-warning btn-spectate btn-needs-server">Spectate</button>
+                    <br clear="both"/>
+                </div>
+                <div style="margin: 6px;">
+                    <label><input type="checkbox" onchange="setSkins(!$(this).is(':checked'))"> No skins</label>
+                    <label><input type="checkbox" onchange="setNames(!$(this).is(':checked'))"> No names</label>
+                    <label><input type="checkbox" onchange="setDarkTheme($(this).is(':checked'))"> Dark Theme</label>
+                    <label><input type="checkbox" onchange="setColors($(this).is(':checked'))"> No colors</label>
+                    <label><input type="checkbox" onchange="setShowMass($(this).is(':checked'))"> Show mass</label>
+                    <label><input type="checkbox" id="showEnemyMassCheckbox" onchange="setShowEnemyMass($(this).is(':checked'))"> Show enemy mass</label>
+                </div>
+            </div>
+        </form>
+            <div id="instructions">
+            <hr/>
+            <center><span class="text-muted">
+                Move your mouse to control your cell<br/>
+                Press <b>Space</b> to split<br/>
+                Press <b>W</b> to eject some mass<br/>
+            </span></center>
+        </div>
+        <br clear="both"/><br clear="both"/><br clear="both"/><br clear="both"/><br clear="both"/>
+        <hr/>
+        <center>
+            <div>
+                <a href="index.html" class="text-primary">Home</a> |
+                <a href="#login" id="loginLink" class="text-primary">Login</a> |
+                <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">Changelog</a> |
+                <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">About</a>
+            </div>
+        </center>
+    </div>
+    <div id="loginDialog">
+        <h3><a href="#home" class="dialog-brand">Bubble.am</a>&gt;&gt; Login</h3>
+        <input id="loginName" class="form-control" placeholder="Username" maxlength="15"/>
+        <input id="loginPassword" type="password" class="form-control" placeholder="Password"/>
+        <a href="#forgot" id="forgotPasswordLink" class="text-primary">Forgot password?</a>
+        <div class="login-actions">
+            <button id="loginSubmit" class="btn btn-primary">Login</button>
+            <button id="registerOpen" class="btn">Register</button>
+        </div>
+        <p id="loginStatus" class="text-success"></p>
+        <div class="dialog-footer">
+            <a href="#home" id="loginHomeLink" class="text-primary">Home</a> |
+            <a href="#login" class="text-primary">Login</a> |
+            <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">Changelog</a> |
+            <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">About</a>
+        </div>
+    </div>
+    <div id="registerDialog">
+        <h3><a href="#home" class="dialog-brand">Bubble.am</a>&gt;&gt; Register</h3>
+        <input id="registerName" class="form-control" placeholder="Username" maxlength="15"/>
+        <input id="registerEmail" type="email" class="form-control" placeholder="Email"/>
+        <input id="registerPassword" type="password" class="form-control" placeholder="Password"/>
+        <input id="registerConfirm" type="password" class="form-control" placeholder="Confirm password"/>
+        <button id="registerCreate" class="btn btn-block">Register</button>
+        <p id="registerStatus" class="text-success"></p>
+        <div class="dialog-footer">
+            <a href="#home" id="registerHomeLink" class="text-primary">Home</a> |
+            <a href="#login" id="registerLoginLink" class="text-primary">Login</a> |
+            <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">Changelog</a> |
+            <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">About</a>
+        </div>
+    </div>
+    <div id="forgotDialog">
+        <h3><a href="#home" class="dialog-brand">Bubble.am</a>&gt;&gt; Forgot Password</h3>
+        <input id="forgotEmail" type="email" class="form-control" placeholder="Email"/>
+        <button id="forgotSubmit" class="btn btn-primary btn-block">Submit</button>
+        <p id="forgotStatus" class="text-success"></p>
+        <div class="dialog-footer">
+            <a href="#home" id="forgotHomeLink" class="text-primary">Home</a> |
+            <a href="#login" id="forgotLoginLink" class="text-primary">Login</a> |
+            <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">Changelog</a> |
+            <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">About</a>
+        </div>
+    </div>
+    <div id="accountDialog">
+        <h3><a href="#home" class="dialog-brand">Bubble.am</a>&gt;&gt; Account</h3>
+        <div class="profile-row">
+            <span class="profile-label">Username</span>
+            <strong id="profileUsername">-</strong>
+        </div>
+        <div class="profile-row">
+            <span class="profile-label">Email</span>
+            <strong id="profileEmail">-</strong>
+        </div>
+        <div class="dialog-footer">
+            <a href="#home" id="accountHomeLink" class="text-primary">Home</a> |
+            <a href="#account" class="text-primary">Account</a> |
+            <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">Changelog</a> |
+            <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">About</a>
+        </div>
+    </div>
+</div>
+<div id="connecting" style="display:none;position:absolute; left:0; right:0; top:0; bottom:0; z-index:100; background-color:rgba(0,0,0,0.5);">
+    <div style="width:350px; background-color:#FFFFFF; margin:100px auto; border-radius:15px; padding:5px 15px 5px 15px;">
+        <h2>Connecting</h2>
+        <p>If you cannot connect to the servers, check if you have some anti virus or firewall blocking the connection.</p>
+    </div>
+</div>
+<canvas id="canvas" width="800" height="600"></canvas>
+<input type="text" id="chat_textbox" maxlength="200" placeholder="Press Enter to chat!"/>
+<div style="font-family:'Ubuntu'">&nbsp;</div>
+<script type="text/javascript">
+    // Simpan dan load nick dari localStorage
+    $(function() {
+        var currentUser = null;
+
+        function authRequest(path, data) {
+            return $.ajax({
+                url: path,
+                method: 'POST',
+                contentType: 'application/json',
+                dataType: 'json',
+                data: JSON.stringify(data)
+            });
+        }
+
+        function applyLoggedInUser(user) {
+            currentUser = user;
+            localStorage.setItem('loginName', user.username);
+            localStorage.setItem('nick', user.username);
+            localStorage.setItem('registerEmail', user.email);
+
+            $('#nick').val(user.username).prop('readonly', true);
+            $('#loginName').val(user.username);
+            $('#loginLink').text('Account');
+            $('#profileUsername').text(user.username);
+            $('#profileEmail').text(user.email);
+        }
+
+        function closeSpaDialogs() {
+            $('#loginDialog').removeClass('login-open');
+            $('#registerDialog').removeClass('register-open');
+            $('#forgotDialog').removeClass('forgot-open');
+            $('#accountDialog').removeClass('account-open');
+        }
+
+        function finishLogin(result, statusEl) {
+            localStorage.setItem('authToken', result.token);
+            applyLoggedInUser(result.user);
+            statusEl.removeClass('text-danger').addClass('text-success').text('Login berhasil. Refresh halaman...').show();
+            setTimeout(function() {
+                window.location.reload();
+            }, 500);
+        }
+
+        function showAuthError(statusEl, xhr, fallback) {
+            var error = fallback;
+            if (xhr.responseJSON && xhr.responseJSON.error) {
+                error = xhr.responseJSON.error;
+            }
+            statusEl.removeClass('text-success').addClass('text-danger').text(error).show();
+        }
+
+        // Load nick saat halaman dibuka
+        var savedNick = localStorage.getItem('nick');
+        if (savedNick) {
+            $('#nick').val(savedNick);
+        }
+        var savedLoginName = localStorage.getItem('loginName');
+        if (savedLoginName) {
+            $('#loginName').val(savedLoginName);
+        }
+        var authToken = localStorage.getItem('authToken');
+        if (authToken) {
+            $.ajax({
+                url: '/api/me',
+                method: 'GET',
+                dataType: 'json',
+                headers: {
+                    Authorization: 'Bearer ' + authToken
+                }
+            }).done(function(result) {
+                applyLoggedInUser(result.user);
+            }).fail(function() {
+                localStorage.removeItem('authToken');
+                $('#nick').prop('readonly', false);
+            });
+        }
+        // Simpan nick ke localStorage hanya saat tombol Play diklik
+        $('#playBtn').on('click', function() {
+            var nick = $('#nick').val();
+            localStorage.setItem('nick', nick);
+        });
+        $('#loginLink').on('click', function(e) {
+            e.preventDefault();
+            $('#helloDialog').hide();
+            closeSpaDialogs();
+            if (currentUser) {
+                $('#accountDialog').addClass('account-open');
+            } else {
+                $('#loginDialog').addClass('login-open');
+                $('#loginName').focus();
+            }
+        });
+        $('#loginHomeLink').on('click', function(e) {
+            e.preventDefault();
+            closeSpaDialogs();
+            $('#loginStatus').hide();
+            $('#helloDialog').show();
+        });
+        $('.dialog-brand').on('click', function(e) {
+            e.preventDefault();
+            closeSpaDialogs();
+            $('#loginStatus, #registerStatus, #forgotStatus').hide();
+            $('#helloDialog').show();
+        });
+        $('#accountHomeLink').on('click', function(e) {
+            e.preventDefault();
+            closeSpaDialogs();
+            $('#helloDialog').show();
+        });
+        $('#registerHomeLink').on('click', function(e) {
+            e.preventDefault();
+            closeSpaDialogs();
+            $('#registerStatus').hide();
+            $('#helloDialog').show();
+        });
+        $('#registerLoginLink').on('click', function(e) {
+            e.preventDefault();
+            closeSpaDialogs();
+            $('#registerStatus').hide();
+            $('#loginDialog').addClass('login-open');
+            $('#loginName').focus();
+        });
+        $('#forgotPasswordLink').on('click', function(e) {
+            e.preventDefault();
+            closeSpaDialogs();
+            $('#forgotStatus').hide();
+            $('#forgotDialog').addClass('forgot-open');
+            $('#forgotEmail').focus();
+        });
+        $('#forgotHomeLink').on('click', function(e) {
+            e.preventDefault();
+            closeSpaDialogs();
+            $('#forgotStatus').hide();
+            $('#helloDialog').show();
+        });
+        $('#forgotLoginLink').on('click', function(e) {
+            e.preventDefault();
+            closeSpaDialogs();
+            $('#forgotStatus').hide();
+            $('#loginDialog').addClass('login-open');
+            $('#loginName').focus();
+        });
+        $('#forgotSubmit').on('click', function(e) {
+            e.preventDefault();
+            var email = $('#forgotEmail').val().trim();
+            var status = $('#forgotStatus');
+
+            if (!email) {
+                status.removeClass('text-success').addClass('text-danger').text('Email wajib diisi.').show();
+                return;
+            }
+
+            authRequest('/api/forgot-password', { email: email })
+                .done(function(result) {
+                    status.removeClass('text-danger').addClass('text-success').text(result.message).show();
+                })
+                .fail(function(xhr) {
+                    showAuthError(status, xhr, 'Reset password gagal.');
+                });
+        });
+        $('#loginSubmit').on('click', function(e) {
+            e.preventDefault();
+            var name = $('#loginName').val().trim();
+            var password = $('#loginPassword').val();
+            var status = $('#loginStatus');
+
+            if (!name) {
+                status.removeClass('text-success').addClass('text-danger').text('Username wajib diisi.').show();
+                return;
+            }
+            if (!password) {
+                status.removeClass('text-success').addClass('text-danger').text('Password wajib diisi.').show();
+                return;
+            }
+
+            authRequest('/api/login', { login: name, password: password })
+                .done(function(result) {
+                    finishLogin(result, status);
+                })
+                .fail(function(xhr) {
+                    showAuthError(status, xhr, 'Login gagal.');
+                });
+        });
+        $('#registerOpen').on('click', function(e) {
+            e.preventDefault();
+            var name = $('#loginName').val().trim();
+            closeSpaDialogs();
+            $('#loginStatus').hide();
+            $('#registerName').val(name);
+            $('#registerDialog').addClass('register-open');
+            $('#registerName').focus();
+        });
+        $('#registerCreate').on('click', function(e) {
+            e.preventDefault();
+            var name = $('#registerName').val().trim();
+            var email = $('#registerEmail').val().trim();
+            var password = $('#registerPassword').val();
+            var confirm = $('#registerConfirm').val();
+            var status = $('#registerStatus');
+
+            if (!name) {
+                status.removeClass('text-success').addClass('text-danger').text('Username wajib diisi.').show();
+                return;
+            }
+            if (!/^[a-z0-9]+$/.test(name)) {
+                status.removeClass('text-success').addClass('text-danger').text('Username hanya boleh huruf kecil a-z dan angka 0-9.').show();
+                return;
+            }
+            if (!email) {
+                status.removeClass('text-success').addClass('text-danger').text('Email wajib diisi.').show();
+                return;
+            }
+            if (!password) {
+                status.removeClass('text-success').addClass('text-danger').text('Password wajib diisi.').show();
+                return;
+            }
+            if (password !== confirm) {
+                status.removeClass('text-success').addClass('text-danger').text('Confirm password tidak sama.').show();
+                return;
+            }
+
+            authRequest('/api/register', { username: name, email: email, password: password })
+                .done(function(result) {
+                    status.removeClass('text-danger').addClass('text-success').text('Register berhasil. Silakan login.').show();
+                    $('#loginName').val(result.user.username);
+                    $('#registerPassword, #registerConfirm').val('');
+                    setTimeout(function() {
+                        closeSpaDialogs();
+                        $('#registerStatus').hide();
+                        $('#loginDialog').addClass('login-open');
+                        $('#loginPassword').focus();
+                    }, 700);
+                })
+                .fail(function(xhr) {
+                    showAuthError(status, xhr, 'Register gagal.');
+                });
+        });
+    });
+    $('#chat_textbox').keypress(function(e) {
+        if (e.which == 13) {
+            e.preventDefault();
+            var msg = $(this).val();
+            if (msg.length > 0) {
+                if (typeof sendChat === 'function') {
+                    sendChat(msg);
+                }
+                $(this).val('');
+            }
+        }
+    });
+    // Agar chat tetap bisa diakses saat overlay aktif
+    $(function() {
+        // Jika overlay aktif dan user klik di luar overlay, fokus ke chat
+        $(document).on('mousedown', function(e) {
+            var overlays = document.getElementById('overlays');
+            var chat = document.getElementById('chat_textbox');
+            if (overlays && overlays.style.display !== 'none') {
+                // Jika klik bukan di overlay dan bukan di chat
+                if (!overlays.contains(e.target) && e.target !== chat) {
+                    chat.focus();
+                }
+            }
+        });
+        // Jika overlay aktif, tekan Tab juga fokus ke chat
+        $(document).on('keydown', function(e) {
+            var overlays = document.getElementById('overlays');
+            var chat = document.getElementById('chat_textbox');
+            if (overlays && overlays.style.display !== 'none') {
+                if (e.key === 'Tab') {
+                    e.preventDefault();
+                    chat.focus();
+                }
+            }
+        });
+    });
+</script>
+<script>
+// Persist checkbox state in localStorage
+$(function() {
+    // Checkbox IDs and their localStorage keys
+    var checkboxes = [
+        { sel: 'input[onchange*="setSkins"]', key: 'noSkins' },
+        { sel: 'input[onchange*="setNames"]', key: 'noNames' },
+        { sel: 'input[onchange*="setDarkTheme"]', key: 'darkTheme' },
+        { sel: 'input[onchange*="setColors"]', key: 'noColors' },
+        { sel: 'input[onchange*="setShowMass"]', key: 'showMass' },
+        { sel: '#showEnemyMassCheckbox', key: 'showEnemyMass' }
+    ];
+    // Set from localStorage on load
+    checkboxes.forEach(function(cb) {
+        var val = localStorage.getItem(cb.key);
+        if (val !== null) {
+            $(cb.sel).prop('checked', val === 'true').trigger('change');
+        }
+        // Save to localStorage on change
+        $(cb.sel).on('change', function() {
+            localStorage.setItem(cb.key, this.checked);
+        });
+    });
+});
+</script>
+<script>
+function setShowEnemyMass(val) {
+    if (typeof wHandle.setShowEnemyMass === 'function') {
+        wHandle.setShowEnemyMass(val);
+    } else {
+        window.showEnemyMass = val;
+    }
+}
+// Sinkronisasi checkbox dan localStorage untuk showEnemyMass
+$(function() {
+    var val = localStorage.getItem('showEnemyMass');
+    var checked = val === 'true';
+    $('#showEnemyMassCheckbox').prop('checked', checked);
+    setShowEnemyMass(checked);
+    // Update localStorage dan JS saat checkbox diubah
+    $('#showEnemyMassCheckbox').on('change', function() {
+        localStorage.setItem('showEnemyMass', this.checked);
+        setShowEnemyMass(this.checked);
+    });
+});
+</script>
+</body>
+</html>
