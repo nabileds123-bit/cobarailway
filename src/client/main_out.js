@@ -1253,10 +1253,10 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
     };
     wHandle.connect = wsConnect;
 
-    //This part is for loading custom skins from older PHP installs.
-    var data = {"action": "test"};
+    // Older PHP installs loaded custom skin names from checkdir.php.
+    // Railway runs this app on Node, so keep this disabled unless PHP support is added.
     var response = [];
-    var skinDirectoryAvailable = true;
+    var skinDirectoryAvailable = false;
     function updateSkinDirectory() {
         if (!skinDirectoryAvailable) {
             return;
@@ -1266,7 +1266,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
             type: "POST",
             dataType: "json",
             url: "checkdir.php",
-            data: data,
+            data: {"action": "test"},
             success: function (data) {
                 if (!data || !data["names"]) {
                     response = [];
@@ -1286,8 +1286,6 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
             }
         });
     }
-
-    updateSkinDirectory();
 
     var interval1Id = setInterval(function () {
         //console.log("logging every 5 seconds");
