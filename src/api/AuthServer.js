@@ -6,6 +6,18 @@ var dbPath = path.join(__dirname, '..', 'data', 'users.json');
 var memorySessions = {};
 var mysqlPool = null;
 var mysqlReady = null;
+var allowedCellColors = [
+    '#6FCA36',
+    '#4379EF',
+    '#98B6FD',
+    '#36D2D6',
+    '#6DE5B7',
+    '#41B136',
+    '#FBD348',
+    '#FFAE6A',
+    '#D61017',
+    '#D9A5FC'
+];
 
 function hasMysqlConfig() {
     return !!(process.env.MYSQL_URL || process.env.MYSQLHOST || process.env.MYSQL_HOST);
@@ -65,6 +77,7 @@ function ensureMysql() {
                 'guild VARCHAR(32) NULL,' +
                 'skin_url VARCHAR(255) NULL,' +
                 'guild_skin_url VARCHAR(255) NULL,' +
+                'cell_color VARCHAR(7) NOT NULL DEFAULT \'#6FCA36\',' +
                 'last_login DATETIME NULL,' +
                 'reset_token VARCHAR(64) NULL,' +
                 'reset_requested_at DATETIME NULL,' +
@@ -81,6 +94,7 @@ function ensureMysql() {
                 'ALTER TABLE users ADD COLUMN guild VARCHAR(32) NULL',
                 'ALTER TABLE users ADD COLUMN skin_url VARCHAR(255) NULL',
                 'ALTER TABLE users ADD COLUMN guild_skin_url VARCHAR(255) NULL',
+                'ALTER TABLE users ADD COLUMN cell_color VARCHAR(7) NOT NULL DEFAULT \'#6FCA36\'',
                 'ALTER TABLE users ADD COLUMN last_login DATETIME NULL'
             ];
 
@@ -156,6 +170,15 @@ function getNextLevelXp(level) {
     return Math.max(1, (Number(level || 1) * 400) + 50);
 }
 
+function normalizeCellColor(color) {
+    var value = String(color || '').trim().toUpperCase();
+    return allowedCellColors.indexOf(value) != -1 ? value : '#6FCA36';
+}
+
+function isAllowedCellColor(color) {
+    return allowedCellColors.indexOf(String(color || '').trim().toUpperCase()) != -1;
+}
+
 function publicUser(user) {
     var level = Number(user.level || 1);
     var xp = Number(user.xp || 0);
@@ -172,6 +195,7 @@ function publicUser(user) {
         guild: user.guild || '',
         skinUrl: user.skinUrl || '',
         guildSkinUrl: user.guildSkinUrl || '',
+        cellColor: normalizeCellColor(user.cellColor),
         lastLogin: user.lastLogin || null
     };
 }
@@ -194,6 +218,7 @@ function mysqlUser(row) {
         guild: row.guild,
         skinUrl: row.skin_url,
         guildSkinUrl: row.guild_skin_url,
+        cellColor: row.cell_color,
         lastLogin: row.last_login,
         createdAt: row.created_at
     };
@@ -489,6 +514,7 @@ function handleRegister(req, res) {
                     guild: '',
                     skinUrl: '',
                     guildSkinUrl: '',
+                    cellColor: '#6FCA36',
                     lastLogin: null,
                     createdAt: new Date().toISOString()
                 });
@@ -590,6 +616,63 @@ function handleMe(req, res) {
         });
 }
 
+function saveAccountColor(userId, color) {
+    return ensureMysql().then(function(usingMysql) {
+        if (usingMysql) {
+            return getMysqlPool()
+                .query('UPDATE users SET cell_color = ? WHERE id = ?', [color, userId]);
+        }
+
+        var db = readJsonDb();
+        for (var i = 0; i < db.users.length; i++) {
+            if (db.users[i].id == userId) {
+                db.users[i].cellColor = color;
+                writeJsonDb(db);
+                return;
+            }
+        }
+    });
+}
+
+function handleAccountColor(req, res) {
+    var header = req.headers.authorization || '';
+    var token = header.replace(/^Bearer\s+/i, '');
+
+    if (!token) {
+        sendJson(res, 401, { ok: false, error: 'Belum login.' });
+        return;
+    }
+
+    readBody(req, function(err, body) {
+        if (err) {
+            sendJson(res, 400, { ok: false, error: 'JSON tidak valid.' });
+            return;
+        }
+
+        var color = String(body.color || '').trim().toUpperCase();
+        if (!isAllowedCellColor(color)) {
+            sendJson(res, 400, { ok: false, error: 'Warna cell tidak valid.' });
+            return;
+        }
+
+        findUserByToken(token)
+            .then(function(user) {
+                if (!user) {
+                    sendJson(res, 401, { ok: false, error: 'Session tidak valid.' });
+                    return null;
+                }
+
+                user.cellColor = color;
+                return saveAccountColor(user.id, color).then(function() {
+                    sendJson(res, 200, { ok: true, user: publicUser(user) });
+                });
+            })
+            .catch(function(error) {
+                handleError(res, error);
+            });
+    });
+}
+
 function handleAuth(req, res) {
     if (req.method == 'OPTIONS' && req.url.indexOf('/api/') == 0) {
         sendJson(res, 204, {});
@@ -616,11 +699,18 @@ function handleAuth(req, res) {
         return true;
     }
 
+    if (req.method == 'POST' && req.url == '/api/account/color') {
+        handleAccountColor(req, res);
+        return true;
+    }
+
     return false;
 }
 
 handleAuth.getUserByToken = findUserByToken;
 handleAuth.awardXp = awardXp;
 handleAuth.getNextLevelXp = getNextLevelXp;
+handleAuth.isAllowedCellColor = isAllowedCellColor;
+handleAuth.normalizeCellColor = normalizeCellColor;
 
 module.exports = handleAuth;

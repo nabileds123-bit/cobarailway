@@ -43,6 +43,19 @@ PacketHandler.prototype.handleMessage = function(message) {
 
             this.setAuthToken(token);
             break;
+        case 102:
+            var color = "";
+            for (var i = 1; i < view.byteLength; i += 2) {
+                var charCode = view.getUint16(i, true);
+                if (charCode == 0) {
+                    break;
+                }
+
+                color += String.fromCharCode(charCode);
+            }
+
+            this.setCellColor(color);
+            break;
         case 0:
             // Set Nickname
             var nick = "";
@@ -218,6 +231,37 @@ default:
     }
 }
 
+function hexToRgb(hex) {
+    var value = String(hex || '').trim().replace('#', '');
+    if (!/^[0-9A-Fa-f]{6}$/.test(value)) {
+        return null;
+    }
+
+    return {
+        r: parseInt(value.substr(0, 2), 16),
+        g: parseInt(value.substr(2, 2), 16),
+        b: parseInt(value.substr(4, 2), 16)
+    };
+}
+
+PacketHandler.prototype.applyCellColor = function(color) {
+    var client = this.socket.playerTracker;
+    var rgb = hexToRgb(color);
+
+    if (!client || !rgb) {
+        return;
+    }
+
+    client.cellColor = color;
+    client.setColor(rgb);
+
+    for (var i = 0; i < client.cells.length; i++) {
+        if (client.cells[i] && client.cells[i].setColor) {
+            client.cells[i].setColor(rgb);
+        }
+    }
+}
+
 PacketHandler.prototype.setAuthToken = function(token) {
     var client = this.socket.playerTracker;
     token = String(token || '').trim();
@@ -235,11 +279,23 @@ PacketHandler.prototype.setAuthToken = function(token) {
             client.authUserId = user.id;
             client.authUsername = user.username;
             client.lastPassiveXpTime = Date.now();
+            this.applyCellColor(Auth.normalizeCellColor(user.cellColor));
             console.log("[Auth] Bound player %s to account %s", client.getName() || "(no nick)", user.username);
-        })
+        }.bind(this))
         .catch(function(error) {
             console.log("[Auth] Token bind failed:", error && error.message ? error.message : error);
         });
+}
+
+PacketHandler.prototype.setCellColor = function(color) {
+    var client = this.socket.playerTracker;
+    color = String(color || '').trim().toUpperCase();
+
+    if (!client || !client.authUserId || !Auth.isAllowedCellColor(color)) {
+        return;
+    }
+
+    this.applyCellColor(color);
 }
 
 PacketHandler.prototype.setNickname = function(newNick) {

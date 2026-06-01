@@ -817,6 +817,20 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         wsSend(msg);
     }
 
+    function sendAccountColor(color) {
+        color = String(color || '').trim().toUpperCase();
+        if (!wsIsOpen() || !/^#[0-9A-F]{6}$/.test(color)) {
+            return;
+        }
+
+        var msg = prepareData(1 + 2 * color.length);
+        msg.setUint8(0, 102);
+        for (var i = 0; i < color.length; ++i) {
+            msg.setUint16(1 + 2 * i, color.charCodeAt(i), true);
+        }
+        wsSend(msg);
+    }
+
     function sendChat(str) {
         if (wsIsOpen() && (str.length < 200) && (str.length > 0)) {
             var msg = prepareData(2 + 2 * str.length);
@@ -1219,6 +1233,9 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
     };
     wHandle.setShowEnemyMass = function (arg) {
         showEnemyMass = arg
+    };
+    wHandle.setAccountCellColor = function (arg) {
+        sendAccountColor(arg);
     };
     wHandle.spectate = function () {
         userNickName = null;

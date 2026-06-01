@@ -28,7 +28,7 @@
     <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://code.jquery.com/jquery-1.11.3.min.js"></script>
     <script src="Vector2.js"></script>
-    <script src="main_out.js?544"></script>
+    <script src="main_out.js?545"></script>
     <script>
     'use strict';
     var SplitInterval;
@@ -371,6 +371,46 @@
         .profile-skin.active {
             border: 2px solid #31b0d5;
         }
+        .profile-color-wrap {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+        }
+        #profileCellColor {
+            width: 21px;
+            height: 28px;
+            border: 1px solid #d0d0d0;
+            cursor: pointer;
+            display: inline-block;
+            margin-left: 12px;
+        }
+        #cellColorPalette {
+            display: none;
+            position: absolute;
+            left: 38px;
+            top: 25px;
+            z-index: 5;
+            padding: 5px;
+            background: #fff;
+            border-radius: 4px;
+            box-shadow: 0 3px 12px rgba(0,0,0,.35);
+            white-space: nowrap;
+        }
+        #cellColorPalette.is-open {
+            display: flex;
+        }
+        .cell-color-swatch {
+            width: 24px;
+            height: 28px;
+            border: 0;
+            padding: 0;
+            margin: 0 2px;
+            cursor: pointer;
+        }
+        .cell-color-swatch.is-selected {
+            outline: 2px solid #337ab7;
+            outline-offset: 1px;
+        }
         .account-actions {
             margin: 14px 0 10px 0;
             padding-bottom: 10px;
@@ -568,7 +608,11 @@
         </div>
         <div class="profile-row">
             <span class="profile-label">Nick:</span>
-            <span class="profile-value"><span id="profileUsername">-</span></span>
+            <span class="profile-value profile-color-wrap">
+                <span id="profileUsername">-</span>
+                <span id="profileCellColor" title="Change cell color"></span>
+                <span id="cellColorPalette"></span>
+            </span>
         </div>
         <div class="profile-row" id="profileSkinRow">
             <span class="profile-label">Skin:</span>
@@ -622,6 +666,18 @@
     $(function() {
         var currentUser = null;
         var accountSyncTimer = null;
+        var cellColors = [
+            '#6FCA36',
+            '#4379EF',
+            '#98B6FD',
+            '#36D2D6',
+            '#6DE5B7',
+            '#41B136',
+            '#FBD348',
+            '#FFAE6A',
+            '#D61017',
+            '#D9A5FC'
+        ];
 
         function authRequest(path, data) {
             return $.ajax({
@@ -630,6 +686,48 @@
                 contentType: 'application/json',
                 dataType: 'json',
                 data: JSON.stringify(data)
+            });
+        }
+
+        function authPost(path, data) {
+            return $.ajax({
+                url: path,
+                method: 'POST',
+                contentType: 'application/json',
+                dataType: 'json',
+                headers: {
+                    Authorization: 'Bearer ' + localStorage.getItem('authToken')
+                },
+                data: JSON.stringify(data)
+            });
+        }
+
+        function normalizeCellColor(color) {
+            color = String(color || '').trim().toUpperCase();
+            return cellColors.indexOf(color) != -1 ? color : cellColors[0];
+        }
+
+        function applyCellColor(color) {
+            color = normalizeCellColor(color);
+            localStorage.setItem('cellColor', color);
+            $('#profileCellColor').css('background-color', color);
+            $('#cellColorPalette .cell-color-swatch').removeClass('is-selected');
+            $('#cellColorPalette .cell-color-swatch[data-color="' + color + '"]').addClass('is-selected');
+
+            if (window.setAccountCellColor) {
+                window.setAccountCellColor(color);
+            }
+        }
+
+        function buildCellColorPalette() {
+            var palette = $('#cellColorPalette');
+            palette.empty();
+
+            cellColors.forEach(function(color) {
+                $('<button type="button" class="cell-color-swatch"></button>')
+                    .attr('data-color', color)
+                    .css('background-color', color)
+                    .appendTo(palette);
             });
         }
 
@@ -644,6 +742,7 @@
             $('#loginLink').text('Account');
             $('#profileUsername').text(user.username);
             $('#profileEmail').text(user.email);
+            applyCellColor(user.cellColor);
             var isPremium = (user.accountType || '').toLowerCase() == 'premium';
             if (isPremium) {
                 $('#profileAccountType')
@@ -777,6 +876,7 @@
         }
 
         // Load nick saat halaman dibuka
+        buildCellColorPalette();
         var savedNick = localStorage.getItem('nick');
         if (savedNick) {
             $('#nick').val(savedNick);
@@ -831,12 +931,41 @@
             e.preventDefault();
             $('#uploadSkinStatus').removeClass('text-success').addClass('text-danger').text('List guild belum tersedia.').show();
         });
+        $('#profileCellColor').on('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            $('#cellColorPalette').toggleClass('is-open');
+        });
+        $('#cellColorPalette').on('click', '.cell-color-swatch', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            var color = $(this).attr('data-color');
+            applyCellColor(color);
+            $('#cellColorPalette').removeClass('is-open');
+
+            authPost('/api/account/color', { color: color })
+                .done(function(result) {
+                    applyLoggedInUser(result.user);
+                    $('#uploadSkinStatus').removeClass('text-danger').addClass('text-success').text('Warna cell berhasil diganti.').show();
+                })
+                .fail(function(xhr) {
+                    showAuthError($('#uploadSkinStatus'), xhr, 'Warna cell gagal diganti.');
+                    if (currentUser) {
+                        applyCellColor(currentUser.cellColor);
+                    }
+                });
+        });
+        $(document).on('click', function() {
+            $('#cellColorPalette').removeClass('is-open');
+        });
         $('#logoutLink').on('click', function(e) {
             e.preventDefault();
             localStorage.removeItem('authToken');
             localStorage.removeItem('loginName');
             localStorage.removeItem('nick');
             localStorage.removeItem('registerEmail');
+            localStorage.removeItem('cellColor');
             clearLoggedInUser();
             window.location.reload();
         });

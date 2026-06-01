@@ -12,6 +12,7 @@ function PlayerTracker(gameServer, socket) {
     this.score = 1; // Needed for leaderboard
     this.authUserId = null;
     this.authUsername = null;
+    this.cellColor = null;
     this.lastPassiveXpTime = Date.now();
 
     this.mouse = {x: 0, y: 0};

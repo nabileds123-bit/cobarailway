@@ -404,6 +404,17 @@ GameServer.prototype.spawnPlayer = function(client) {
             });
         }
     }
+
+    if (client.cellColor) {
+        var hex = String(client.cellColor).replace('#', '');
+        if (/^[0-9A-Fa-f]{6}$/.test(hex)) {
+            client.setColor({
+                r: parseInt(hex.substr(0, 2), 16),
+                g: parseInt(hex.substr(2, 2), 16),
+                b: parseInt(hex.substr(4, 2), 16)
+            });
+        }
+    }
     
     // Spawn player and add to world
     var cell = new Entity.PlayerCell(this.getNextNodeId(), client, pos, startMass);
