@@ -473,19 +473,42 @@
             border-top: 1px solid #eee;
             padding: 16px 0;
         }
-        #uploadSkinPreview {
+        #uploadPreviewCircle {
             width: 220px;
             height: 220px;
+            position: relative;
             border-radius: 50%;
             border: 2px solid #222;
-            background: #0a7f31;
+            background: transparent;
+            overflow: hidden;
+        }
+        #uploadSkinPreview {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: transparent;
             object-fit: cover;
+        }
+        #uploadPreviewName {
+            position: absolute;
+            left: 12px;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #fff;
+            font-size: 26px;
+            font-weight: bold;
+            line-height: 1.1;
+            text-align: center;
+            text-shadow: 0 2px 4px rgba(0,0,0,.8), 0 0 2px #000;
+            word-break: break-word;
+            pointer-events: none;
         }
         #uploadSkinDialog .upload-preview-empty {
             display: flex;
             align-items: center;
             justify-content: center;
-            color: #fff;
+            color: transparent;
             font-size: 26px;
             font-weight: bold;
             text-transform: lowercase;
@@ -687,7 +710,10 @@
         <button id="uploadSkinSubmit" class="btn btn-primary btn-block">Upload</button>
         <p id="uploadSkinDialogStatus" class="upload-status text-muted"></p>
         <div id="uploadPreviewWrap">
-            <div id="uploadSkinPreview" class="upload-preview-empty">skin</div>
+            <div id="uploadPreviewCircle">
+                <div id="uploadSkinPreview" class="upload-preview-empty">skin</div>
+                <div id="uploadPreviewName"></div>
+            </div>
         </div>
         <div class="dialog-footer">
             <a href="#home" id="uploadHomeLink" class="text-primary">Home</a> |
@@ -799,6 +825,7 @@
             $('#loginName').val(user.username);
             $('#loginLink').text('Account');
             $('#profileUsername').text(user.username);
+            updateUploadPreviewName();
             $('#profileEmail').text(user.email);
             applyCellColor(user.cellColor);
             var isPremium = (user.accountType || '').toLowerCase() == 'premium';
@@ -877,6 +904,11 @@
             accountSyncTimer = setInterval(refreshLoggedInUser, 30000);
         }
 
+        function updateUploadPreviewName() {
+            var name = currentUser && currentUser.username ? currentUser.username : $('#nick').val();
+            $('#uploadPreviewName').text(name || '');
+        }
+
         function closeSpaDialogs() {
             $('#loginDialog').removeClass('login-open');
             $('#registerDialog').removeClass('register-open');
@@ -891,6 +923,7 @@
             $('#uploadSkinPreview')
                 .removeAttr('src')
                 .replaceWith('<div id="uploadSkinPreview" class="upload-preview-empty">skin</div>');
+            updateUploadPreviewName();
         }
 
         function openAccountDialog() {
