@@ -93,7 +93,7 @@
         #locationUnknown #region { margin-bottom:15px; }
         #gamemode,#spectateBtn { width:33%; float:right; }
         #helloDialog {
-    width: 350px;
+    width: 460px;
     background-color: #FFFFFF;
     margin: 10px auto;
     border-radius: 15px;
@@ -178,7 +178,7 @@
         #guildDialog,
         #highScoreDialog {
             display: none;
-            width: 350px;
+            width: 460px;
             background-color: #FFFFFF;
             margin: 10px auto;
             border-radius: 15px;
@@ -310,8 +310,9 @@
         }
         .xp-panel {
             display: none;
-            display: none;
             margin: 8px 18px 6px 18px;
+            position: relative;
+            padding-right: 40px;
         }
         .xp-panel.is-visible {
             display: block;
@@ -479,6 +480,24 @@
             color: #23527c;
             text-decoration: none;
         }
+        .index-xp-star {
+            position: absolute;
+            right: -8px;
+            top: 50%;
+            width: 52px;
+            height: 52px;
+            transform: translateY(-50%);
+            background: url('../img/star.png') center/contain no-repeat;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2;
+            color: #333;
+            font-size: 15px;
+            font-weight: 900;
+            font-family: Arial, sans-serif;
+            text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff;
+        }
         .spa-page-body {
             flex: 1;
             font-size: 13px;
@@ -509,7 +528,7 @@
         }
         #uploadSkinDialog {
             display: none;
-            width: 350px;
+            width: 460px;
             background-color: #FFFFFF;
             margin: 10px auto;
             border-radius: 15px;
@@ -602,7 +621,7 @@
 
                 <!-- ✅ Tombol Discord -->
                 <a href="https://discord.gg/SjKG6JHNg3" target="_blank"
-                   style="background-color:#5865F2; color:white; border-radius:6px; padding:5px 14px; font-weight:bold; font-size:14px; text-decoration:none; margin-right:-100px;">
+                   style="background-color:#5865F2; color:white; border-radius:6px; padding:5px 14px; font-weight:bold; font-size:14px; text-decoration:none;">
                    Discord
                 </a>
                 <!-- ✅ Selesai -->
@@ -672,6 +691,7 @@
                             font-family: Arial, sans-serif;
                             text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, -1px 0 0 #000, 1px 0 0 #000, 0 -1px 0 #000, 0 1px 0 #000;">0 / 450 XP</span>
             </div>
+            <div id="indexXpLevel" class="index-xp-star">1</div>
         </div>
         <hr/>
         <center>
@@ -999,6 +1019,7 @@
             $('#helloXpPanel').removeClass('is-visible');
             $('#indexXpBar').css('width', '0%');
             $('#indexXpText').text('0 / 450 XP');
+            $('#indexXpLevel').text('1');
         }
 
         function refreshLoggedInUser() {
@@ -1184,6 +1205,7 @@
             $('#helloXpPanel').addClass('is-visible');
             $('#indexXpBar').css('width', percent + '%');
             $('#indexXpText').text(xp + ' / ' + nextLevelXp + ' XP');
+            $('#indexXpLevel').text(level);
         }
 
         function finishLogin(result, statusEl) {
