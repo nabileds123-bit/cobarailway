@@ -278,6 +278,7 @@ PacketHandler.prototype.setAuthToken = function(token) {
 
             client.authUserId = user.id;
             client.authUsername = user.username;
+            client.skinUrl = user.skinUrl || user.guildSkinUrl || null;
             client.lastPassiveXpTime = Date.now();
             this.applyCellColor(Auth.normalizeCellColor(user.cellColor));
             console.log("[Auth] Bound player %s to account %s", client.getName() || "(no nick)", user.username);

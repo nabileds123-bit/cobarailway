@@ -28,7 +28,7 @@
     <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://code.jquery.com/jquery-1.11.3.min.js"></script>
     <script src="Vector2.js"></script>
-    <script src="main_out.js?548"></script>
+    <script src="main_out.js?549"></script>
     <script>
     'use strict';
     // Hide overlays background (but not helloDialog) when ESC is pressed
@@ -1172,6 +1172,9 @@
             authUpload('/api/account/upload-skin', formData)
                 .done(function(result) {
                     applyLoggedInUser(result.user);
+                    if (window.refreshAccountSkin) {
+                        window.refreshAccountSkin();
+                    }
                     $('#uploadSkinStatus').removeClass('text-danger').addClass('text-success').text(result.message || 'Skin berhasil diupload.').show();
                     openAccountDialog();
                 })

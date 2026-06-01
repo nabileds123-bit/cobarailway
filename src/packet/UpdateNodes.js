@@ -16,8 +16,9 @@ UpdateNodes.prototype.build = function() {
         if (typeof node == "undefined") {
             continue;
         }
-        
-        nodesLength = nodesLength + 16 + (node.getName().length * 2);
+
+        var skinUrl = node.owner && node.owner.skinUrl ? String(node.owner.skinUrl) : "";
+        nodesLength = nodesLength + 18 + (node.getName().length * 2) + (skinUrl.length * 2);
     }
     
     var buf = new ArrayBuffer(3 + (this.destroyQueue.length * 12) + (this.nonVisibleNodes.length * 4) + nodesLength + 8);
@@ -76,6 +77,20 @@ UpdateNodes.prototype.build = function() {
         }
 
         view.setUint16(offset, 0, true); // End of string
+        offset += 2;
+
+        var skinUrl = node.owner && node.owner.skinUrl ? String(node.owner.skinUrl) : "";
+        if (skinUrl) {
+            for (var j = 0; j < skinUrl.length; j++) {
+                var c = skinUrl.charCodeAt(j);
+                if (c) {
+                    view.setUint16(offset, c, true);
+                }
+                offset += 2;
+            }
+        }
+
+        view.setUint16(offset, 0, true); // End of skin url
         offset += 2;
     }
     

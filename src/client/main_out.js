@@ -764,6 +764,12 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
                 if (0 == char) break;
                 name += String.fromCharCode(char)
             }
+            for (var skinChar, skinUrl = ""; ;) {
+                skinChar = view.getUint16(offset, true);
+                offset += 2;
+                if (0 == skinChar) break;
+                skinUrl += String.fromCharCode(skinChar)
+            }
             var node = null;
             if (nodes.hasOwnProperty(nodeid)) {
                 node = nodes[nodeid];
@@ -779,6 +785,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
                 node.ka = posX;
                 node.la = posY;
             }
+            node.skinUrl = skinUrl || "";
             node.isVirus = flagVirus;
             node.isAgitated = flagAgitated;
             node.nx = posX;
@@ -852,6 +859,8 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         }
         wsSend(msg);
     }
+
+    wHandle.refreshAccountSkin = sendAuthToken;
 
     function sendAccountColor(color) {
         color = String(color || '').trim().toUpperCase();
@@ -1183,6 +1192,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         this.color = ucolor;
         this.points = [];
         this.pointsAcc = [];
+        this.skinUrl = "";
         this.createPoints();
         this.setName(uname)
     }
@@ -1387,6 +1397,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         points: null,
         pointsAcc: null,
         name: null,
+        skinUrl: "",
         nameCache: null,
         sizeCache: null,
         x: 0,
@@ -1591,7 +1602,17 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
                 }
 
                 if (!this.isAgitated && showSkin && ':teams' != gameMode) {
-                    if (-1 != knownNameDict.indexOf(skinName)) {
+                    if (this.skinUrl) {
+                        if (!skins.hasOwnProperty(this.skinUrl)) {
+                            skins[this.skinUrl] = new Image;
+                            skins[this.skinUrl].src = this.skinUrl;
+                        }
+                        if (0 != skins[this.skinUrl].width && skins[this.skinUrl].complete) {
+                            c = skins[this.skinUrl];
+                        } else {
+                            c = null;
+                        }
+                    } else if (-1 != knownNameDict.indexOf(skinName)) {
                         if (!skins.hasOwnProperty(skinName)) {
                             skins[skinName] = new Image;
                             skins[skinName].src = SKIN_URL + skinName + '.png';
