@@ -304,7 +304,9 @@
         .xp-panel {
             display: none;
             align-items: center;
+            position: relative;
             margin: 8px 18px 6px 18px;
+            padding-right: 42px;
         }
         .xp-panel.is-visible {
             display: flex;
@@ -313,7 +315,7 @@
             position: relative;
             flex: 1;
             height: 24px;
-            margin-right: 28px;
+            margin-right: 0;
             border: 1px solid #2b6f8b;
             border-radius: 3px;
             overflow: hidden;
@@ -339,7 +341,7 @@
         }
         .xp-star {
             position: absolute;
-            right: -33px;
+            right: 0;
             top: 50%;
             width: 52px;
             height: 52px;
@@ -496,8 +498,8 @@
             <div class="xp-track">
                 <div id="profileXpFill" class="xp-fill"></div>
                 <div id="profileXpText" class="xp-text">0/450 XP</div>
-                <div id="profileXpLevel" class="xp-star">1</div>
             </div>
+            <div id="profileXpLevel" class="xp-star">1</div>
         </div>
         <hr/>
         <center>
