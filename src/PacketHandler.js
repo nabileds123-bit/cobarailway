@@ -270,7 +270,7 @@ PacketHandler.prototype.setAuthToken = function(token) {
         return;
     }
 
-    Auth.getUserByToken(token)
+    client.authPending = Auth.getUserByToken(token)
         .then(function(user) {
             if (!user) {
                 return;
@@ -284,6 +284,9 @@ PacketHandler.prototype.setAuthToken = function(token) {
         }.bind(this))
         .catch(function(error) {
             console.log("[Auth] Token bind failed:", error && error.message ? error.message : error);
+        })
+        .then(function() {
+            client.authPending = null;
         });
 }
 
@@ -300,12 +303,21 @@ PacketHandler.prototype.setCellColor = function(color) {
 
 PacketHandler.prototype.setNickname = function(newNick) {
     var client = this.socket.playerTracker;
+    client.setName(newNick);
+
     if (client.cells.length < 1) {
-        // If client has no cells... then spawn a player
-        this.gameServer.spawnPlayer(client);
-        
-        // Turn off spectate mode
-        client.spectate = false;
+        var spawn = function() {
+            if (client.cells.length < 1) {
+                this.gameServer.spawnPlayer(client);
+                client.spectate = false;
+            }
+        }.bind(this);
+
+        if (client.authPending) {
+            client.authPending.then(spawn);
+            return;
+        }
+
+        spawn();
     }
-	client.setName(newNick);
 }

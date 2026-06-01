@@ -479,6 +479,8 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         msg.setUint32(1, 1332175218, true);
         wsSend(msg);
         sendAuthToken();
+        setTimeout(sendSavedAccountColor, 150);
+        setTimeout(sendSavedAccountColor, 700);
         sendNickName();
     }
 
@@ -829,6 +831,14 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
             msg.setUint16(1 + 2 * i, color.charCodeAt(i), true);
         }
         wsSend(msg);
+    }
+
+    function sendSavedAccountColor() {
+        if (!wHandle.localStorage) {
+            return;
+        }
+
+        sendAccountColor(wHandle.localStorage.getItem('cellColor'));
     }
 
     function sendChat(str) {
