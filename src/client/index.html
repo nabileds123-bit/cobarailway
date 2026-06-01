@@ -676,6 +676,16 @@
             $('#profileSkinRow').toggle(hasSkin || hasGuildSkin);
         }
 
+        function clearLoggedInUser() {
+            currentUser = null;
+            $('#loginLink').text('Login');
+            $('#nick').prop('readonly', false);
+            $('#helloXpPanel').removeClass('is-visible');
+            $('#profileXpFill').css('width', '0%');
+            $('#profileXpText').text('0/450 XP');
+            $('#profileXpLevel').text('1');
+        }
+
         function closeSpaDialogs() {
             $('#loginDialog').removeClass('login-open');
             $('#registerDialog').removeClass('register-open');
@@ -754,7 +764,7 @@
                 applyLoggedInUser(result.user);
             }).fail(function() {
                 localStorage.removeItem('authToken');
-                $('#nick').prop('readonly', false);
+                clearLoggedInUser();
             });
         }
         // Simpan nick ke localStorage hanya saat tombol Play diklik
@@ -804,6 +814,7 @@
             localStorage.removeItem('loginName');
             localStorage.removeItem('nick');
             localStorage.removeItem('registerEmail');
+            clearLoggedInUser();
             window.location.reload();
         });
         $('#changePasswordLink').on('click', function(e) {
