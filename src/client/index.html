@@ -309,15 +309,15 @@
             margin-left: 8px;
         }
         .xp-panel {
+            --xp-star-size: clamp(44px, 10vw, 52px);
             display: none;
-            margin: 8px 18px 6px 18px;
-            padding-right: calc((var(--xp-star-size, 52px) / 2) + 4px);
+            margin: 8px 4px 6px 4px;
+            padding-right: calc((var(--xp-star-size) / 2) + 2px);
         }
         .xp-panel.is-visible {
             display: block;
         }
         .xp-container {
-            --xp-star-size: clamp(42px, 10vw, 52px);
             position: relative;
             height: 30px;
             background: #f5f5f5;
