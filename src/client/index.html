@@ -167,13 +167,16 @@
         #overlays.only-dialog > #helloDialog {
     display: block;
 }
-        #overlays.only-dialog > *:not(#helloDialog):not(#loginDialog):not(#registerDialog):not(#forgotDialog):not(#accountDialog):not(#uploadSkinDialog) {
+        #overlays.only-dialog > *:not(#helloDialog):not(#loginDialog):not(#registerDialog):not(#forgotDialog):not(#accountDialog):not(#uploadSkinDialog):not(#notificationDialog):not(#guildDialog):not(#highScoreDialog) {
     display: none !important;
 }
         #loginDialog,
         #registerDialog,
         #forgotDialog,
-        #accountDialog {
+        #accountDialog,
+        #notificationDialog,
+        #guildDialog,
+        #highScoreDialog {
             display: none;
             width: 350px;
             background-color: #FFFFFF;
@@ -190,7 +193,10 @@
         #loginDialog.login-open,
         #registerDialog.register-open,
         #forgotDialog.forgot-open,
-        #accountDialog.account-open {
+        #accountDialog.account-open,
+        #notificationDialog.spa-open,
+        #guildDialog.spa-open,
+        #highScoreDialog.spa-open {
             display: flex;
             flex-direction: column;
         }
@@ -202,7 +208,10 @@
         #registerDialog h3,
         #forgotDialog h3,
         #accountDialog h3,
-        #uploadSkinDialog h3 {
+        #uploadSkinDialog h3,
+        #notificationDialog h3,
+        #guildDialog h3,
+        #highScoreDialog h3 {
             margin: 0 0 14px 0;
             font-weight: bold;
             font-size: 12px;
@@ -211,7 +220,10 @@
         #registerDialog .dialog-brand,
         #forgotDialog .dialog-brand,
         #accountDialog .dialog-brand,
-        #uploadSkinDialog .dialog-brand {
+        #uploadSkinDialog .dialog-brand,
+        #notificationDialog .dialog-brand,
+        #guildDialog .dialog-brand,
+        #highScoreDialog .dialog-brand {
             color: #337ab7;
             text-decoration: none;
         }
@@ -261,7 +273,10 @@
         #registerDialog .dialog-footer,
         #forgotDialog .dialog-footer,
         #accountDialog .dialog-footer,
-        #uploadSkinDialog .dialog-footer {
+        #uploadSkinDialog .dialog-footer,
+        #notificationDialog .dialog-footer,
+        #guildDialog .dialog-footer,
+        #highScoreDialog .dialog-footer {
             margin-top: auto;
             padding-top: 12px;
             border-top: 1px solid #eee;
@@ -295,13 +310,11 @@
         }
         .xp-panel {
             display: none;
-            align-items: center;
-            position: relative;
+            display: none;
             margin: 8px 18px 6px 18px;
-            padding-right: 42px;
         }
         .xp-panel.is-visible {
-            display: flex;
+            display: block;
         }
         .xp-track {
             position: relative;
@@ -437,6 +450,42 @@
         .footer-current:hover {
             color: #999;
             text-decoration: none;
+        }
+        #communityDropup {
+            display: none;
+            position: absolute;
+            z-index: 1200;
+            width: 160px;
+            padding: 0;
+            background: transparent;
+            border: 0;
+            border-radius: 0;
+            box-shadow: none;
+            text-align: left;
+        }
+        #communityDropup.is-open {
+            display: block;
+        }
+        #communityDropup a {
+            display: block;
+            padding: 7px 12px;
+            color: #337ab7;
+            text-decoration: none;
+            font-size: 13px;
+            line-height: 1.2;
+        }
+        #communityDropup a:hover {
+            background: #f5f5f5;
+            color: #23527c;
+            text-decoration: none;
+        }
+        .spa-page-body {
+            flex: 1;
+            font-size: 13px;
+            color: #333;
+        }
+        .spa-page-body p {
+            margin: 0 0 10px 0;
         }
         #forgotPasswordLink {
             display: inline-block;
@@ -610,18 +659,26 @@
         </div>
         <br clear="both"/><br clear="both"/><br clear="both"/><br clear="both"/><br clear="both"/>
         <div id="helloXpPanel" class="xp-panel">
-            <div class="xp-track">
-                <div id="profileXpFill" class="xp-fill"></div>
-                <div id="profileXpText" class="xp-text">0/450 XP</div>
+            <div style="
+                                    background:#f5f5f5;
+                                    height:30px;
+                                    overflow:hidden;
+                                    position:relative;
+                                    border-radius:5px;
+                                    border:2px solid #154865;
+                                ">
+                <div id="indexXpBar" style="background: repeating-linear-gradient(-45deg, rgb(91, 158, 190), rgb(91, 158, 190) 10px, rgb(116, 171, 208) 10px, rgb(116, 171, 208) 20px); height: 100%; width: 0%; position: absolute; top: 0px; left: 0px; right: 0px;"></div>
+                <span id="indexXpText" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:13px; font-weight:900; color:#ffffff; white-space:nowrap; z-index:1;
+                            font-family: Arial, sans-serif;
+                            text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, -1px 0 0 #000, 1px 0 0 #000, 0 -1px 0 #000, 0 1px 0 #000;">0 / 450 XP</span>
             </div>
-            <div id="profileXpLevel" class="xp-star">1</div>
         </div>
         <hr/>
         <center>
             <div>
                 <a href="index.html" class="text-primary">Home</a> |
                 <a href="#login" id="loginLink" class="text-primary">Login</a> |
-                <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">Community</a> |
+                <a href="#community" class="text-primary community-menu-link">Community</a> |
                 <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">About</a>
             </div>
         </center>
@@ -639,7 +696,7 @@
         <div class="dialog-footer">
             <a href="#home" id="loginHomeLink" class="text-primary">Home</a> |
             <a href="#login" class="text-primary">Login</a> |
-            <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">Community</a> |
+            <a href="#community" class="text-primary community-menu-link">Community</a> |
             <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">About</a>
         </div>
     </div>
@@ -654,7 +711,7 @@
         <div class="dialog-footer">
             <a href="#home" id="registerHomeLink" class="text-primary">Home</a> |
             <a href="#login" id="registerLoginLink" class="text-primary">Login</a> |
-            <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">Community</a> |
+            <a href="#community" class="text-primary community-menu-link">Community</a> |
             <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">About</a>
         </div>
     </div>
@@ -666,7 +723,7 @@
         <div class="dialog-footer">
             <a href="#home" id="forgotHomeLink" class="text-primary">Home</a> |
             <a href="#login" id="forgotLoginLink" class="text-primary">Login</a> |
-            <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">Community</a> |
+            <a href="#community" class="text-primary community-menu-link">Community</a> |
             <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">About</a>
         </div>
     </div>
@@ -722,7 +779,7 @@
         <div class="dialog-footer">
             <a href="#home" id="accountHomeLink" class="text-primary">Home</a> |
             <a href="#account" class="footer-current">Account</a> |
-            <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">Community</a> |
+            <a href="#community" class="text-primary community-menu-link">Community</a> |
             <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">About</a>
         </div>
     </div>
@@ -741,9 +798,47 @@
         <div class="dialog-footer">
             <a href="#home" id="uploadHomeLink" class="text-primary">Home</a> |
             <a href="#account" id="uploadAccountFooterLink" class="text-primary">Account</a> |
-            <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">Community</a>
+            <a href="#community" class="text-primary community-menu-link">Community</a>
         </div>
     </div>
+    <div id="notificationDialog">
+        <h3><a href="#home" class="dialog-brand">Bubble.am</a>&gt;&gt; Notification</h3>
+        <div class="spa-page-body">
+            <p>Belum ada notifikasi baru.</p>
+        </div>
+        <div class="dialog-footer">
+            <a href="#home" class="text-primary spa-home-link">Home</a> |
+            <a href="#community" class="text-primary community-menu-link">Community</a> |
+            <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">About</a>
+        </div>
+    </div>
+    <div id="guildDialog">
+        <h3><a href="#home" class="dialog-brand">Bubble.am</a>&gt;&gt; Guild</h3>
+        <div class="spa-page-body">
+            <p>Guild page.</p>
+        </div>
+        <div class="dialog-footer">
+            <a href="#home" class="text-primary spa-home-link">Home</a> |
+            <a href="#community" class="text-primary community-menu-link">Community</a> |
+            <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">About</a>
+        </div>
+    </div>
+    <div id="highScoreDialog">
+        <h3><a href="#home" class="dialog-brand">Bubble.am</a>&gt;&gt; High Score</h3>
+        <div class="spa-page-body">
+            <p>High score page.</p>
+        </div>
+        <div class="dialog-footer">
+            <a href="#home" class="text-primary spa-home-link">Home</a> |
+            <a href="#community" class="text-primary community-menu-link">Community</a> |
+            <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">About</a>
+        </div>
+    </div>
+</div>
+<div id="communityDropup">
+    <a href="#notification" data-route="notification">Notification</a>
+    <a href="#guild" data-route="guild">Guild</a>
+    <a href="#high-score" data-route="high-score">High Score</a>
 </div>
 <div id="connecting" style="display:none;position:absolute; left:0; right:0; top:0; bottom:0; z-index:100; background-color:rgba(0,0,0,0.5);">
     <div style="width:350px; background-color:#FFFFFF; margin:100px auto; border-radius:15px; padding:5px 15px 5px 15px;">
@@ -902,9 +997,8 @@
             localStorage.removeItem('accountType');
             updateChatAccessControls();
             $('#helloXpPanel').removeClass('is-visible');
-            $('#profileXpFill').css('width', '0%');
-            $('#profileXpText').text('0/450 XP');
-            $('#profileXpLevel').text('1');
+            $('#indexXpBar').css('width', '0%');
+            $('#indexXpText').text('0 / 450 XP');
         }
 
         function refreshLoggedInUser() {
@@ -975,11 +1069,68 @@
         window.showChatAccessError = showChatAccessError;
 
         function closeSpaDialogs() {
+            $('#overlays').removeClass('only-dialog');
             $('#loginDialog').removeClass('login-open');
             $('#registerDialog').removeClass('register-open');
             $('#forgotDialog').removeClass('forgot-open');
             $('#accountDialog').removeClass('account-open');
             $('#uploadSkinDialog').removeClass('upload-open');
+            $('#notificationDialog, #guildDialog, #highScoreDialog').removeClass('spa-open');
+            closeCommunityDropup();
+        }
+
+        function closeCommunityDropup() {
+            $('#communityDropup').removeClass('is-open').removeAttr('style');
+        }
+
+        function toggleCommunityDropup(link) {
+            var menu = $('#communityDropup');
+            var target = $(link);
+            var offset = target.offset();
+            var menuHeight = menu.outerHeight() || 104;
+
+            if (!offset) {
+                return;
+            }
+
+            if (menu.hasClass('is-open') && menu.data('trigger') === link) {
+                closeCommunityDropup();
+                return;
+            }
+
+            menu
+                .data('trigger', link)
+                .css({
+                    left: Math.round(offset.left - 24),
+                    top: Math.round(offset.top - menuHeight - 8)
+                })
+                .addClass('is-open');
+        }
+
+        function openSpaPage(page) {
+            var target = {
+                notification: '#notificationDialog',
+                guild: '#guildDialog',
+                'high-score': '#highScoreDialog'
+            }[page];
+
+            if (!target) {
+                return false;
+            }
+
+            closeSpaDialogs();
+            $('#helloDialog').hide();
+            $(target).addClass('spa-open');
+            $('#overlays').addClass('only-dialog').show();
+            return true;
+        }
+
+        function routeSpaHash() {
+            var route = String(window.location.hash || '').replace(/^#/, '');
+
+            if (route == 'notification' || route == 'guild' || route == 'high-score') {
+                openSpaPage(route);
+            }
         }
 
         function resetUploadSkinDialog() {
@@ -1031,9 +1182,8 @@
             var percent = Math.max(0, Math.min(100, (xp / nextLevelXp) * 100));
 
             $('#helloXpPanel').addClass('is-visible');
-            $('#profileXpFill').css('width', percent + '%');
-            $('#profileXpText').text(xp + '/' + nextLevelXp + ' XP');
-            $('#profileXpLevel').text(level);
+            $('#indexXpBar').css('width', percent + '%');
+            $('#indexXpText').text(xp + ' / ' + nextLevelXp + ' XP');
         }
 
         function finishLogin(result, statusEl) {
@@ -1069,7 +1219,11 @@
             refreshLoggedInUser();
             startAccountSync();
         }
-        $(window).on('hashchange', updateChatAccessControls);
+        routeSpaHash();
+        $(window).on('hashchange', function() {
+            updateChatAccessControls();
+            routeSpaHash();
+        });
         // Simpan nick ke localStorage hanya saat tombol Play diklik
         $('#playBtn').on('click', function() {
             var nick = $('#nick').val();
@@ -1097,6 +1251,30 @@
             closeSpaDialogs();
             $('#loginStatus, #registerStatus, #forgotStatus').hide();
             $('#helloDialog').show();
+        });
+        $('.spa-home-link').on('click', function(e) {
+            e.preventDefault();
+            window.location.hash = '#home';
+            closeSpaDialogs();
+            $('#helloDialog').show();
+        });
+        $(document).on('click', '.community-menu-link', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleCommunityDropup(this);
+        });
+        $('#communityDropup').on('click', 'a', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            var route = $(this).attr('data-route');
+            closeCommunityDropup();
+            window.location.hash = route;
+            openSpaPage(route);
+        });
+        $(document).on('click', function(e) {
+            if (!$(e.target).closest('#communityDropup, .community-menu-link').length) {
+                closeCommunityDropup();
+            }
         });
         $('#accountHomeLink').on('click', function(e) {
             e.preventDefault();
