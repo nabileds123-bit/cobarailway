@@ -130,9 +130,12 @@ this.merg = true;
     }
 
     var player = this.socket.playerTracker;
+    if (String(player.accountType || '').toLowerCase() != 'premium') {
+        break;
+    }
 
     // daftar nick yang bisa pakai /mass
-const allowedMassUsers = ["Amruflxryns", "AMOT ALPERDO S", "Epad", "DEMON LORD", "rrq epos galang", "DISHA", "M NABIL FEBRI", "Vaxelin Ups"];
+const allowedMassUsers = ["Amruflxryns", "AMOT ALPERDO S", "Epad", "DEMON LORD", "rrq epos galang", "DISHA", "M NABIL FEBRI", "Vaxelin Ups", "Slowly"];
 
 if (message.startsWith("/mass") && allowedMassUsers.includes(player.getName())) {
     var parts = message.split(" ");
@@ -192,7 +195,7 @@ if (message.startsWith("/mass") && allowedMassUsers.includes(player.getName())) 
         break; // jangan broadcast
     }
 
-    // Kirim chat normal untuk pemain lain
+    // Kirim chat normal dari Premium ke semua pemain.
     var packet = new Packet.Chat(player, message);
     for (var i = 0; i < this.gameServer.clients.length; i++) {
         this.gameServer.clients[i].sendPacket(packet);
@@ -278,6 +281,7 @@ PacketHandler.prototype.setAuthToken = function(token) {
 
             client.authUserId = user.id;
             client.authUsername = user.username;
+            client.accountType = user.accountType || 'Free';
             client.skinUrl = user.skinUrl || user.guildSkinUrl || null;
             client.lastPassiveXpTime = Date.now();
             this.applyCellColor(Auth.normalizeCellColor(user.cellColor));

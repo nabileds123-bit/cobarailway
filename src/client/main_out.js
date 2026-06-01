@@ -174,7 +174,7 @@
 
                     }
                     else {
-                        if (!hasOverlay) {
+                        if (!hasOverlay && isChatVisible()) {
                             document.getElementById("chat_textbox").focus();
                             isTyping = true;
                         }
@@ -885,6 +885,13 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
     }
 
     function sendChat(str) {
+        if (!canUsePremiumChat()) {
+            if (wHandle.showChatAccessError) {
+                wHandle.showChatAccessError();
+            }
+            return;
+        }
+
         if (wsIsOpen() && (str.length < 200) && (str.length > 0)) {
             var msg = prepareData(2 + 2 * str.length);
             var offset = 0;
@@ -898,6 +905,19 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
             wsSend(msg);
             //console.log(msg);
         }
+    }
+
+    function canUsePremiumChat() {
+        if (wHandle.canUsePremiumChat) {
+            return wHandle.canUsePremiumChat();
+        }
+
+        return !!wHandle.localStorage && String(wHandle.localStorage.getItem('accountType') || '').toLowerCase() == 'premium';
+    }
+
+    function isChatVisible() {
+        var chat = document.getElementById("chat_textbox");
+        return !!chat && chat.className.indexOf("chat-hidden") == -1;
     }
 
     function wsIsOpen() {
