@@ -60,6 +60,7 @@ function ensureMysql() {
                 'password_hash VARCHAR(256) NOT NULL,' +
                 'account_type VARCHAR(16) NOT NULL DEFAULT \'Free\',' +
                 'level INT NOT NULL DEFAULT 1,' +
+                'xp INT NOT NULL DEFAULT 0,' +
                 'points DECIMAL(12,2) NOT NULL DEFAULT 0,' +
                 'guild VARCHAR(32) NULL,' +
                 'skin_url VARCHAR(255) NULL,' +
@@ -75,6 +76,7 @@ function ensureMysql() {
             var alters = [
                 'ALTER TABLE users ADD COLUMN account_type VARCHAR(16) NOT NULL DEFAULT \'Free\'',
                 'ALTER TABLE users ADD COLUMN level INT NOT NULL DEFAULT 1',
+                'ALTER TABLE users ADD COLUMN xp INT NOT NULL DEFAULT 0',
                 'ALTER TABLE users ADD COLUMN points DECIMAL(12,2) NOT NULL DEFAULT 0',
                 'ALTER TABLE users ADD COLUMN guild VARCHAR(32) NULL',
                 'ALTER TABLE users ADD COLUMN skin_url VARCHAR(255) NULL',
@@ -150,13 +152,22 @@ function makeToken() {
     return crypto.randomBytes(32).toString('hex');
 }
 
+function getNextLevelXp(level) {
+    return Math.max(1, (Number(level || 1) * 400) + 50);
+}
+
 function publicUser(user) {
+    var level = Number(user.level || 1);
+    var xp = Number(user.xp || 0);
+
     return {
         id: user.id,
         username: user.username,
         email: user.email,
         accountType: user.accountType || 'Free',
-        level: Number(user.level || 1),
+        level: level,
+        xp: xp,
+        nextLevelXp: getNextLevelXp(level),
         points: Number(user.points || 0),
         guild: user.guild || '',
         skinUrl: user.skinUrl || '',
@@ -178,6 +189,7 @@ function mysqlUser(row) {
         passwordHash: row.password_hash,
         accountType: row.account_type,
         level: row.level,
+        xp: row.xp,
         points: row.points,
         guild: row.guild,
         skinUrl: row.skin_url,
@@ -412,6 +424,7 @@ function handleRegister(req, res) {
                     passwordHash: hashPassword(password, salt),
                     accountType: 'Free',
                     level: 1,
+                    xp: 0,
                     points: 0,
                     guild: '',
                     skinUrl: '',

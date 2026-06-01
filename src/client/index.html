@@ -301,6 +301,61 @@
         #buyPremiumLink {
             margin-left: 8px;
         }
+        .xp-panel {
+            display: flex;
+            align-items: center;
+            padding: 8px 8px;
+            border-top: 1px solid #ddd;
+        }
+        .xp-track {
+            position: relative;
+            flex: 1;
+            height: 28px;
+            border: 1px solid #2e6f8f;
+            border-radius: 3px;
+            overflow: hidden;
+            background-color: #77b8d3;
+            background-image: repeating-linear-gradient(
+                45deg,
+                rgba(255,255,255,.16) 0,
+                rgba(255,255,255,.16) 10px,
+                rgba(255,255,255,0) 10px,
+                rgba(255,255,255,0) 20px
+            );
+            box-shadow: inset 0 1px 2px rgba(0,0,0,.22);
+        }
+        .xp-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(#48a4c8, #267da8);
+            transition: width .25s ease;
+        }
+        .xp-text {
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 5px;
+            color: #fff;
+            font-size: 12px;
+            font-weight: bold;
+            text-align: center;
+            text-shadow: 0 1px 2px rgba(0,0,0,.75);
+        }
+        .xp-star {
+            width: 48px;
+            height: 48px;
+            margin-left: -5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #ffd928;
+            color: #333;
+            font-size: 16px;
+            font-weight: bold;
+            text-shadow: 0 1px 0 rgba(255,255,255,.8);
+            clip-path: polygon(50% 0%, 61% 33%, 98% 35%, 68% 56%, 79% 91%, 50% 70%, 21% 91%, 32% 56%, 2% 35%, 39% 33%);
+            filter: drop-shadow(0 1px 1px rgba(0,0,0,.35));
+        }
         .profile-skin {
             width: 42px;
             height: 42px;
@@ -516,6 +571,13 @@
             <span class="profile-label">Level:</span>
             <span id="profileLevel" class="profile-value">1</span>
         </div>
+        <div class="xp-panel">
+            <div class="xp-track">
+                <div id="profileXpFill" class="xp-fill"></div>
+                <div id="profileXpText" class="xp-text">0/450 XP</div>
+            </div>
+            <div id="profileXpLevel" class="xp-star">1</div>
+        </div>
         <div class="profile-row">
             <span class="profile-label">Points:</span>
             <span id="profilePoints" class="profile-value">0.00</span>
@@ -587,6 +649,7 @@
                     .html('Free <a href="#buy-premium" id="buyPremiumLink" class="text-primary">Buy Premium</a>');
             }
             $('#profileLevel').text(user.level || 1);
+            updateXpBar(user);
             $('#profilePoints').text(Number(user.points || 0).toFixed(2));
             if (user.guild) {
                 $('#profileGuild').text(user.guild);
@@ -635,6 +698,17 @@
             var seconds = String(date.getSeconds()).padStart(2, '0');
 
             return day + '/' + month + '/' + year + ' ' + hours + ':' + minutes + ':' + seconds;
+        }
+
+        function updateXpBar(user) {
+            var level = Number(user.level || 1);
+            var xp = Number(user.xp || 0);
+            var nextLevelXp = Number(user.nextLevelXp || ((level * 400) + 50));
+            var percent = Math.max(0, Math.min(100, (xp / nextLevelXp) * 100));
+
+            $('#profileXpFill').css('width', percent + '%');
+            $('#profileXpText').text(xp + '/' + nextLevelXp + ' XP');
+            $('#profileXpLevel').text(level);
         }
 
         function finishLogin(result, statusEl) {
