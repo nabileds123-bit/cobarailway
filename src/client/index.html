@@ -889,11 +889,36 @@
         });
         $('#accountDialog').on('click', '#buyPremiumLink', function(e) {
             e.preventDefault();
-            $('#uploadSkinStatus').removeClass('text-success').addClass('text-danger').text('Buy Premium belum tersedia.').show();
+            var status = $('#uploadSkinStatus');
+            status.removeClass('text-danger').addClass('text-success').text('Memproses Buy Premium...').show();
+
+            authPost('/api/account/buy-premium', {})
+                .done(function(result) {
+                    applyLoggedInUser(result.user);
+                    status.removeClass('text-danger').addClass('text-success').text(result.message || 'Account berhasil menjadi Premium.').show();
+                })
+                .fail(function(xhr) {
+                    showAuthError(status, xhr, 'Buy Premium gagal.');
+                });
         });
         $('#accountDialog').on('click', '#joinGuildLink', function(e) {
             e.preventDefault();
-            $('#uploadSkinStatus').removeClass('text-success').addClass('text-danger').text('List guild belum tersedia.').show();
+            var guild = prompt('Nama guild baru (2-12 karakter A-Z 0-9). Membutuhkan 50 point:');
+            if (guild === null) {
+                return;
+            }
+
+            var status = $('#uploadSkinStatus');
+            status.removeClass('text-danger').addClass('text-success').text('Membuat guild...').show();
+
+            authPost('/api/guild/create', { guild: guild })
+                .done(function(result) {
+                    applyLoggedInUser(result.user);
+                    status.removeClass('text-danger').addClass('text-success').text(result.message || 'Guild berhasil dibuat.').show();
+                })
+                .fail(function(xhr) {
+                    showAuthError(status, xhr, 'Membuat guild gagal.');
+                });
         });
         $('#profileCellColor').on('click', function(e) {
             e.preventDefault();
@@ -947,7 +972,20 @@
                 return;
             }
 
-            $('#uploadSkinStatus').removeClass('text-success').addClass('text-danger').text('Upload skin backend belum tersedia. File dipilih: ' + file.name).show();
+            var status = $('#uploadSkinStatus');
+            if (!currentUser || Number(currentUser.points || 0) < 150) {
+                status.removeClass('text-success').addClass('text-danger').text('Point tidak cukup. Upload skin membutuhkan 150 point.').show();
+                return;
+            }
+
+            authPost('/api/account/upload-skin', { skinUrl: '' })
+                .done(function(result) {
+                    applyLoggedInUser(result.user);
+                    status.removeClass('text-danger').addClass('text-success').text(result.message || 'Skin berhasil disimpan.').show();
+                })
+                .fail(function(xhr) {
+                    showAuthError(status, xhr, 'Upload skin belum bisa diproses.');
+                });
         });
         $('#registerHomeLink').on('click', function(e) {
             e.preventDefault();

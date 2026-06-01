@@ -6,6 +6,9 @@ var dbPath = path.join(__dirname, '..', 'data', 'users.json');
 var memorySessions = {};
 var mysqlPool = null;
 var mysqlReady = null;
+var BUY_PREMIUM_COST = 2;
+var UPLOAD_SKIN_COST = 150;
+var CREATE_GUILD_COST = 50;
 var allowedCellColors = [
     '#6FCA36',
     '#4379EF',
@@ -250,6 +253,29 @@ function readBody(req, callback) {
         } catch (e) {
             callback(e);
         }
+    });
+}
+
+function getAuthToken(req) {
+    var header = req.headers.authorization || '';
+    return header.replace(/^Bearer\s+/i, '');
+}
+
+function requireUser(req, res) {
+    var token = getAuthToken(req);
+
+    if (!token) {
+        sendJson(res, 401, { ok: false, error: 'Belum login.' });
+        return Promise.resolve(null);
+    }
+
+    return findUserByToken(token).then(function(user) {
+        if (!user) {
+            sendJson(res, 401, { ok: false, error: 'Session tidak valid.' });
+            return null;
+        }
+
+        return user;
     });
 }
 
@@ -594,18 +620,9 @@ function handleForgotPassword(req, res) {
 }
 
 function handleMe(req, res) {
-    var header = req.headers.authorization || '';
-    var token = header.replace(/^Bearer\s+/i, '');
-
-    if (!token) {
-        sendJson(res, 401, { ok: false, error: 'Belum login.' });
-        return;
-    }
-
-    findUserByToken(token)
+    requireUser(req, res)
         .then(function(user) {
             if (!user) {
-                sendJson(res, 401, { ok: false, error: 'Session tidak valid.' });
                 return;
             }
 
@@ -634,15 +651,46 @@ function saveAccountColor(userId, color) {
     });
 }
 
-function handleAccountColor(req, res) {
-    var header = req.headers.authorization || '';
-    var token = header.replace(/^Bearer\s+/i, '');
+function saveAccountFields(user) {
+    return ensureMysql().then(function(usingMysql) {
+        if (usingMysql) {
+            return getMysqlPool()
+                .query(
+                    'UPDATE users SET account_type = ?, points = ?, guild = ?, skin_url = ? WHERE id = ?',
+                    [user.accountType || 'Free', Number(user.points || 0), user.guild || null, user.skinUrl || null, user.id]
+                )
+                .then(function() {
+                    return user;
+                });
+        }
 
-    if (!token) {
-        sendJson(res, 401, { ok: false, error: 'Belum login.' });
-        return;
+        var db = readJsonDb();
+        for (var i = 0; i < db.users.length; i++) {
+            if (db.users[i].id == user.id) {
+                db.users[i].accountType = user.accountType || 'Free';
+                db.users[i].points = Number(user.points || 0);
+                db.users[i].guild = user.guild || '';
+                db.users[i].skinUrl = user.skinUrl || '';
+                writeJsonDb(db);
+                return user;
+            }
+        }
+
+        return user;
+    });
+}
+
+function spendPoints(user, cost) {
+    var points = Number(user.points || 0);
+    if (points < cost) {
+        return false;
     }
 
+    user.points = points - cost;
+    return true;
+}
+
+function handleAccountColor(req, res) {
     readBody(req, function(err, body) {
         if (err) {
             sendJson(res, 400, { ok: false, error: 'JSON tidak valid.' });
@@ -655,16 +703,118 @@ function handleAccountColor(req, res) {
             return;
         }
 
-        findUserByToken(token)
+        requireUser(req, res)
             .then(function(user) {
                 if (!user) {
-                    sendJson(res, 401, { ok: false, error: 'Session tidak valid.' });
                     return null;
                 }
 
                 user.cellColor = color;
                 return saveAccountColor(user.id, color).then(function() {
                     sendJson(res, 200, { ok: true, user: publicUser(user) });
+                });
+            })
+            .catch(function(error) {
+                handleError(res, error);
+            });
+    });
+}
+
+function handleBuyPremium(req, res) {
+    requireUser(req, res)
+        .then(function(user) {
+            if (!user) {
+                return;
+            }
+
+            if (String(user.accountType || '').toLowerCase() == 'premium') {
+                sendJson(res, 200, { ok: true, message: 'Account sudah Premium.', user: publicUser(user) });
+                return;
+            }
+
+            if (!spendPoints(user, BUY_PREMIUM_COST)) {
+                sendJson(res, 400, { ok: false, error: 'Point tidak cukup. Buy Premium membutuhkan 2 point.' });
+                return;
+            }
+
+            user.accountType = 'Premium';
+            return saveAccountFields(user).then(function(savedUser) {
+                sendJson(res, 200, { ok: true, message: 'Account berhasil menjadi Premium.', user: publicUser(savedUser) });
+            });
+        })
+        .catch(function(error) {
+            handleError(res, error);
+        });
+}
+
+function handleUploadSkin(req, res) {
+    readBody(req, function(err, body) {
+        if (err) {
+            sendJson(res, 400, { ok: false, error: 'JSON tidak valid.' });
+            return;
+        }
+
+        var skinUrl = String(body.skinUrl || '').trim();
+
+        requireUser(req, res)
+            .then(function(user) {
+                if (!user) {
+                    return;
+                }
+
+                if (!skinUrl) {
+                    sendJson(res, 400, { ok: false, error: 'Upload skin membutuhkan storage file. Minimal point yang dibutuhkan: 150.' });
+                    return;
+                }
+
+                if (!spendPoints(user, UPLOAD_SKIN_COST)) {
+                    sendJson(res, 400, { ok: false, error: 'Point tidak cukup. Upload skin membutuhkan 150 point.' });
+                    return;
+                }
+
+                user.skinUrl = skinUrl;
+                return saveAccountFields(user).then(function(savedUser) {
+                    sendJson(res, 200, { ok: true, message: 'Skin berhasil disimpan.', user: publicUser(savedUser) });
+                });
+            })
+            .catch(function(error) {
+                handleError(res, error);
+            });
+    });
+}
+
+function handleCreateGuild(req, res) {
+    readBody(req, function(err, body) {
+        if (err) {
+            sendJson(res, 400, { ok: false, error: 'JSON tidak valid.' });
+            return;
+        }
+
+        var guild = String(body.guild || '').trim();
+        if (!/^[A-Za-z0-9]{2,12}$/.test(guild)) {
+            sendJson(res, 400, { ok: false, error: 'Nama guild hanya boleh A-Z 0-9, 2-12 karakter.' });
+            return;
+        }
+
+        requireUser(req, res)
+            .then(function(user) {
+                if (!user) {
+                    return;
+                }
+
+                if (user.guild) {
+                    sendJson(res, 400, { ok: false, error: 'Account sudah memiliki guild.' });
+                    return;
+                }
+
+                if (!spendPoints(user, CREATE_GUILD_COST)) {
+                    sendJson(res, 400, { ok: false, error: 'Point tidak cukup. Membuat guild membutuhkan 50 point.' });
+                    return;
+                }
+
+                user.guild = guild;
+                return saveAccountFields(user).then(function(savedUser) {
+                    sendJson(res, 200, { ok: true, message: 'Guild berhasil dibuat.', user: publicUser(savedUser) });
                 });
             })
             .catch(function(error) {
@@ -701,6 +851,21 @@ function handleAuth(req, res) {
 
     if (req.method == 'POST' && req.url == '/api/account/color') {
         handleAccountColor(req, res);
+        return true;
+    }
+
+    if (req.method == 'POST' && req.url == '/api/account/buy-premium') {
+        handleBuyPremium(req, res);
+        return true;
+    }
+
+    if (req.method == 'POST' && req.url == '/api/account/upload-skin') {
+        handleUploadSkin(req, res);
+        return true;
+    }
+
+    if (req.method == 'POST' && req.url == '/api/guild/create') {
+        handleCreateGuild(req, res);
         return true;
     }
 
