@@ -576,8 +576,9 @@ GameServer.prototype.splitCells = function(client) {
         // Calculate mass of splitting cell
         var newMass = cell.mass / 2;
         cell.mass = newMass;
+        cell.calcMergeTime(this.config.playerRecombineTime);
         // Create cell
-        split = new Entity.PlayerCell(this.getNextNodeId(), client, startPos, newMass);
+        var split = new Entity.PlayerCell(this.getNextNodeId(), client, startPos, newMass);
         split.setAngle(angle);
         split.setMoveEngineData(60 + (cell.getSpeed() * 4), 20);
         split.calcMergeTime(this.config.playerRecombineTime);
@@ -731,6 +732,9 @@ GameServer.prototype.getCellsInRange = function(cell) {
                 break;
             case 0: // Players
                 multiplier = check.owner == cell.owner ? 1.00 : multiplier;
+                if (check.owner == cell.owner && (check.getRecombineTicks() > 0 || cell.getRecombineTicks() > 0)) {
+                    continue;
+                }
                 // Can't eat team members
                 if (this.gameMode.haveTeams) {
                     if (!check.owner) { // Error check
