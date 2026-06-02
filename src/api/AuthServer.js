@@ -1,6 +1,8 @@
 var crypto = require('crypto');
 var fs = require('fs');
+var net = require('net');
 var path = require('path');
+var tls = require('tls');
 
 var dbPath = path.join(__dirname, '..', 'data', 'users.json');
 var memorySessions = {};
@@ -172,6 +174,238 @@ function hashPassword(password, salt) {
 
 function makeToken() {
     return crypto.randomBytes(32).toString('hex');
+}
+
+function getBaseUrl(req) {
+    var configuredUrl = process.env.PUBLIC_URL || process.env.APP_URL || process.env.BASE_URL || '';
+    if (configuredUrl) {
+        return String(configuredUrl).replace(/\/+$/, '');
+    }
+
+    var protocol = (req.headers['x-forwarded-proto'] || 'http').split(',')[0];
+    var host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost';
+    return protocol + '://' + host;
+}
+
+function getMailFrom() {
+    return process.env.EMAIL_FROM || process.env.MAIL_FROM || 'Bubble.am <noreply@bubblev2.site>';
+}
+
+function getMailAddress(value) {
+    var text = String(value || '').trim();
+    var match = text.match(/<([^>]+)>/);
+    return match ? match[1].trim() : text;
+}
+
+function escapeMailHeader(value) {
+    return String(value || '').replace(/[\r\n]+/g, ' ').trim();
+}
+
+function dotStuff(value) {
+    return String(value || '').replace(/\r?\n/g, '\r\n').replace(/^\./gm, '..');
+}
+
+function readSmtpResponse(socket) {
+    return new Promise(function(resolve, reject) {
+        var buffer = '';
+
+        function cleanup() {
+            socket.removeListener('data', onData);
+            socket.removeListener('error', onError);
+        }
+
+        function onError(error) {
+            cleanup();
+            reject(error);
+        }
+
+        function onData(chunk) {
+            buffer += chunk.toString('utf8');
+            var lines = buffer.split(/\r?\n/).filter(function(line) {
+                return line.length;
+            });
+            if (lines.length && /^[0-9]{3} /.test(lines[lines.length - 1])) {
+                cleanup();
+                resolve(buffer);
+            }
+        }
+
+        socket.on('data', onData);
+        socket.on('error', onError);
+    });
+}
+
+function smtpCommand(socket, command, expectedCode) {
+    socket.write(command + '\r\n');
+    return readSmtpResponse(socket).then(function(response) {
+        if (expectedCode && response.indexOf(String(expectedCode)) !== 0) {
+            throw new Error('SMTP command failed: ' + response.trim());
+        }
+        return response;
+    });
+}
+
+function sendSmtpEmail(to, subject, html, text) {
+    var host = process.env.SMTP_HOST || '';
+    var port = Number(process.env.SMTP_PORT || 587);
+    var user = process.env.SMTP_USER || '';
+    var pass = process.env.SMTP_PASS || '';
+    var from = getMailFrom();
+    var fromAddress = getMailAddress(from);
+
+    if (!host || !user || !pass || !fromAddress) {
+        console.log('[Auth] Email skipped; SMTP env is incomplete. To: %s Subject: %s', to, subject);
+        return Promise.resolve(false);
+    }
+
+    var socket = net.createConnection({ host: host, port: port });
+    var secureSocket = null;
+
+    function activeSocket() {
+        return secureSocket || socket;
+    }
+
+    function closeSocket() {
+        try {
+            activeSocket().end();
+        } catch (e) {}
+    }
+
+    return readSmtpResponse(socket)
+        .then(function(response) {
+            if (response.indexOf('220') !== 0) {
+                throw new Error('SMTP connect failed: ' + response.trim());
+            }
+            return smtpCommand(socket, 'EHLO bubblev2.site', 250);
+        })
+        .then(function() {
+            return smtpCommand(socket, 'STARTTLS', 220);
+        })
+        .then(function() {
+            secureSocket = tls.connect({
+                socket: socket,
+                servername: host
+            });
+
+            return new Promise(function(resolve, reject) {
+                secureSocket.once('secureConnect', resolve);
+                secureSocket.once('error', reject);
+            });
+        })
+        .then(function() {
+            return smtpCommand(activeSocket(), 'EHLO bubblev2.site', 250);
+        })
+        .then(function() {
+            return smtpCommand(activeSocket(), 'AUTH LOGIN', 334);
+        })
+        .then(function() {
+            return smtpCommand(activeSocket(), Buffer.from(user).toString('base64'), 334);
+        })
+        .then(function() {
+            return smtpCommand(activeSocket(), Buffer.from(pass).toString('base64'), 235);
+        })
+        .then(function() {
+            return smtpCommand(activeSocket(), 'MAIL FROM:<' + fromAddress + '>', 250);
+        })
+        .then(function() {
+            return smtpCommand(activeSocket(), 'RCPT TO:<' + getMailAddress(to) + '>', 250);
+        })
+        .then(function() {
+            return smtpCommand(activeSocket(), 'DATA', 354);
+        })
+        .then(function() {
+            var boundary = 'bubble-' + crypto.randomBytes(8).toString('hex');
+            var body = [
+                'From: ' + escapeMailHeader(from),
+                'To: ' + escapeMailHeader(to),
+                'Subject: ' + escapeMailHeader(subject),
+                'MIME-Version: 1.0',
+                'Content-Type: multipart/alternative; boundary="' + boundary + '"',
+                '',
+                '--' + boundary,
+                'Content-Type: text/plain; charset=UTF-8',
+                '',
+                dotStuff(text),
+                '--' + boundary,
+                'Content-Type: text/html; charset=UTF-8',
+                '',
+                dotStuff(html),
+                '--' + boundary + '--',
+                '.'
+            ].join('\r\n');
+
+            activeSocket().write(body + '\r\n');
+            return readSmtpResponse(activeSocket());
+        })
+        .then(function(response) {
+            if (response.indexOf('250') !== 0) {
+                throw new Error('SMTP send failed: ' + response.trim());
+            }
+            return smtpCommand(activeSocket(), 'QUIT', 221).catch(function() {});
+        })
+        .then(function() {
+            closeSocket();
+            return true;
+        })
+        .catch(function(error) {
+            closeSocket();
+            throw error;
+        });
+}
+
+function sendResendEmail(to, subject, html, text) {
+    var resendKey = process.env.RESEND_API_KEY || '';
+    var from = getMailFrom();
+
+    if (!resendKey) {
+        console.log('[Auth] Email skipped; RESEND_API_KEY is not configured. To: %s Subject: %s', to, subject);
+        return Promise.resolve(false);
+    }
+
+    return fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+            Authorization: 'Bearer ' + resendKey,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            from: from,
+            to: [to],
+            subject: subject,
+            html: html,
+            text: text
+        })
+    }).then(function(response) {
+        if (!response.ok) {
+            return response.text().then(function(body) {
+                throw new Error(body || 'Email send failed.');
+            });
+        }
+
+        return true;
+    });
+}
+
+function sendEmail(to, subject, html, text) {
+    if (process.env.SMTP_HOST) {
+        return sendSmtpEmail(to, subject, html, text);
+    }
+
+    return sendResendEmail(to, subject, html, text);
+}
+
+function sendVerificationEmail(user, req) {
+    var verifyUrl = getBaseUrl(req) + '/api/verify-email?token=' + encodeURIComponent(user.verificationToken);
+    var subject = 'Verifikasi email Bubble.am';
+    var text = 'Halo ' + user.username + ', buka link ini untuk verifikasi email Anda: ' + verifyUrl;
+    var html = '' +
+        '<p>Halo <b>' + user.username + '</b>,</p>' +
+        '<p>Klik tombol di bawah ini untuk verifikasi email Bubble.am.</p>' +
+        '<p><a href="' + verifyUrl + '" style="display:inline-block;padding:10px 14px;background:#337ab7;color:#fff;text-decoration:none;border-radius:4px;">Verifikasi email</a></p>' +
+        '<p>Jika tombol tidak bisa dibuka, salin link ini:</p>' +
+        '<p>' + verifyUrl + '</p>';
+
+    return sendEmail(user.email, subject, html, text);
 }
 
 function getNextLevelXp(level) {
@@ -540,6 +774,46 @@ function setResetToken(userId, token) {
     });
 }
 
+function verifyEmailToken(token) {
+    token = String(token || '').trim();
+    if (!token) {
+        return Promise.resolve(null);
+    }
+
+    return ensureMysql().then(function(usingMysql) {
+        if (usingMysql) {
+            return getMysqlPool()
+                .query('SELECT * FROM users WHERE verification_token = ? LIMIT 1', [token])
+                .then(function(result) {
+                    var user = mysqlUser(result[0][0]);
+                    if (!user) {
+                        return null;
+                    }
+
+                    return getMysqlPool()
+                        .query('UPDATE users SET email_verified = 1, verification_token = NULL WHERE id = ?', [user.id])
+                        .then(function() {
+                            user.emailVerified = 1;
+                            user.verificationToken = null;
+                            return user;
+                        });
+                });
+        }
+
+        var db = readJsonDb();
+        for (var i = 0; i < db.users.length; i++) {
+            if (db.users[i].verificationToken == token) {
+                db.users[i].emailVerified = 1;
+                db.users[i].verificationToken = null;
+                writeJsonDb(db);
+                return db.users[i];
+            }
+        }
+
+        return null;
+    });
+}
+
 function applyXp(user, amount) {
     var gained = Math.max(0, Math.floor(Number(amount || 0)));
     var level = Math.max(1, Number(user.level || 1));
@@ -668,10 +942,14 @@ function handleRegister(req, res) {
             .then(function(user) {
                 if (user) {
                     console.log('[Auth] Verification token for %s: %s', user.email, user.verificationToken);
-                    sendJson(res, 201, {
-                        ok: true,
-                        message: 'Register berhasil. Silakan cek email Anda untuk verifikasi.',
-                        user: publicUser(user)
+                    return sendVerificationEmail(user, req).then(function(sent) {
+                        sendJson(res, 201, {
+                            ok: true,
+                            message: sent
+                                ? 'Register berhasil. Silakan cek email Anda untuk verifikasi.'
+                                : 'Register berhasil, tetapi email belum terkirim karena konfigurasi email belum aktif.',
+                            user: publicUser(user)
+                        });
                     });
                 }
             })
@@ -750,6 +1028,32 @@ function handleForgotPassword(req, res) {
                 handleError(res, error);
             });
     });
+}
+
+function sendHtml(res, statusCode, body) {
+    res.writeHead(statusCode, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-store'
+    });
+    res.end(body);
+}
+
+function handleVerifyEmail(req, res) {
+    var parsedUrl = new URL(req.url, 'http://localhost');
+    var token = parsedUrl.searchParams.get('token') || '';
+
+    verifyEmailToken(token)
+        .then(function(user) {
+            if (!user) {
+                sendHtml(res, 400, '<h2>Verifikasi gagal</h2><p>Token verifikasi tidak valid atau sudah digunakan.</p>');
+                return;
+            }
+
+            sendHtml(res, 200, '<h2>Email berhasil diverifikasi</h2><p>Silakan kembali ke game dan login.</p><p><a href="/">Kembali ke Bubble.am</a></p>');
+        })
+        .catch(function(error) {
+            handleError(res, error);
+        });
 }
 
 function handleMe(req, res) {
@@ -1000,6 +1304,11 @@ function handleCreateGuild(req, res) {
 function handleAuth(req, res) {
     if (req.method == 'OPTIONS' && req.url.indexOf('/api/') == 0) {
         sendJson(res, 204, {});
+        return true;
+    }
+
+    if (req.method == 'GET' && req.url.indexOf('/api/verify-email') == 0) {
+        handleVerifyEmail(req, res);
         return true;
     }
 
