@@ -639,6 +639,9 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
                 offset += 4;
                 break;
             case 20: // clear nodes
+                if (playerStat && playerStat.active && playerStat.hasSpawned && 0 < playerCells.length) {
+                    finalizeMatchStats("death", true);
+                }
                 playerCells = [];
                 nodesOnScreen = [];
                 break;
@@ -677,6 +680,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
                         name: getString()
                     })
                 }
+                updateMatchLeaderboardStats();
                 drawLeaderBoard();
                 break;
             case 50: // update leaderboard (teams)
@@ -705,6 +709,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
                     nodeX = posX;
                     nodeY = posY;
                     viewZoom = posSize;
+                    entityViewZoom = posSize;
                 }
                 break;
             case 99:
@@ -763,6 +768,10 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
 
     function drawChatBoard() {
         //chatCanvas = null;
+        if (!showChat) {
+            chatCanvas = null;
+            return;
+        }
         if (!(0 < canvasWidth) || !(0 < canvasHeight)) {
             return;
         }
@@ -809,6 +818,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         timestamp = +new Date;
         var code = Math.random();
         ua = false;
+        var hadPlayerCells = 0 < playerCells.length;
         var queueLength = view.getUint16(offset, true);
         offset += 2;
         for (i = 0; i < queueLength; ++i) {
@@ -816,6 +826,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
                 killedNode = nodes[view.getUint32(offset + 4, true)];
             offset += 8;
             if (killer && killedNode) {
+                recordMatchEat(killer, killedNode);
                 killedNode.destroy();
                 killedNode.ox = killedNode.x;
                 killedNode.oy = killedNode.y;
@@ -842,7 +853,8 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
             var colorstr = "#" + color,
                 flags = view.getUint8(offset++),
                 flagVirus = !!(flags & 1),
-                flagAgitated = !!(flags & 16);
+                flagAgitated = !!(flags & 16),
+                flagPlayerCell = !!(flags & 128);
             flags & 2 && (offset += 4);
             flags & 4 && (offset += 8);
             flags & 8 && (offset += 16);
@@ -876,6 +888,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
             node.skinUrl = skinUrl || "";
             node.isVirus = flagVirus;
             node.isAgitated = flagAgitated;
+            node.isPlayerCell = flagPlayerCell;
             node.nx = posX;
             node.ny = posY;
             node.nSize = size;
@@ -886,6 +899,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
             if (-1 != nodesOnScreen.indexOf(nodeid) && -1 == playerCells.indexOf(node)) {
                 document.getElementById("overlays").style.display = "none";
                 playerCells.push(node);
+                noteMatchSpawn();
                 if (1 == playerCells.length) {
                     nodeX = node.x;
                     nodeY = node.y;
@@ -900,7 +914,12 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
             node = nodes[nodeId];
             null != node && node.destroy();
         }
-        ua && 0 == playerCells.length && showOverlays(false)
+        updateMatchMassStats();
+        if (ua && 0 == playerCells.length) {
+            if (!finalizeMatchStats("death", hadPlayerCells)) {
+                showOverlays(false)
+            }
+        }
     }
 
     function sendMouseMove() {
@@ -1083,11 +1102,17 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         return ratio * zoom;
     }
 
+    function entityViewRange() {
+        return Math.max(canvasHeight / 1080, canvasWidth / 1920);
+    }
+
     function calcViewZoom() {
         if (0 != playerCells.length) {
             for (var newViewZoom = 0, i = 0; i < playerCells.length; i++) newViewZoom += playerCells[i].size;
-            newViewZoom = Math.pow(Math.min(64 / newViewZoom, 1), .4) * viewRange();
-            viewZoom = (9 * viewZoom + newViewZoom) / 10
+            var massZoom = Math.pow(Math.min(64 / newViewZoom, 1), .4);
+            newViewZoom = massZoom * viewRange();
+            viewZoom = (9 * viewZoom + newViewZoom) / 10;
+            entityViewZoom = (9 * entityViewZoom + massZoom * entityViewRange()) / 10
         }
     }
 
@@ -1116,6 +1141,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
             nodeX = (29 * nodeX + posX) / 30;
             nodeY = (29 * nodeY + posY) / 30;
             viewZoom = (9 * viewZoom + posSize * viewRange()) / 10;
+            entityViewZoom = (9 * entityViewZoom + posSize * entityViewRange()) / 10;
         }
         buildQTree();
         mouseCoordinateChange();
@@ -1165,10 +1191,11 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
             ctx.restore()
         }
         ctx.restore();
-        lbCanvas && lbCanvas.width && safeDrawImage(ctx, lbCanvas, canvasWidth - lbCanvas.width - 10, 10); // draw Leader Board
-        if (chatCanvas != null) safeDrawImage(ctx, chatCanvas, 0, canvasHeight - chatCanvas.height - 50); // draw Leader Board
+        lbCanvas && showLeaderboard && lbCanvas.width && safeDrawImage(ctx, lbCanvas, canvasWidth - lbCanvas.width - 10, 10); // draw Leader Board
+        if (showChat && chatCanvas != null) safeDrawImage(ctx, chatCanvas, 0, canvasHeight - chatCanvas.height - 50); // draw Chat
 
         userScore = Math.max(userScore, calcUserScore());
+        updateMatchMassStats();
         if (0 != userScore) {
             if (null == scoreText) {
                 scoreText = new UText(24, '#FFFFFF');
@@ -1281,8 +1308,181 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         return score
     }
 
+    function getMassOwnerType(cell) {
+        if (!cell || 0 == cell.id || cell.isVirus) {
+            return "none";
+        }
+        if (-1 != playerCells.indexOf(cell)) {
+            return "own";
+        }
+        return "enemy";
+    }
+
+    function resetMatchStats() {
+        playerStat = {
+            active: false,
+            finalized: false,
+            hasSpawned: false,
+            startTime: 0,
+            endTime: 0,
+            leaderboardStartedAt: 0,
+            leaderboardTimeMs: 0,
+            foodCellsEaten: 0,
+            cellsEaten: 0,
+            highestMass: 0,
+            massHistory: [],
+            lastMassTrackAt: 0,
+            topPosition: null
+        };
+    }
+
+    function startMatchStats() {
+        resetMatchStats();
+        playerStat.active = true;
+        playerStat.startTime = Date.now();
+    }
+
+    function noteMatchSpawn() {
+        if (!playerStat || !playerStat.active || playerStat.finalized || wHandle.isSpectating) {
+            return;
+        }
+
+        playerStat.hasSpawned = true;
+        updateMatchMassStats();
+    }
+
+    function getCellMass(cell) {
+        if (!cell) {
+            return 0;
+        }
+
+        return Math.max(0, ~~(cell.nSize * cell.nSize / 100));
+    }
+
+    function getCurrentMass() {
+        for (var mass = 0, i = 0; i < playerCells.length; i++) {
+            mass += getCellMass(playerCells[i]);
+        }
+        return mass;
+    }
+
+    function updateMatchMassStats() {
+        if (!playerStat || !playerStat.active || playerStat.finalized) {
+            return;
+        }
+
+        var now = Date.now();
+        var mass = getCurrentMass();
+        playerStat.highestMass = Math.max(playerStat.highestMass, mass);
+
+        if (!playerStat.hasSpawned) {
+            return;
+        }
+
+        if (!playerStat.massHistory.length || 350 <= now - playerStat.lastMassTrackAt || playerStat.highestMass == mass) {
+            playerStat.massHistory.push({
+                time: Math.max(0, now - playerStat.startTime),
+                mass: mass
+            });
+            playerStat.lastMassTrackAt = now;
+        }
+    }
+
+    function isOwnCell(cell) {
+        return -1 != playerCells.indexOf(cell);
+    }
+
+    function isFoodCell(cell) {
+        return !!cell && !cell.name && !cell.isVirus && 20 >= cell.size;
+    }
+
+    function recordMatchEat(killer, killedNode) {
+        if (!playerStat || !playerStat.active || playerStat.finalized || wHandle.isSpectating) {
+            return;
+        }
+        if (!isOwnCell(killer) || isOwnCell(killedNode)) {
+            return;
+        }
+
+        if (isFoodCell(killedNode)) {
+            playerStat.foodCellsEaten++;
+        } else if (!killedNode.isVirus) {
+            playerStat.cellsEaten++;
+        }
+    }
+
+    function updateMatchLeaderboardStats() {
+        if (!playerStat || !playerStat.active || playerStat.finalized || wHandle.isSpectating) {
+            return;
+        }
+
+        var position = null;
+        for (var i = 0; i < leaderBoard.length; i++) {
+            if (-1 != nodesOnScreen.indexOf(leaderBoard[i].id)) {
+                position = i + 1;
+                break;
+            }
+        }
+
+        var now = Date.now();
+        if (position) {
+            if (!playerStat.leaderboardStartedAt) {
+                playerStat.leaderboardStartedAt = now;
+            }
+            playerStat.topPosition = null == playerStat.topPosition ? position : Math.min(playerStat.topPosition, position);
+        } else if (playerStat.leaderboardStartedAt) {
+            playerStat.leaderboardTimeMs += now - playerStat.leaderboardStartedAt;
+            playerStat.leaderboardStartedAt = 0;
+        }
+    }
+
+    function getFinalMatchStats() {
+        var now = playerStat.endTime || Date.now();
+        var leaderboardTimeMs = playerStat.leaderboardTimeMs;
+
+        if (playerStat.leaderboardStartedAt) {
+            leaderboardTimeMs += now - playerStat.leaderboardStartedAt;
+        }
+
+        return {
+            foodCellsEaten: playerStat.foodCellsEaten,
+            highestMass: playerStat.highestMass,
+            timeAliveMs: Math.max(0, now - playerStat.startTime),
+            leaderboardTimeMs: Math.max(0, leaderboardTimeMs),
+            cellsEaten: playerStat.cellsEaten,
+            topPosition: playerStat.topPosition,
+            massHistory: playerStat.massHistory.slice()
+        };
+    }
+
+    function finalizeMatchStats(reason, hadPlayerCells) {
+        if (!playerStat || !playerStat.active || playerStat.finalized || wHandle.isSpectating || !playerStat.hasSpawned || !hadPlayerCells) {
+            return false;
+        }
+
+        playerStat.endTime = Date.now();
+        updateMatchMassStats();
+        playerStat.finalized = true;
+        playerStat.active = false;
+
+        var detail = getFinalMatchStats();
+        detail.reason = reason || "death";
+        var event;
+        if (typeof CustomEvent == "function") {
+            event = new CustomEvent("matchResultReady", { detail: detail });
+        } else {
+            event = document.createEvent("CustomEvent");
+            event.initCustomEvent("matchResultReady", false, false, detail);
+        }
+        wHandle.dispatchEvent(event);
+        return true;
+    }
+
     function drawLeaderBoard() {
         lbCanvas = null;
+        if (!showLeaderboard) {
+            return;
+        }
         if (!(0 < canvasWidth) || !(0 < canvasHeight)) {
             return;
         }
@@ -1389,6 +1589,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         rightPos = 1E4,
         bottomPos = 1E4,
         viewZoom = 1,
+        entityViewZoom = 1,
         w = null,
         showSkin = true,
         showName = true,
@@ -1397,7 +1598,10 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         userScore = 0,
         showDarkTheme = false,
         showMass = false,
-        showEnemyMass = false,
+        showOtherMass = false,
+        showLeaderboard = true,
+        showChat = true,
+        smoothRender = false,
         posX = nodeX = ~~((leftPos + rightPos) / 2),
         posY = nodeY = ~~((topPos + bottomPos) / 2),
         posSize = 1,
@@ -1422,9 +1626,12 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
     ejectIcon.src = "/client/feed.png";
     var wCanvas = document.createElement("canvas");
     var playerStat = null;
+    resetMatchStats();
     wHandle.isSpectating = false;
     wHandle.setNick = function (arg) {
         hasClickedPlay = true;
+        wHandle.isSpectating = false;
+        startMatchStats();
         hideOverlays();
         userNickName = arg;
         sendNickName();
@@ -1444,10 +1651,49 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         showColor = arg
     };
     wHandle.setShowMass = function (arg) {
-        showMass = arg
+        showMass = !!arg
     };
-    wHandle.setShowEnemyMass = function (arg) {
-        showEnemyMass = arg
+    wHandle.setShowOtherMass = function (arg) {
+        showOtherMass = !!arg
+    };
+    wHandle.setShowEnemyMass = wHandle.setShowOtherMass;
+    wHandle.getMassDisplayState = function () {
+        return {
+            showMass: showMass,
+            showOtherMass: showOtherMass
+        };
+    };
+    wHandle.syncMassDisplayState = function () {
+        var ownMassCheckbox = document.getElementById("showMassCheckbox");
+        var otherMassCheckbox = document.getElementById("showOtherMassCheckbox");
+
+        if (ownMassCheckbox) {
+            showMass = !!ownMassCheckbox.checked;
+        }
+        if (otherMassCheckbox) {
+            showOtherMass = !!otherMassCheckbox.checked;
+        } else if (wHandle.localStorage) {
+            showOtherMass = wHandle.localStorage.getItem("showOtherMass") == "true";
+        }
+    };
+    wHandle.setShowLeaderboard = function (arg) {
+        showLeaderboard = arg;
+        if (!showLeaderboard) {
+            lbCanvas = null;
+        } else {
+            drawLeaderBoard();
+        }
+    };
+    wHandle.setShowChat = function (arg) {
+        showChat = arg;
+        if (!showChat) {
+            chatCanvas = null;
+        } else {
+            drawChatBoard();
+        }
+    };
+    wHandle.setSmoothRender = function (arg) {
+        smoothRender = arg
     };
     wHandle.setAccountCellColor = function (arg) {
         sendAccountColor(arg);
@@ -1455,6 +1701,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
     wHandle.spectate = function () {
         userNickName = null;
         wHandle.isSpectating = true;
+        resetMatchStats();
         sendUint8(1);
         hideOverlays()
     };
@@ -1577,6 +1824,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         destroyed: false,
         isVirus: false,
         isAgitated: false,
+        isPlayerCell: false,
         wasSimpleDrawing: true,
         destroy: function () {
             var tmp;
@@ -1698,7 +1946,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         updatePos: function () {
             if (0 == this.id) return 1;
             var a;
-            a = (timestamp - this.updateTime) / 120;
+            a = (timestamp - this.updateTime) / (smoothRender ? 180 : 120);
             a = 0 > a ? 0 : 1 < a ? 1 : a;
             var b = 0 > a ? 0 : 1 < a ? 1 : a;
             this.getNameSize();
@@ -1715,7 +1963,8 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
             if (0 == this.id) {
                 return true
             } else {
-                return !(this.x + this.size + 40 < nodeX - canvasWidth / 2 / viewZoom || this.y + this.size + 40 < nodeY - canvasHeight / 2 / viewZoom || this.x - this.size - 40 > nodeX + canvasWidth / 2 / viewZoom || this.y - this.size - 40 > nodeY + canvasHeight / 2 / viewZoom);
+                var cullZoom = 0 < entityViewZoom ? entityViewZoom : viewZoom;
+                return !(this.x + this.size + 40 < nodeX - canvasWidth / 2 / cullZoom || this.y + this.size + 40 < nodeY - canvasHeight / 2 / cullZoom || this.x - this.size - 40 > nodeX + canvasWidth / 2 / cullZoom || this.y - this.size - 40 > nodeY + canvasHeight / 2 / cullZoom);
             }
         },
         drawOneCell: function (ctx) {
@@ -1807,7 +2056,8 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
                 if (null != e && c) {
                     safeDrawImage(ctx, e, this.x - 2 * this.size, this.y - 2 * this.size, 4 * this.size, 4 * this.size);
                 }
-                var isOwnCell = -1 != playerCells.indexOf(this);
+                var massOwnerType = getMassOwnerType(this);
+                var isOwnCell = massOwnerType == "own";
                 var ncache;
                 //draw name
                 if (0 != this.id) {
@@ -1826,9 +2076,9 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
                     }
 
                     //draw mass
-                    var shouldShowOwnMass = showMass && (isOwnCell || 0 == playerCells.length);
-                    var shouldShowEnemyMass = showEnemyMass && !isOwnCell && 0 < playerCells.length && (!this.isVirus || this.isAgitated) && 20 < this.size;
-                    if (shouldShowOwnMass || shouldShowEnemyMass) {
+                    var shouldShowOwnMass = showMass && massOwnerType == "own";
+                    var shouldShowOtherMass = showOtherMass && massOwnerType == "enemy";
+                    if (shouldShowOwnMass || shouldShowOtherMass) {
                         if (null == this.sizeCache) {
                             this.sizeCache = new UText(this.getNameSize() / 2, "#FFFFFF", true, "#000000")
                         }
