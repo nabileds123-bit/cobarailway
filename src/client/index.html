@@ -28,7 +28,7 @@
     <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://code.jquery.com/jquery-1.11.3.min.js"></script>
     <script src="/client/Vector2.js"></script>
-    <script src="/client/main_out.js?550"></script>
+    <script src="/client/main_out.js?553"></script>
     <script>
     'use strict';
     // Hide overlays background (but not helloDialog) when ESC is pressed
@@ -115,11 +115,12 @@
         }
         .settings-checkbox-grid {
             display: grid;
-            grid-template-columns: 1fr 1.15fr 1.25fr;
-            column-gap: 12px;
-            row-gap: 6px;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            column-gap: 16px;
+            row-gap: 4px;
             margin: 6px 0 2px 0;
             font-size: 12px;
+            line-height: 1.2;
         }
         .settings-checkbox-grid label {
             margin: 0;
@@ -128,10 +129,13 @@
             display: flex;
             align-items: center;
             min-width: 0;
+            min-height: 18px;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         .settings-checkbox-grid input {
             flex: 0 0 auto;
-            margin: 0 6px 0 0;
+            margin: 0 5px 0 0;
         }
         #mode-buttons {
             display: flex;
@@ -267,7 +271,7 @@
         #overlays.only-dialog > #helloDialog {
     display: flex;
 }
-        #overlays.only-dialog > *:not(#helloDialog):not(#loginDialog):not(#registerDialog):not(#forgotDialog):not(#accountDialog):not(#uploadSkinDialog):not(#notificationDialog):not(#guildDialog):not(#highScoreDialog) {
+        #overlays.only-dialog > *:not(#helloDialog):not(#loginDialog):not(#registerDialog):not(#forgotDialog):not(#accountDialog):not(#uploadSkinDialog):not(#notificationDialog):not(#guildDialog):not(#highScoreDialog):not(#matchResultDialog) {
     display: none !important;
 }
         #loginDialog,
@@ -276,7 +280,8 @@
         #accountDialog,
         #notificationDialog,
         #guildDialog,
-        #highScoreDialog {
+        #highScoreDialog,
+        #matchResultDialog {
             display: none;
             width: var(--dialog-width);
             background-color: #FFFFFF;
@@ -296,7 +301,8 @@
         #accountDialog.account-open,
         #notificationDialog.spa-open,
         #guildDialog.spa-open,
-        #highScoreDialog.spa-open {
+        #highScoreDialog.spa-open,
+        #matchResultDialog.spa-open {
             display: flex;
             flex-direction: column;
         }
@@ -311,7 +317,8 @@
         #uploadSkinDialog h3,
         #notificationDialog h3,
         #guildDialog h3,
-        #highScoreDialog h3 {
+        #highScoreDialog h3,
+        #matchResultDialog h3 {
             margin: 0 0 14px 0;
             font-weight: bold;
             font-size: 12px;
@@ -323,7 +330,8 @@
         #uploadSkinDialog .dialog-brand,
         #notificationDialog .dialog-brand,
         #guildDialog .dialog-brand,
-        #highScoreDialog .dialog-brand {
+        #highScoreDialog .dialog-brand,
+        #matchResultDialog .dialog-brand {
             color: #337ab7;
             text-decoration: none;
         }
@@ -376,7 +384,8 @@
         #uploadSkinDialog .dialog-footer,
         #notificationDialog .dialog-footer,
         #guildDialog .dialog-footer,
-        #highScoreDialog .dialog-footer {
+        #highScoreDialog .dialog-footer,
+        #matchResultDialog .dialog-footer {
             margin-top: auto;
             padding-top: 12px;
             border-top: 1px solid #eee;
@@ -612,6 +621,78 @@
         .spa-page-body p {
             margin: 0 0 10px 0;
         }
+        .match-result-title {
+            margin: 6px 0 16px 0;
+            text-align: center;
+            font-size: 28px;
+            font-weight: normal;
+            color: #333;
+        }
+        .match-result-stats-stage {
+            position: relative;
+            min-height: 190px;
+            margin: 0 0 22px 0;
+            padding: 16px 0 10px 0;
+            overflow: hidden;
+        }
+        .match-result-chart-wrap {
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 18px;
+            bottom: 4px;
+            border-radius: 6px;
+            background: transparent;
+            overflow: hidden;
+            pointer-events: none;
+            z-index: 0;
+        }
+        #matchMassChart {
+            display: block;
+            width: 100%;
+            height: 100%;
+            opacity: .82;
+        }
+        .match-result-grid {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px 20px;
+            margin: 0;
+            text-align: center;
+        }
+        .match-result-value {
+            display: block;
+            color: #222;
+            font-size: 24px;
+            font-weight: 700;
+            line-height: 1;
+        }
+        .match-result-label {
+            display: block;
+            margin-top: 4px;
+            color: #555;
+            font-size: 12px;
+            line-height: 1.2;
+            text-transform: lowercase;
+        }
+        #matchResultBack {
+            margin-top: 4px;
+        }
+        #matchResultDialog.fade-in {
+            animation: matchResultFadeIn .35s ease forwards;
+        }
+        @keyframes matchResultFadeIn {
+            from {
+                opacity: 0;
+                transform: translate(-50%, calc(-50% + 10px));
+            }
+            to {
+                opacity: 1;
+                transform: translate(-50%, -50%);
+            }
+        }
         #forgotPasswordLink {
             display: inline-block;
             margin: -2px 0 10px 0;
@@ -806,12 +887,12 @@
                             class="btn btn-warning btn-spectate btn-needs-server">Spectate</button>
                 </div>
                 <div class="settings-checkbox-grid">
-                    <label><input type="checkbox" onchange="setSkins(!$(this).is(':checked'))"> No skins</label>
+                    <label><input type="checkbox" id="noSkinsCheckbox"> No skins</label>
                     <label><input type="checkbox" id="noLeaderboardCheckbox"> No Leaderboard</label>
-                    <label><input type="checkbox" onchange="setDarkTheme($(this).is(':checked'))"> Dark</label>
-                    <label><input type="checkbox" onchange="setColors($(this).is(':checked'))"> No colors</label>
-                    <label><input type="checkbox" onchange="setShowMass($(this).is(':checked'))"> Show mass</label>
-                    <label><input type="checkbox" id="showEnemyMassCheckbox" onchange="setShowEnemyMass($(this).is(':checked'))"> Show Other Mass</label>
+                    <label><input type="checkbox" id="darkThemeCheckbox"> Dark</label>
+                    <label><input type="checkbox" id="noColorsCheckbox"> No colors</label>
+                    <label><input type="checkbox" id="showMassCheckbox"> Show mass</label>
+                    <label><input type="checkbox" id="showOtherMassCheckbox" onchange="setShowOtherMass(this.checked)"> Show Other Mass</label>
                     <label><input type="checkbox" id="smoothRenderCheckbox"> Smooth Render</label>
                     <label><input type="checkbox" id="noChatCheckbox"> No Chat</label>
                 </div>
@@ -1021,6 +1102,49 @@
         </div>
         <div class="spa-page-body">
             <p>High score page.</p>
+        </div>
+        <div class="dialog-footer">
+            <a href="#home" class="text-primary spa-home-link">Home</a> |
+            <a href="#login" class="text-primary account-menu-link">Login</a> |
+            <a href="#community" class="text-primary community-menu-link">Community</a> |
+            <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">About</a>
+        </div>
+    </div>
+    <div id="matchResultDialog">
+        <div class="spa-page-body">
+            <h2 class="match-result-title">Match Results</h2>
+            <div class="match-result-stats-stage">
+                <div class="match-result-chart-wrap">
+                    <canvas id="matchMassChart" width="320" height="160"></canvas>
+                </div>
+                <div class="match-result-grid">
+                    <div>
+                        <span id="matchFoodCells" class="match-result-value">0</span>
+                        <span class="match-result-label">food eaten</span>
+                    </div>
+                    <div>
+                        <span id="matchHighestMass" class="match-result-value">0</span>
+                        <span class="match-result-label">highest mass</span>
+                    </div>
+                    <div>
+                        <span id="matchTimeAlive" class="match-result-value">0:00</span>
+                        <span class="match-result-label">time alive</span>
+                    </div>
+                    <div>
+                        <span id="matchLeaderboardTime" class="match-result-value">0:00</span>
+                        <span class="match-result-label">leaderboard time</span>
+                    </div>
+                    <div>
+                        <span id="matchCellsEaten" class="match-result-value">0</span>
+                        <span class="match-result-label">cells eaten</span>
+                    </div>
+                    <div>
+                        <span id="matchTopPosition" class="match-result-value">:(</span>
+                        <span class="match-result-label">top position</span>
+                    </div>
+                </div>
+            </div>
+            <button id="matchResultBack" class="btn btn-primary btn-block">Back</button>
         </div>
         <div class="dialog-footer">
             <a href="#home" class="text-primary spa-home-link">Home</a> |
@@ -1251,9 +1375,10 @@
             var chat = $('#chat_textbox');
             var isGuest = !currentUser;
             var isPremium = isPremiumAccount();
+            var noChat = localStorage.getItem('noChat') == 'true';
 
-            chat.toggleClass('chat-hidden', isGuest);
-            $('#chatAccessError').toggleClass('chat-hidden', isGuest).hide();
+            chat.toggleClass('chat-hidden', isGuest || noChat);
+            $('#chatAccessError').toggleClass('chat-hidden', isGuest || noChat).hide();
             chat.prop('readonly', false);
             chat.toggleClass('chat-locked', !!currentUser && !isPremium);
         }
@@ -1263,6 +1388,7 @@
         };
 
         window.showChatAccessError = showChatAccessError;
+        window.updateChatAccessControls = updateChatAccessControls;
 
         function closeSpaDialogs() {
             $('#overlays').removeClass('only-dialog');
@@ -1271,7 +1397,7 @@
             $('#forgotDialog').removeClass('forgot-open');
             $('#accountDialog').removeClass('account-open');
             $('#uploadSkinDialog').removeClass('upload-open');
-            $('#notificationDialog, #guildDialog, #highScoreDialog').removeClass('spa-open');
+            $('#notificationDialog, #guildDialog, #highScoreDialog, #matchResultDialog').removeClass('spa-open');
             closeCommunityDropup(true);
         }
 
@@ -1297,6 +1423,8 @@
         function updateFooterActiveFromVisible() {
             if ($('#communityDropup').hasClass('is-open') || $('#notificationDialog, #guildDialog, #highScoreDialog').hasClass('spa-open')) {
                 setFooterActive('community');
+            } else if ($('#matchResultDialog').hasClass('spa-open')) {
+                setFooterActive('home');
             } else if ($('#loginDialog, #registerDialog, #forgotDialog, #accountDialog, #uploadSkinDialog').filter(function() {
                 return $(this).hasClass('login-open') || $(this).hasClass('register-open') || $(this).hasClass('forgot-open') || $(this).hasClass('account-open') || $(this).hasClass('upload-open');
             }).length) {
@@ -1347,7 +1475,8 @@
             var target = {
                 notification: '#notificationDialog',
                 guild: '#guildDialog',
-                'high-score': '#highScoreDialog'
+                'high-score': '#highScoreDialog',
+                'match-result': '#matchResultDialog'
             }[page];
 
             if (!target) {
@@ -1365,9 +1494,125 @@
         function routeSpaHash() {
             var route = String(window.location.hash || '').replace(/^#/, '');
 
-            if (route == 'notification' || route == 'guild' || route == 'high-score') {
+            if (route == 'notification' || route == 'guild' || route == 'high-score' || route == 'match-result') {
                 openSpaPage(route);
             }
+        }
+
+        function formatMatchDuration(ms) {
+            var totalSeconds = Math.max(0, Math.floor(Number(ms || 0) / 1000));
+            var minutes = Math.floor(totalSeconds / 60);
+            var seconds = String(totalSeconds % 60).padStart(2, '0');
+            return minutes + ':' + seconds;
+        }
+
+        function renderMatchMassChart(history) {
+            var canvas = document.getElementById('matchMassChart');
+            if (!canvas) {
+                return;
+            }
+
+            var wrap = canvas.parentNode;
+            var cssWidth = wrap && wrap.clientWidth ? wrap.clientWidth : 320;
+            var cssHeight = wrap && wrap.clientHeight ? wrap.clientHeight : 132;
+            var ratio = window.devicePixelRatio || 1;
+            canvas.width = Math.max(1, Math.floor(cssWidth * ratio));
+            canvas.height = Math.max(1, Math.floor(cssHeight * ratio));
+            canvas.style.width = cssWidth + 'px';
+            canvas.style.height = cssHeight + 'px';
+
+            var ctx = canvas.getContext('2d');
+            ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+            ctx.clearRect(0, 0, cssWidth, cssHeight);
+
+            history = Array.isArray(history) ? history.filter(function(point) {
+                return point && isFinite(point.time) && isFinite(point.mass);
+            }) : [];
+
+            if (!history.length) {
+                history = [{ time: 0, mass: 0 }];
+            }
+            if (history.length == 1) {
+                history.push({ time: history[0].time + 1, mass: history[0].mass });
+            }
+
+            var padding = 10;
+            var maxTime = Math.max.apply(null, history.map(function(point) { return Number(point.time || 0); })) || 1;
+            var maxMass = Math.max.apply(null, history.map(function(point) { return Number(point.mass || 0); })) || 1;
+
+            function xFor(point) {
+                return padding + (cssWidth - padding * 2) * (Number(point.time || 0) / maxTime);
+            }
+
+            function yFor(point) {
+                return cssHeight - padding - (cssHeight - padding * 2) * (Number(point.mass || 0) / maxMass);
+            }
+
+            ctx.fillStyle = 'rgba(255,255,255,.55)';
+            ctx.fillRect(0, 0, cssWidth, cssHeight);
+            ctx.strokeStyle = 'rgba(21,72,101,.18)';
+            ctx.lineWidth = 1;
+            for (var grid = 1; grid < 4; grid++) {
+                var y = padding + ((cssHeight - padding * 2) / 4) * grid;
+                ctx.beginPath();
+                ctx.moveTo(padding, y);
+                ctx.lineTo(cssWidth - padding, y);
+                ctx.stroke();
+            }
+
+            ctx.beginPath();
+            history.forEach(function(point, index) {
+                var x = xFor(point);
+                var y = yFor(point);
+                if (index) {
+                    ctx.lineTo(x, y);
+                } else {
+                    ctx.moveTo(x, y);
+                }
+            });
+            ctx.lineTo(xFor(history[history.length - 1]), cssHeight - padding);
+            ctx.lineTo(xFor(history[0]), cssHeight - padding);
+            ctx.closePath();
+            ctx.fillStyle = 'rgba(91, 158, 190, .28)';
+            ctx.fill();
+
+            ctx.beginPath();
+            history.forEach(function(point, index) {
+                var x = xFor(point);
+                var y = yFor(point);
+                if (index) {
+                    ctx.lineTo(x, y);
+                } else {
+                    ctx.moveTo(x, y);
+                }
+            });
+            ctx.strokeStyle = 'rgb(91, 158, 190)';
+            ctx.lineWidth = 3;
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            ctx.stroke();
+        }
+
+        function showMatchResult(stats) {
+            stats = stats || {};
+            $('#matchFoodCells').text(Number(stats.foodCellsEaten || 0));
+            $('#matchHighestMass').text(Number(stats.highestMass || 0));
+            $('#matchTimeAlive').text(formatMatchDuration(stats.timeAliveMs));
+            $('#matchLeaderboardTime').text(formatMatchDuration(stats.leaderboardTimeMs));
+            $('#matchCellsEaten').text(Number(stats.cellsEaten || 0));
+            $('#matchTopPosition').text(stats.topPosition ? stats.topPosition : ':(');
+
+            if (window.location.hash != '#match-result') {
+                window.location.hash = '#match-result';
+            }
+            closeSpaDialogs();
+            $('#helloDialog').hide();
+            showNavigationOverlay();
+            $('#matchResultDialog').removeClass('fade-in');
+            void document.getElementById('matchResultDialog').offsetWidth;
+            $('#matchResultDialog').addClass('spa-open fade-in');
+            renderMatchMassChart(stats.massHistory);
+            setFooterActive('home');
         }
 
         function resetUploadSkinDialog() {
@@ -1472,6 +1717,9 @@
             updateChatAccessControls();
             routeSpaHash();
         });
+        $(window).on('matchResultReady', function(e) {
+            showMatchResult(e.originalEvent && e.originalEvent.detail ? e.originalEvent.detail : {});
+        });
         function showHomeDialog() {
             if (window.location.hash != '#home') {
                 window.location.hash = '#home';
@@ -1498,6 +1746,10 @@
         $('#playBtn').on('click', function(e) {
             e.preventDefault();
             playOrResumeGame();
+        });
+        $('#matchResultBack').on('click', function(e) {
+            e.preventDefault();
+            showHomeDialog();
         });
         $('#loginLink, .account-menu-link').on('click', function(e) {
             e.preventDefault();
@@ -1820,17 +2072,15 @@
 
             authRequest('/api/register', { username: name, email: email, password: password })
                 .done(function(result) {
-                    status.removeClass('text-danger').addClass('text-success').text('Register berhasil. Silakan login.').show();
-                    $('#loginName').val(result.user.username);
+                    currentUser = null;
+                    localStorage.removeItem('authToken');
+                    status.removeClass('text-danger').addClass('text-success').text(result.message || 'Register berhasil. Silakan cek email Anda untuk verifikasi.').show();
+                    $('#loginName').val(result.user && result.user.username ? result.user.username : name);
                     $('#registerPassword, #registerConfirm').val('');
-                    setTimeout(function() {
-                        closeSpaDialogs();
-                        $('#registerStatus').hide();
-                        showNavigationOverlay();
-                        $('#loginDialog').addClass('login-open');
-                        setFooterActive('account');
-                        $('#loginPassword').focus();
-                    }, 700);
+                    closeSpaDialogs();
+                    showNavigationOverlay();
+                    $('#registerDialog').addClass('register-open');
+                    setFooterActive('account');
                 })
                 .fail(function(xhr) {
                     showAuthError(status, xhr, 'Register gagal.');
@@ -1890,49 +2140,90 @@
 <script>
 // Persist checkbox state in localStorage
 $(function() {
-    // Checkbox IDs and their localStorage keys
-    var checkboxes = [
-        { sel: 'input[onchange*="setSkins"]', key: 'noSkins' },
-        { sel: 'input[onchange*="setNames"]', key: 'noNames' },
-        { sel: 'input[onchange*="setDarkTheme"]', key: 'darkTheme' },
-        { sel: 'input[onchange*="setColors"]', key: 'noColors' },
-        { sel: 'input[onchange*="setShowMass"]', key: 'showMass' },
-        { sel: '#showEnemyMassCheckbox', key: 'showEnemyMass' },
-        { sel: '#noLeaderboardCheckbox', key: 'noLeaderboard' },
-        { sel: '#smoothRenderCheckbox', key: 'smoothRender' },
-        { sel: '#noChatCheckbox', key: 'noChat' }
-    ];
-    // Set from localStorage on load
-    checkboxes.forEach(function(cb) {
-        var val = localStorage.getItem(cb.key);
-        if (val !== null) {
-            $(cb.sel).prop('checked', val === 'true').trigger('change');
+    function callGameSetter(name, value) {
+        if (typeof window[name] == 'function') {
+            window[name](value);
         }
-        // Save to localStorage on change
-        $(cb.sel).on('change', function() {
-            localStorage.setItem(cb.key, this.checked);
-        });
-    });
-});
-</script>
-<script>
-function setShowEnemyMass(val) {
-    if (window.wHandle && typeof window.wHandle.setShowEnemyMass === 'function') {
-        window.wHandle.setShowEnemyMass(val);
-    } else {
-        window.showEnemyMass = val;
     }
-}
-// Sinkronisasi checkbox dan localStorage untuk showEnemyMass
-$(function() {
-    var val = localStorage.getItem('showEnemyMass');
-    var checked = val === 'true';
-    $('#showEnemyMassCheckbox').prop('checked', checked);
-    setShowEnemyMass(checked);
-    // Update localStorage dan JS saat checkbox diubah
-    $('#showEnemyMassCheckbox').on('change', function() {
-        localStorage.setItem('showEnemyMass', this.checked);
-        setShowEnemyMass(this.checked);
+
+    var settings = [
+        {
+            sel: '#noSkinsCheckbox',
+            key: 'noSkins',
+            apply: function(checked) {
+                callGameSetter('setSkins', !checked);
+            }
+        },
+        {
+            sel: '#noLeaderboardCheckbox',
+            key: 'noLeaderboard',
+            apply: function(checked) {
+                callGameSetter('setShowLeaderboard', !checked);
+            }
+        },
+        {
+            sel: '#darkThemeCheckbox',
+            key: 'darkTheme',
+            apply: function(checked) {
+                callGameSetter('setDarkTheme', checked);
+            }
+        },
+        {
+            sel: '#noColorsCheckbox',
+            key: 'noColors',
+            apply: function(checked) {
+                callGameSetter('setColors', checked);
+            }
+        },
+        {
+            sel: '#showMassCheckbox',
+            key: 'showMass',
+            apply: function(checked) {
+                callGameSetter('setShowMass', checked);
+                callGameSetter('syncMassDisplayState');
+            }
+        },
+        {
+            sel: '#showOtherMassCheckbox',
+            key: 'showOtherMass',
+            apply: function(checked) {
+                callGameSetter('setShowOtherMass', checked);
+                callGameSetter('syncMassDisplayState');
+            }
+        },
+        {
+            sel: '#smoothRenderCheckbox',
+            key: 'smoothRender',
+            apply: function(checked) {
+                callGameSetter('setSmoothRender', checked);
+            }
+        },
+        {
+            sel: '#noChatCheckbox',
+            key: 'noChat',
+            apply: function(checked) {
+                callGameSetter('setShowChat', !checked);
+                if (typeof window.updateChatAccessControls == 'function') {
+                    window.updateChatAccessControls();
+                }
+            }
+        }
+    ];
+
+    settings.forEach(function(setting) {
+        var storedValue = localStorage.getItem(setting.key);
+        if (storedValue === null && setting.legacyKey) {
+            storedValue = localStorage.getItem(setting.legacyKey);
+        }
+        var checked = storedValue == 'true';
+        $(setting.sel).prop('checked', checked);
+        setting.apply(checked);
+
+        $(setting.sel).on('change', function() {
+            var isChecked = this.checked;
+            localStorage.setItem(setting.key, isChecked);
+            setting.apply(isChecked);
+        });
     });
 });
 </script>

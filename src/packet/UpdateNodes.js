@@ -53,7 +53,10 @@ UpdateNodes.prototype.build = function() {
             continue;
         }
         
-        var v = node.getType() == 2|| node.spiked ? 1: 0; // Virus flag
+        var v = node.getType() == 2 || node.spiked ? 1 : 0; // Virus flag
+        if (node.getType() == 0) {
+            v |= 128; // Player cell flag for client-side "Show Other Mass"
+        }
         
         view.setUint32(offset, node.nodeId, true); // Node ID
         view.setUint16(offset + 4, node.position.x, true); // X position

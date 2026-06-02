@@ -82,6 +82,8 @@ function ensureMysql() {
                 'skin_url VARCHAR(255) NULL,' +
                 'guild_skin_url VARCHAR(255) NULL,' +
                 'cell_color VARCHAR(7) NOT NULL DEFAULT \'#6FCA36\',' +
+                'email_verified TINYINT(1) NOT NULL DEFAULT 0,' +
+                'verification_token VARCHAR(64) NULL,' +
                 'last_login DATETIME NULL,' +
                 'reset_token VARCHAR(64) NULL,' +
                 'reset_requested_at DATETIME NULL,' +
@@ -99,6 +101,8 @@ function ensureMysql() {
                 'ALTER TABLE users ADD COLUMN skin_url VARCHAR(255) NULL',
                 'ALTER TABLE users ADD COLUMN guild_skin_url VARCHAR(255) NULL',
                 'ALTER TABLE users ADD COLUMN cell_color VARCHAR(7) NOT NULL DEFAULT \'#6FCA36\'',
+                'ALTER TABLE users ADD COLUMN email_verified TINYINT(1) NOT NULL DEFAULT 0',
+                'ALTER TABLE users ADD COLUMN verification_token VARCHAR(64) NULL',
                 'ALTER TABLE users ADD COLUMN last_login DATETIME NULL'
             ];
 
@@ -224,7 +228,9 @@ function mysqlUser(row) {
         guildSkinUrl: row.guild_skin_url,
         cellColor: row.cell_color,
         lastLogin: row.last_login,
-        createdAt: row.created_at
+        createdAt: row.created_at,
+        emailVerified: row.email_verified,
+        verificationToken: row.verification_token
     };
 }
 
@@ -451,8 +457,8 @@ function createUser(user) {
         if (usingMysql) {
             return getMysqlPool()
                 .query(
-                    'INSERT INTO users (id, username, email, salt, password_hash) VALUES (?, ?, ?, ?, ?)',
-                    [user.id, user.username, user.email, user.salt, user.passwordHash]
+                    'INSERT INTO users (id, username, email, salt, password_hash, email_verified, verification_token) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                    [user.id, user.username, user.email, user.salt, user.passwordHash, Number(user.emailVerified || 0), user.verificationToken || null]
                 )
                 .then(function() {
                     return user;
@@ -638,6 +644,7 @@ function handleRegister(req, res) {
                 }
 
                 var salt = crypto.randomBytes(16).toString('hex');
+                var verificationToken = makeToken();
                 return createUser({
                     id: crypto.randomBytes(12).toString('hex'),
                     username: username,
@@ -652,13 +659,20 @@ function handleRegister(req, res) {
                     skinUrl: '',
                     guildSkinUrl: '',
                     cellColor: '#6FCA36',
+                    emailVerified: 0,
+                    verificationToken: verificationToken,
                     lastLogin: null,
                     createdAt: new Date().toISOString()
                 });
             })
             .then(function(user) {
                 if (user) {
-                    sendJson(res, 201, { ok: true, user: publicUser(user) });
+                    console.log('[Auth] Verification token for %s: %s', user.email, user.verificationToken);
+                    sendJson(res, 201, {
+                        ok: true,
+                        message: 'Register berhasil. Silakan cek email Anda untuk verifikasi.',
+                        user: publicUser(user)
+                    });
                 }
             })
             .catch(function(error) {
@@ -685,6 +699,14 @@ function handleLogin(req, res) {
             .then(function(user) {
                 if (!user || hashPassword(password, user.salt) != user.passwordHash) {
                     sendJson(res, 401, { ok: false, error: 'Username/email atau password salah.' });
+                    return null;
+                }
+
+                if (Number(user.emailVerified || 0) !== 1) {
+                    sendJson(res, 403, {
+                        ok: false,
+                        error: 'Email belum diverifikasi. Silakan cek email Anda.'
+                    });
                     return null;
                 }
 
