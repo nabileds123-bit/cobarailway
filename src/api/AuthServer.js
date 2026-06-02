@@ -457,8 +457,8 @@ function createUser(user) {
         if (usingMysql) {
             return getMysqlPool()
                 .query(
-                    'INSERT INTO users (id, username, email, salt, password_hash) VALUES (?, ?, ?, ?, ?)',
-                    [user.id, user.username, user.email, user.salt, user.passwordHash]
+                    'INSERT INTO users (id, username, email, salt, password_hash, email_verified, verification_token) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                    [user.id, user.username, user.email, user.salt, user.passwordHash, Number(user.emailVerified || 0), user.verificationToken || null]
                 )
                 .then(function() {
                     return user;
@@ -644,6 +644,7 @@ function handleRegister(req, res) {
                 }
 
                 var salt = crypto.randomBytes(16).toString('hex');
+                var verificationToken = makeToken();
                 return createUser({
                     id: crypto.randomBytes(12).toString('hex'),
                     username: username,
@@ -658,13 +659,20 @@ function handleRegister(req, res) {
                     skinUrl: '',
                     guildSkinUrl: '',
                     cellColor: '#6FCA36',
+                    emailVerified: 0,
+                    verificationToken: verificationToken,
                     lastLogin: null,
                     createdAt: new Date().toISOString()
                 });
             })
             .then(function(user) {
                 if (user) {
-                    sendJson(res, 201, { ok: true, user: publicUser(user) });
+                    console.log('[Auth] Verification token for %s: %s', user.email, user.verificationToken);
+                    sendJson(res, 201, {
+                        ok: true,
+                        message: 'Register berhasil. Silakan cek email Anda untuk verifikasi.',
+                        user: publicUser(user)
+                    });
                 }
             })
             .catch(function(error) {
