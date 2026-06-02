@@ -552,12 +552,14 @@
             margin-top: 8px;
             font-size: 12px;
         }
-        .footer-current {
+        .footer-current,
+        .footer-active {
             color: #999;
             cursor: default;
             text-decoration: none;
         }
-        .footer-current:hover {
+        .footer-current:hover,
+        .footer-active:hover {
             color: #999;
             text-decoration: none;
         }
@@ -1254,11 +1256,38 @@
             $('#accountDialog').removeClass('account-open');
             $('#uploadSkinDialog').removeClass('upload-open');
             $('#notificationDialog, #guildDialog, #highScoreDialog').removeClass('spa-open');
-            closeCommunityDropup();
+            closeCommunityDropup(true);
         }
 
-        function closeCommunityDropup() {
+        function closeCommunityDropup(skipFooterUpdate) {
             $('#communityDropup').removeClass('is-open').removeAttr('style');
+            if (!skipFooterUpdate) {
+                updateFooterActiveFromVisible();
+            }
+        }
+
+        function setFooterActive(section) {
+            $('.hello-footer a, .dialog-footer a').removeClass('footer-active footer-current');
+
+            if (section == 'home') {
+                $('.hello-footer a[href="#home"], .dialog-footer a[href="#home"], .spa-home-link').addClass('footer-active');
+            } else if (section == 'account') {
+                $('#loginLink, .dialog-footer a[href="#login"], .dialog-footer a[href="#account"]').addClass('footer-active');
+            } else if (section == 'community') {
+                $('.community-menu-link').addClass('footer-active');
+            }
+        }
+
+        function updateFooterActiveFromVisible() {
+            if ($('#communityDropup').hasClass('is-open') || $('#notificationDialog, #guildDialog, #highScoreDialog').hasClass('spa-open')) {
+                setFooterActive('community');
+            } else if ($('#loginDialog, #registerDialog, #forgotDialog, #accountDialog, #uploadSkinDialog').filter(function() {
+                return $(this).hasClass('login-open') || $(this).hasClass('register-open') || $(this).hasClass('forgot-open') || $(this).hasClass('account-open') || $(this).hasClass('upload-open');
+            }).length) {
+                setFooterActive('account');
+            } else {
+                setFooterActive('home');
+            }
         }
 
         function toggleCommunityDropup(link) {
@@ -1276,6 +1305,7 @@
                 return;
             }
 
+            setFooterActive('community');
             menu
                 .data('trigger', link)
                 .css({
@@ -1300,6 +1330,7 @@
             $('#helloDialog').hide();
             $(target).addClass('spa-open');
             $('#overlays').addClass('only-dialog').show();
+            setFooterActive('community');
             return true;
         }
 
@@ -1325,6 +1356,7 @@
             $('#helloDialog').hide();
             $('#overlays').addClass('only-dialog').show();
             $('#accountDialog').addClass('account-open');
+            setFooterActive('account');
         }
 
         function openUploadSkinDialog() {
@@ -1332,6 +1364,7 @@
             $('#helloDialog').hide();
             resetUploadSkinDialog();
             $('#uploadSkinDialog').addClass('upload-open');
+            setFooterActive('account');
         }
 
         function formatProfileDate(value) {
@@ -1404,6 +1437,7 @@
             refreshLoggedInUser();
             startAccountSync();
         }
+        setFooterActive('home');
         routeSpaHash();
         $(window).on('hashchange', function() {
             updateChatAccessControls();
@@ -1418,6 +1452,7 @@
             $('#overlays').addClass('only-dialog').show();
             $('#helloDialog').css('display', 'flex');
             updateChatAccessControls();
+            setFooterActive('home');
         }
 
         function playOrResumeGame() {
@@ -1443,6 +1478,7 @@
                 openAccountDialog();
             } else {
                 $('#loginDialog').addClass('login-open');
+                setFooterActive('account');
                 $('#loginName').focus();
             }
         });
@@ -1633,15 +1669,15 @@
         });
         $('#registerHomeLink').on('click', function(e) {
             e.preventDefault();
-            closeSpaDialogs();
             $('#registerStatus').hide();
-            $('#helloDialog').show();
+            showHomeDialog();
         });
         $('#registerLoginLink').on('click', function(e) {
             e.preventDefault();
             closeSpaDialogs();
             $('#registerStatus').hide();
             $('#loginDialog').addClass('login-open');
+            setFooterActive('account');
             $('#loginName').focus();
         });
         $('#forgotPasswordLink').on('click', function(e) {
@@ -1649,19 +1685,20 @@
             closeSpaDialogs();
             $('#forgotStatus').hide();
             $('#forgotDialog').addClass('forgot-open');
+            setFooterActive('account');
             $('#forgotEmail').focus();
         });
         $('#forgotHomeLink').on('click', function(e) {
             e.preventDefault();
-            closeSpaDialogs();
             $('#forgotStatus').hide();
-            $('#helloDialog').show();
+            showHomeDialog();
         });
         $('#forgotLoginLink').on('click', function(e) {
             e.preventDefault();
             closeSpaDialogs();
             $('#forgotStatus').hide();
             $('#loginDialog').addClass('login-open');
+            setFooterActive('account');
             $('#loginName').focus();
         });
         $('#forgotSubmit').on('click', function(e) {
@@ -1712,6 +1749,7 @@
             $('#loginStatus').hide();
             $('#registerName').val(name);
             $('#registerDialog').addClass('register-open');
+            setFooterActive('account');
             $('#registerName').focus();
         });
         $('#registerCreate').on('click', function(e) {
@@ -1752,6 +1790,7 @@
                         closeSpaDialogs();
                         $('#registerStatus').hide();
                         $('#loginDialog').addClass('login-open');
+                        setFooterActive('account');
                         $('#loginPassword').focus();
                     }, 700);
                 })

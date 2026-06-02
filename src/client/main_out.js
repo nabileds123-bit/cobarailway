@@ -42,16 +42,99 @@
         nonPassiveEventOptions = false;
     }
 
+    var gameLoopStarted = false;
+    var serverListTimer = null;
+    var hasClickedPlay = false;
+
+    function requestFrame(callback) {
+        if (wHandle.requestAnimationFrame) {
+            wHandle.requestAnimationFrame(callback);
+        } else {
+            setTimeout(callback, 1E3 / 60);
+        }
+    }
+
+    function isCanvasReady() {
+        var canvas = document.getElementById("canvas");
+        if (!canvas) {
+            return false;
+        }
+
+        return 0 < (wHandle.innerWidth || canvas.clientWidth || canvas.offsetWidth || canvas.width || 0)
+            && 0 < (wHandle.innerHeight || canvas.clientHeight || canvas.offsetHeight || canvas.height || 0);
+    }
+
+    function startGameLoopWhenReady() {
+        if (gameLoopStarted) {
+            return;
+        }
+
+        if (!isCanvasReady()) {
+            requestFrame(startGameLoopWhenReady);
+            return;
+        }
+
+        gameLoop();
+    }
+
+    function queueGameLoopStart() {
+        if ("loading" == document.readyState) {
+            document.addEventListener("DOMContentLoaded", function() {
+                requestFrame(startGameLoopWhenReady);
+            });
+        } else {
+            requestFrame(startGameLoopWhenReady);
+        }
+    }
+
+    function canDrawSource(source) {
+        if (!source || false === source.complete) {
+            return false;
+        }
+
+        return 0 < (source.naturalWidth || source.videoWidth || source.width || 0)
+            && 0 < (source.naturalHeight || source.videoHeight || source.height || 0);
+    }
+
+    function safeDrawImage(context, source, dx, dy, dw, dh) {
+        if (!context || !canDrawSource(source)) {
+            return false;
+        }
+
+        if (arguments.length >= 6 && (!(0 < dw) || !(0 < dh))) {
+            return false;
+        }
+
+        if (arguments.length >= 6) {
+            context.drawImage(source, dx, dy, dw, dh);
+        } else {
+            context.drawImage(source, dx, dy);
+        }
+        return true;
+    }
 
 
     function gameLoop() {
+        if (gameLoopStarted) {
+            return;
+        }
+
+        gameLoopStarted = true;
+        mainCanvas = nCanvas = document.getElementById("canvas");
+        if (!mainCanvas) {
+            gameLoopStarted = false;
+            requestFrame(startGameLoopWhenReady);
+            return;
+        }
+
         ma = true;
-        document.getElementById("canvas").focus();
+        mainCanvas.focus();
         var isTyping = false;
         var chattxt;
         getServerList();
-        setInterval(getServerList, 18E4);
-        mainCanvas = nCanvas = document.getElementById("canvas");
+        if (!serverListTimer) {
+            serverListTimer = setInterval(getServerList, 18E4);
+        }
         ctx = mainCanvas.getContext("2d");
         /*mainCanvas.onmousedown = function (event) {
             if (isTouchStart) {
@@ -208,7 +291,11 @@
         };
 
         wHandle.onresize = canvasResize;
-        canvasResize();
+        if (!canvasResize()) {
+            gameLoopStarted = false;
+            requestFrame(startGameLoopWhenReady);
+            return;
+        }
         if (wHandle.requestAnimationFrame) {
             wHandle.requestAnimationFrame(redrawGameScene);
         } else {
@@ -421,7 +508,9 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
 
     function showOverlays(arg) {
         hasOverlay = true;
-        userNickName = null;
+        if (!wHandle.isGameSessionActive || !wHandle.isGameSessionActive()) {
+            userNickName = null;
+        }
         wjQuery("#overlays").fadeIn(arg ? 200 : 3E3);
         arg || wjQuery("#adsBottom").fadeIn(3E3)
     }
@@ -674,6 +763,13 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
 
     function drawChatBoard() {
         //chatCanvas = null;
+        if (!(0 < canvasWidth) || !(0 < canvasHeight)) {
+            return;
+        }
+
+        if (chatBoard.length < 1) {
+            return;
+        }
 
         chatCanvas = document.createElement("canvas");
         var ctx = chatCanvas.getContext("2d");
@@ -683,9 +779,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         ctx.scale(scaleFactor, scaleFactor);
         var nowtime = Date.now();
         var lasttime = 0;
-        if (chatBoard.length >= 1)
-            lasttime = chatBoard[chatBoard.length - 1].time;
-        else return;
+        lasttime = chatBoard[chatBoard.length - 1].time;
         var deltat = nowtime - lasttime;
 
         ctx.globalAlpha = 0.8 * Math.exp(-deltat / 25000);
@@ -700,12 +794,12 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
             chatName.setValue(chatBoard[i + from].name);
             var width = chatName.getWidth();
             var a = chatName.render();
-            ctx.drawImage(a, 15, chatCanvas.height / scaleFactor - 24 * (len - i - from));
+            safeDrawImage(ctx, a, 15, chatCanvas.height / scaleFactor - 24 * (len - i - from));
 
             var chatText = new UText(18, '#666666');
             chatText.setValue(':' + chatBoard[i + from].message);
             a = chatText.render();
-            ctx.drawImage(a, 15 + width * 1.8, chatCanvas.height / scaleFactor - 24 * (len - from - i));
+            safeDrawImage(ctx, a, 15 + width * 1.8, chatCanvas.height / scaleFactor - 24 * (len - from - i));
         }
         //ctx.restore();
     }
@@ -932,7 +1026,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
     }
 
     wHandle.isGameSessionActive = function () {
-        return wsIsOpen() && playerCells.length > 0;
+        return hasClickedPlay && wsIsOpen() && playerCells.length > 0;
     };
 
     wHandle.resumeGameSession = function () {
@@ -953,17 +1047,30 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
     }
 
     function redrawGameScene() {
-        drawGameScene();
-        wHandle.requestAnimationFrame(redrawGameScene)
+        if (!drawGameScene()) {
+            requestFrame(redrawGameScene);
+            return;
+        }
+        requestFrame(redrawGameScene)
     }
 
     function canvasResize() {
         window.scrollTo(0,0);
-        canvasWidth = wHandle.innerWidth;
-        canvasHeight = wHandle.innerHeight;
+        if (!nCanvas) {
+            return false;
+        }
+
+        canvasWidth = wHandle.innerWidth || nCanvas.clientWidth || nCanvas.offsetWidth || 0;
+        canvasHeight = wHandle.innerHeight || nCanvas.clientHeight || nCanvas.offsetHeight || 0;
+        if (!(0 < canvasWidth) || !(0 < canvasHeight)) {
+            requestFrame(canvasResize);
+            return false;
+        }
+
         nCanvas.width = canvasWidth;
         nCanvas.height = canvasHeight;
-        drawGameScene()
+        drawGameScene();
+        return true;
     }
 
     function viewRange() {
@@ -982,6 +1089,10 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
 
     function drawGameScene() {
         var a, oldtime = Date.now();
+        if (!ctx || !nCanvas || !(0 < canvasWidth) || !(0 < canvasHeight) || !(0 < nCanvas.width) || !(0 < nCanvas.height)) {
+            return false;
+        }
+
         ++cb;
         timestamp = oldtime;
         if (0 < playerCells.length) {
@@ -1050,8 +1161,8 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
             ctx.restore()
         }
         ctx.restore();
-        lbCanvas && lbCanvas.width && ctx.drawImage(lbCanvas, canvasWidth - lbCanvas.width - 10, 10); // draw Leader Board
-        if (chatCanvas != null) ctx.drawImage(chatCanvas, 0, canvasHeight - chatCanvas.height - 50); // draw Leader Board
+        lbCanvas && lbCanvas.width && safeDrawImage(ctx, lbCanvas, canvasWidth - lbCanvas.width - 10, 10); // draw Leader Board
+        if (chatCanvas != null) safeDrawImage(ctx, chatCanvas, 0, canvasHeight - chatCanvas.height - 50); // draw Leader Board
 
         userScore = Math.max(userScore, calcUserScore());
         if (0 != userScore) {
@@ -1065,7 +1176,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
             ctx.fillStyle = '#000000';
             ctx.fillRect(10, 10, a + 10, 34);//canvasHeight - 10 - 24 - 10
             ctx.globalAlpha = 1;
-            ctx.drawImage(c, 15, 15);//canvasHeight - 10 - 24 - 5
+            safeDrawImage(ctx, c, 15, 15);//canvasHeight - 10 - 24 - 5
         }
         drawSplitIcon(ctx);
         drawTouch(ctx);
@@ -1073,7 +1184,8 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         var deltatime = Date.now() - oldtime;
         deltatime > 1E3 / 60 ? z -= .01 : deltatime < 1E3 / 65 && (z += .01);
         .4 > z && (z = .4);
-        1 < z && (z = 1)
+        1 < z && (z = 1);
+        return true;
     }
 
 
@@ -1150,12 +1262,12 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
     function drawSplitIcon(ctx) {
         if (touchable && splitIcon.width) {
          var size = ~~ (canvasWidth / 7);
-         ctx.drawImage(splitIcon, canvasWidth - size, canvasHeight - size, size, size);
+         safeDrawImage(ctx, splitIcon, canvasWidth - size, canvasHeight - size, size, size);
         }
 
-        if (touchable && splitIcon.width) {
+        if (touchable && ejectIcon.width) {
             var size = ~~ (canvasWidth / 7);
-            ctx.drawImage(ejectIcon, canvasWidth - size, canvasHeight - 2*size-10, size, size);
+            safeDrawImage(ctx, ejectIcon, canvasWidth - size, canvasHeight - 2*size-10, size, size);
         }
         
     }
@@ -1167,6 +1279,10 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
 
     function drawLeaderBoard() {
         lbCanvas = null;
+        if (!(0 < canvasWidth) || !(0 < canvasHeight)) {
+            return;
+        }
+
         if (null != teamScores || 0 != leaderBoard.length)
             if (null != teamScores || showName) {
                 lbCanvas = document.createElement("canvas");
@@ -1304,6 +1420,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
     var playerStat = null;
     wHandle.isSpectating = false;
     wHandle.setNick = function (arg) {
+        hasClickedPlay = true;
         hideOverlays();
         userNickName = arg;
         sendNickName();
@@ -1674,7 +1791,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
                 if (!(null == e || c)) {
                     ctx.save();
                     ctx.clip();
-                    ctx.drawImage(e, this.x - this.size, this.y - this.size, 2 * this.size, 2 * this.size);
+                    safeDrawImage(ctx, e, this.x - this.size, this.y - this.size, 2 * this.size, 2 * this.size);
                     ctx.restore();
                 }
                 if ((showColor || 15 < this.size) && !b) {
@@ -1684,7 +1801,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
                 }
                 ctx.globalAlpha = 1;
                 if (null != e && c) {
-                    ctx.drawImage(e, this.x - 2 * this.size, this.y - 2 * this.size, 4 * this.size, 4 * this.size);
+                    safeDrawImage(ctx, e, this.x - 2 * this.size, this.y - 2 * this.size, 4 * this.size, 4 * this.size);
                 }
                 var isOwnCell = -1 != playerCells.indexOf(this);
                 var ncache;
@@ -1700,7 +1817,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
                         var rnchache = ncache.render(),
                             m = ~~(rnchache.width / ratio),
                             h = ~~(rnchache.height / ratio);
-                        ctx.drawImage(rnchache, ~~this.x - ~~(m / 2), b - ~~(h / 2), m, h);
+                        safeDrawImage(ctx, rnchache, ~~this.x - ~~(m / 2), b - ~~(h / 2), m, h);
                         b += rnchache.height / 2 / ratio + 4
                     }
 
@@ -1719,7 +1836,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
                         e = c.render();
                         m = ~~(e.width / ratio);
                         h = ~~(e.height / ratio);
-                        ctx.drawImage(e, ~~this.x - ~~(m / 2), b - ~~(h / 2), m, h);
+                        safeDrawImage(ctx, e, ~~this.x - ~~(m / 2), b - ~~(h / 2), m, h);
                     }
                 }
                 ctx.restore()
@@ -1936,6 +2053,6 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         setInterval(renderFavicon, 1E3);
         setInterval(drawChatBoard, 1E3);
     });
-    wHandle.onload = gameLoop
+    queueGameLoopStart();
 //console.log(knownNameDict);
 })(window, window.jQuery);
