@@ -119,6 +119,9 @@ GameServer.prototype.start = function() {
       var pathname = req.url.split('?')[0];
       if (pathname == '/' || pathname == '/index.html') {
         req.url = '/client/index.html';
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
       }
 
       if (req.url == '/info.php' || req.url == '/api/regions') {

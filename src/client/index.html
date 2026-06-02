@@ -2072,9 +2072,15 @@
 
             authRequest('/api/register', { username: name, email: email, password: password })
                 .done(function(result) {
+                    currentUser = null;
+                    localStorage.removeItem('authToken');
                     status.removeClass('text-danger').addClass('text-success').text(result.message || 'Register berhasil. Silakan cek email Anda untuk verifikasi.').show();
                     $('#loginName').val(result.user && result.user.username ? result.user.username : name);
                     $('#registerPassword, #registerConfirm').val('');
+                    closeSpaDialogs();
+                    showNavigationOverlay();
+                    $('#registerDialog').addClass('register-open');
+                    setFooterActive('account');
                 })
                 .fail(function(xhr) {
                     showAuthError(status, xhr, 'Register gagal.');
