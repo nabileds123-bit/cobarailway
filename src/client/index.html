@@ -19,7 +19,7 @@
     <meta property="og:image:height" content="630"/>
     <meta property="og:type" content="website"/>
     <title>Bubble.am</title>
-    <link id="favicon" rel="icon" type="image/png" href="../img/favicon.png"/>
+    <link id="favicon" rel="icon" type="image/png" href="/img/favicon.png"/>
     <style>
         /* Force favicon to always be red, prevent JS/CSS from changing it */
         /* If you have a static red favicon.png, this is enough. */
@@ -27,8 +27,8 @@
     <link href='https://fonts.googleapis.com/css?family=Ubuntu:700' rel='stylesheet' type='text/css'>
     <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://code.jquery.com/jquery-1.11.3.min.js"></script>
-    <script src="Vector2.js"></script>
-    <script src="main_out.js?550"></script>
+    <script src="/client/Vector2.js"></script>
+    <script src="/client/main_out.js?550"></script>
     <script>
     'use strict';
     // Hide overlays background (but not helloDialog) when ESC is pressed
@@ -567,28 +567,41 @@
             display: none;
             position: absolute;
             z-index: 1200;
-            width: 160px;
+            min-width: 126px;
             padding: 0;
-            background: transparent;
-            border: 0;
-            border-radius: 0;
-            box-shadow: none;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            box-shadow: 0 2px 6px rgba(0,0,0,.15);
             text-align: left;
+            overflow: hidden;
         }
         #communityDropup.is-open {
             display: block;
         }
         #communityDropup a {
-            display: block;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            min-height: 35px;
             padding: 7px 12px;
-            color: #337ab7;
+            color: #333;
             text-decoration: none;
-            font-size: 13px;
-            line-height: 1.2;
+            font-size: 14px;
+            line-height: 1.1;
+            border-bottom: 1px solid #eee;
+        }
+        #communityDropup a:last-child {
+            border-bottom: 0;
+        }
+        #communityDropup .dropup-icon {
+            width: 14px;
+            text-align: center;
+            font-size: 12px;
         }
         #communityDropup a:hover {
             background: #f5f5f5;
-            color: #23527c;
+            color: #222;
             text-decoration: none;
         }
         .spa-page-body {
@@ -981,6 +994,7 @@
         </div>
         <div class="dialog-footer">
             <a href="#home" class="text-primary spa-home-link">Home</a> |
+            <a href="#login" class="text-primary account-menu-link">Login</a> |
             <a href="#community" class="text-primary community-menu-link">Community</a> |
             <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">About</a>
         </div>
@@ -995,6 +1009,7 @@
         </div>
         <div class="dialog-footer">
             <a href="#home" class="text-primary spa-home-link">Home</a> |
+            <a href="#login" class="text-primary account-menu-link">Login</a> |
             <a href="#community" class="text-primary community-menu-link">Community</a> |
             <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">About</a>
         </div>
@@ -1009,15 +1024,16 @@
         </div>
         <div class="dialog-footer">
             <a href="#home" class="text-primary spa-home-link">Home</a> |
+            <a href="#login" class="text-primary account-menu-link">Login</a> |
             <a href="#community" class="text-primary community-menu-link">Community</a> |
             <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">About</a>
         </div>
     </div>
 </div>
 <div id="communityDropup">
-    <a href="#notification" data-route="notification">Notification</a>
-    <a href="#guild" data-route="guild">Guild</a>
-    <a href="#high-score" data-route="high-score">High Score</a>
+    <a href="#notification" data-route="notification"><span class="dropup-icon glyphicon glyphicon-bell"></span><span>Notifications</span></a>
+    <a href="#high-score" data-route="high-score"><span class="dropup-icon glyphicon glyphicon-stats"></span><span>Highscore</span></a>
+    <a href="#guild" data-route="guild"><span class="dropup-icon glyphicon glyphicon-tower"></span><span>Guilds</span></a>
 </div>
 <div id="connecting" style="display:none;position:absolute; left:0; right:0; top:0; bottom:0; z-index:100; background-color:rgba(0,0,0,0.5);">
     <div style="width:350px; background-color:#FFFFFF; margin:100px auto; border-radius:15px; padding:5px 15px 5px 15px;">
@@ -1123,7 +1139,7 @@
 
             $('#nick').val(user.username).prop('readonly', true);
             $('#loginName').val(user.username);
-            $('#loginLink').text('Account');
+            $('#loginLink, .account-menu-link').text('Account');
             $('#profileUsername').text(user.username);
             updateUploadPreviewName();
             $('#profileEmail').text(user.email);
@@ -1171,7 +1187,7 @@
                 clearInterval(accountSyncTimer);
                 accountSyncTimer = null;
             }
-            $('#loginLink').text('Login');
+            $('#loginLink, .account-menu-link').text('Login');
             $('#nick').prop('readonly', false);
             localStorage.removeItem('accountType');
             updateChatAccessControls();
@@ -1290,6 +1306,18 @@
             }
         }
 
+        function hasPlayedGame() {
+            return !!(window.hasPlayedGame && window.hasPlayedGame());
+        }
+
+        function showNavigationOverlay() {
+            if (hasPlayedGame()) {
+                $('#overlays').addClass('only-dialog').show();
+            } else {
+                $('#overlays').removeClass('only-dialog no-bg').show();
+            }
+        }
+
         function toggleCommunityDropup(link) {
             var menu = $('#communityDropup');
             var target = $(link);
@@ -1329,7 +1357,7 @@
             closeSpaDialogs();
             $('#helloDialog').hide();
             $(target).addClass('spa-open');
-            $('#overlays').addClass('only-dialog').show();
+            showNavigationOverlay();
             setFooterActive('community');
             return true;
         }
@@ -1354,7 +1382,7 @@
         function openAccountDialog() {
             closeSpaDialogs();
             $('#helloDialog').hide();
-            $('#overlays').addClass('only-dialog').show();
+            showNavigationOverlay();
             $('#accountDialog').addClass('account-open');
             setFooterActive('account');
         }
@@ -1363,6 +1391,7 @@
             closeSpaDialogs();
             $('#helloDialog').hide();
             resetUploadSkinDialog();
+            showNavigationOverlay();
             $('#uploadSkinDialog').addClass('upload-open');
             setFooterActive('account');
         }
@@ -1449,7 +1478,7 @@
             }
             closeSpaDialogs();
             $('#loginStatus, #registerStatus, #forgotStatus').hide();
-            $('#overlays').addClass('only-dialog').show();
+            showNavigationOverlay();
             $('#helloDialog').css('display', 'flex');
             updateChatAccessControls();
             setFooterActive('home');
@@ -1470,13 +1499,14 @@
             e.preventDefault();
             playOrResumeGame();
         });
-        $('#loginLink').on('click', function(e) {
+        $('#loginLink, .account-menu-link').on('click', function(e) {
             e.preventDefault();
             $('#helloDialog').hide();
             closeSpaDialogs();
             if (currentUser) {
                 openAccountDialog();
             } else {
+                showNavigationOverlay();
                 $('#loginDialog').addClass('login-open');
                 setFooterActive('account');
                 $('#loginName').focus();
@@ -1497,6 +1527,9 @@
         $(document).on('click', '.community-menu-link', function(e) {
             e.preventDefault();
             e.stopPropagation();
+            if (!hasPlayedGame()) {
+                showNavigationOverlay();
+            }
             toggleCommunityDropup(this);
         });
         $('#communityDropup').on('click', 'a', function(e) {
@@ -1676,6 +1709,7 @@
             e.preventDefault();
             closeSpaDialogs();
             $('#registerStatus').hide();
+            showNavigationOverlay();
             $('#loginDialog').addClass('login-open');
             setFooterActive('account');
             $('#loginName').focus();
@@ -1684,6 +1718,7 @@
             e.preventDefault();
             closeSpaDialogs();
             $('#forgotStatus').hide();
+            showNavigationOverlay();
             $('#forgotDialog').addClass('forgot-open');
             setFooterActive('account');
             $('#forgotEmail').focus();
@@ -1697,6 +1732,7 @@
             e.preventDefault();
             closeSpaDialogs();
             $('#forgotStatus').hide();
+            showNavigationOverlay();
             $('#loginDialog').addClass('login-open');
             setFooterActive('account');
             $('#loginName').focus();
@@ -1748,6 +1784,7 @@
             closeSpaDialogs();
             $('#loginStatus').hide();
             $('#registerName').val(name);
+            showNavigationOverlay();
             $('#registerDialog').addClass('register-open');
             setFooterActive('account');
             $('#registerName').focus();
@@ -1789,6 +1826,7 @@
                     setTimeout(function() {
                         closeSpaDialogs();
                         $('#registerStatus').hide();
+                        showNavigationOverlay();
                         $('#loginDialog').addClass('login-open');
                         setFooterActive('account');
                         $('#loginPassword').focus();

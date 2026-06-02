@@ -16,7 +16,7 @@
      * Enter path to the skin image folder
      * To take skins from the official server enter: "http://agar.io/skins/"
      */
-    var SKIN_URL = "./skins/";//skins folder
+    var SKIN_URL = "/skins/";//skins folder
 
 
     var touchX, touchY,
@@ -1029,6 +1029,10 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         return hasClickedPlay && wsIsOpen() && playerCells.length > 0;
     };
 
+    wHandle.hasPlayedGame = function () {
+        return hasClickedPlay;
+    };
+
     wHandle.resumeGameSession = function () {
         if (!wHandle.isGameSessionActive()) {
             return false;
@@ -1414,8 +1418,8 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         splitIcon = new Image,
         ejectIcon = new Image,
         noRanking = false;
-    splitIcon.src = "split.png";
-    ejectIcon.src = "feed.png";
+    splitIcon.src = "/client/split.png";
+    ejectIcon.src = "/client/feed.png";
     var wCanvas = document.createElement("canvas");
     var playerStat = null;
     wHandle.isSpectating = false;

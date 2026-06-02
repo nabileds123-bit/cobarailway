@@ -116,6 +116,11 @@ GameServer.prototype.start = function() {
     
     var self = this;
     var hserver = http.createServer(function(req, res){
+      var pathname = req.url.split('?')[0];
+      if (pathname == '/' || pathname == '/index.html') {
+        req.url = '/client/index.html';
+      }
+
       if (req.url == '/info.php' || req.url == '/api/regions') {
         var region = 'SG-Singapore';
         var count = self.clients.filter(function(client) {
