@@ -836,15 +836,12 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         }
     }
 
-    function sendAuthToken() {
+    function sendAuthTokenValue(token) {
         if (!wsIsOpen() || !wHandle.localStorage) {
             return;
         }
 
-        var token = wHandle.localStorage.getItem('authToken');
-        if (!token) {
-            return;
-        }
+        token = String(token || '');
 
         var msg = prepareData(1 + 2 * token.length);
         msg.setUint8(0, 101);
@@ -854,7 +851,23 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         wsSend(msg);
     }
 
+    function sendAuthToken() {
+        if (!wHandle.localStorage) {
+            return;
+        }
+
+        var token = wHandle.localStorage.getItem('authToken');
+        if (!token) {
+            return;
+        }
+
+        sendAuthTokenValue(token);
+    }
+
     wHandle.refreshAccountSkin = sendAuthToken;
+    wHandle.clearAccountSession = function () {
+        sendAuthTokenValue("");
+    };
 
     function sendAccountColor(color) {
         color = String(color || '').trim().toUpperCase();
@@ -917,6 +930,19 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
     function wsIsOpen() {
         return null != ws && ws.readyState == ws.OPEN
     }
+
+    wHandle.isGameSessionActive = function () {
+        return wsIsOpen() && playerCells.length > 0;
+    };
+
+    wHandle.resumeGameSession = function () {
+        if (!wHandle.isGameSessionActive()) {
+            return false;
+        }
+
+        hideOverlays();
+        return true;
+    };
 
     function sendUint8(a) {
         if (wsIsOpen()) {

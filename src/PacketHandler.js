@@ -269,7 +269,15 @@ PacketHandler.prototype.setAuthToken = function(token) {
     var client = this.socket.playerTracker;
     token = String(token || '').trim();
 
-    if (!token || !client) {
+    if (!client) {
+        return;
+    }
+
+    if (!token) {
+        client.authUserId = null;
+        client.authUsername = null;
+        client.accountType = 'Guest';
+        client.skinUrl = null;
         return;
     }
 

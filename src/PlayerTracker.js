@@ -68,8 +68,8 @@ PlayerTracker.prototype.getScore = function(reCalcScore) {
         var s = 0;
         for (var i = 0; i < this.cells.length; i++) {
             s += this.cells[i].mass;
-            this.score = s;
         }
+        this.score = s;
     }
     return this.score;
 }

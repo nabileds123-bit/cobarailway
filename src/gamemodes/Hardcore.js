@@ -33,34 +33,27 @@ Hardcore.prototype.leaderboardAddSort = function(player,leaderboard) {
 // Override
 
 Hardcore.prototype.updateLB = function(gameServer) {
-	var lb = gameServer.leaderboard;
-	// Loop through all clients
+	var players = [];
+
 	for (var i = 0; i < gameServer.clients.length; i++) {
         if (typeof gameServer.clients[i] == "undefined") {
             continue;
         }
 
         var player = gameServer.clients[i].playerTracker;
-        var playerScore = player.getScore(true);
         if (player.cells.length <= 0) {
             continue;
         }
-        
-        if (lb.length == 0) {
-            // Initial player
-            lb.push(player);
-            continue;
-        } else if (lb.length < 10) {
-            this.leaderboardAddSort(player,lb);
-        } else {
-            // 10 in leaderboard already
-            if (playerScore > lb[9].getScore(false)) {
-                lb.pop();
-                this.leaderboardAddSort(player,lb);
-            }
-        }
+
+        player.getScore(true);
+        players.push(player);
     }
-	
-	this.rankOne = lb[0];
+
+    players.sort(function(a, b) {
+        return b.getScore(false) - a.getScore(false);
+    });
+
+    gameServer.leaderboard = players.slice(0, gameServer.config.gameLBlength);
+	this.rankOne = gameServer.leaderboard[0];
 }
 

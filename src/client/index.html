@@ -180,14 +180,17 @@
         #helloDialog form {
             flex: 0 0 auto;
         }
-        #helloDialog .hello-footer {
+        #helloDialog .hello-bottom {
             margin-top: auto;
+        }
+        #helloDialog .hello-footer {
+            margin-top: 0;
         }
         #helloDialog .top-brand-row {
             margin-bottom: 6px;
         }
         #helloDialog .main-input-row {
-            margin: 10px 0 4px 0;
+            margin: 25px 0 4px 0;
         }
         #helloDialog h2 {
             margin: 0;
@@ -262,7 +265,7 @@
     background: none !important;
 }
         #overlays.only-dialog > #helloDialog {
-    display: block;
+    display: flex;
 }
         #overlays.only-dialog > *:not(#helloDialog):not(#loginDialog):not(#registerDialog):not(#forgotDialog):not(#accountDialog):not(#uploadSkinDialog):not(#notificationDialog):not(#guildDialog):not(#highScoreDialog) {
     display: none !important;
@@ -776,7 +779,6 @@
             <div><div class="text-muted region-message CN-China"></div></div>
             <div class="form-group">
                 <button type="submit" id="playBtn"
-                        onclick="setNick(document.getElementById('nick').value); return false;"
                         class="btn btn-play btn-primary btn-needs-server">Play</button>
                 <button onclick="$('#settings, #instructions').toggle();return false;"
                         class="btn btn-info btn-settings"><i class="glyphicon glyphicon-cog"></i></button>
@@ -812,24 +814,26 @@
                 Press <b>W</b> to eject some mass<br/>
             </span></center>
         </div>
-        <br clear="both"/>
-        <div id="helloXpPanel" class="xp-panel">
-            <div class="xp-container">
-                <div id="indexXpBar"></div>
-                <span id="indexXpText">0 / 450 XP</span>
-                <div id="indexXpLevel" class="xp-star">1</div>
+        <div class="hello-bottom">
+            <br clear="both"/>
+            <div id="helloXpPanel" class="xp-panel">
+                <div class="xp-container">
+                    <div id="indexXpBar"></div>
+                    <span id="indexXpText">0 / 450 XP</span>
+                    <div id="indexXpLevel" class="xp-star">1</div>
+                </div>
             </div>
-        </div>
-        <div class="hello-footer">
-        <hr/>
-        <center>
-            <div>
-                <a href="index.html" class="text-primary">Home</a> |
-                <a href="#login" id="loginLink" class="text-primary">Login</a> |
-                <a href="#community" class="text-primary community-menu-link">Community</a> |
-                <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">About</a>
+            <div class="hello-footer">
+            <hr/>
+            <center>
+                <div>
+                    <a href="#home" class="text-primary spa-home-link">Home</a> |
+                    <a href="#login" id="loginLink" class="text-primary">Login</a> |
+                    <a href="#community" class="text-primary community-menu-link">Community</a> |
+                    <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">About</a>
+                </div>
+            </center>
             </div>
-        </center>
         </div>
     </div>
     <div id="loginDialog">
@@ -1365,9 +1369,14 @@
         function finishLogin(result, statusEl) {
             localStorage.setItem('authToken', result.token);
             applyLoggedInUser(result.user);
-            statusEl.removeClass('text-danger').addClass('text-success').text('Login berhasil. Refresh halaman...').show();
+            startAccountSync();
+            updateChatAccessControls();
+            if (window.refreshAccountSkin) {
+                window.refreshAccountSkin();
+            }
+            statusEl.removeClass('text-danger').addClass('text-success').text('Login berhasil.').show();
             setTimeout(function() {
-                window.location.reload();
+                showHomeDialog();
             }, 500);
         }
 
@@ -1400,10 +1409,31 @@
             updateChatAccessControls();
             routeSpaHash();
         });
-        // Simpan nick ke localStorage hanya saat tombol Play diklik
-        $('#playBtn').on('click', function() {
+        function showHomeDialog() {
+            if (window.location.hash != '#home') {
+                window.location.hash = '#home';
+            }
+            closeSpaDialogs();
+            $('#loginStatus, #registerStatus, #forgotStatus').hide();
+            $('#overlays').addClass('only-dialog').show();
+            $('#helloDialog').css('display', 'flex');
+            updateChatAccessControls();
+        }
+
+        function playOrResumeGame() {
             var nick = $('#nick').val();
             localStorage.setItem('nick', nick);
+
+            if (window.resumeGameSession && window.resumeGameSession()) {
+                return;
+            }
+
+            setNick(nick);
+        }
+
+        $('#playBtn').on('click', function(e) {
+            e.preventDefault();
+            playOrResumeGame();
         });
         $('#loginLink').on('click', function(e) {
             e.preventDefault();
@@ -1418,21 +1448,15 @@
         });
         $('#loginHomeLink').on('click', function(e) {
             e.preventDefault();
-            closeSpaDialogs();
-            $('#loginStatus').hide();
-            $('#helloDialog').show();
+            showHomeDialog();
         });
         $('.dialog-brand').on('click', function(e) {
             e.preventDefault();
-            closeSpaDialogs();
-            $('#loginStatus, #registerStatus, #forgotStatus').hide();
-            $('#helloDialog').show();
+            showHomeDialog();
         });
         $('.spa-home-link').on('click', function(e) {
             e.preventDefault();
-            window.location.hash = '#home';
-            closeSpaDialogs();
-            $('#helloDialog').show();
+            showHomeDialog();
         });
         $(document).on('click', '.community-menu-link', function(e) {
             e.preventDefault();
@@ -1454,13 +1478,11 @@
         });
         $('#accountHomeLink').on('click', function(e) {
             e.preventDefault();
-            closeSpaDialogs();
-            $('#helloDialog').show();
+            showHomeDialog();
         });
         $('#uploadHomeLink').on('click', function(e) {
             e.preventDefault();
-            closeSpaDialogs();
-            $('#helloDialog').show();
+            showHomeDialog();
         });
         $('#uploadAccountLink, #uploadAccountFooterLink').on('click', function(e) {
             e.preventDefault();
@@ -1534,8 +1556,11 @@
             localStorage.removeItem('nick');
             localStorage.removeItem('registerEmail');
             localStorage.removeItem('cellColor');
+            if (window.clearAccountSession) {
+                window.clearAccountSession();
+            }
             clearLoggedInUser();
-            window.location.reload();
+            showHomeDialog();
         });
         $('#changePasswordLink').on('click', function(e) {
             e.preventDefault();
