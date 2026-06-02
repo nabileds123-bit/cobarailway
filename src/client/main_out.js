@@ -433,19 +433,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
 
     function attemptConnection() {
         console.log("Find " + w + gameMode);
-        wjQuery.ajax("main.php", {
-            error: function () {
-                setTimeout(attemptConnection, 1E3)
-            },
-            success: function () {
-                wsConnect("ws://" + CONNECTION_URL)
-            },
-            dataType: "text",
-            method: "POST",
-            cache: false,
-            crossDomain: true,
-            data: w + gameMode || "?"
-        })
+        wsConnect();
     }
 
     function showConnecting() {
