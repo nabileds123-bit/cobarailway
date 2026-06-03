@@ -1735,14 +1735,6 @@
             <span id="profileAccountType" class="profile-value">Free</span>
         </div>
         <div class="profile-row">
-            <span class="profile-label">Premium:</span>
-            <span id="profilePremiumStatus" class="profile-value">Inactive</span>
-        </div>
-        <div class="profile-row" id="profilePremiumRemainingRow" style="display:none">
-            <span class="profile-label">Expires In:</span>
-            <span id="profilePremiumRemaining" class="profile-value">-</span>
-        </div>
-        <div class="profile-row">
             <span class="profile-label">Nick:</span>
             <span class="profile-value profile-color-wrap">
                 <span id="profileUsername">-</span>
@@ -2090,8 +2082,6 @@
         var currentUser = null;
         var accountSyncTimer = null;
         var chatAccessErrorTimer = null;
-        var premiumCountdownTimer = null;
-        var premiumCountdownDeadline = 0;
         var guildsCache = [];
         var guildRefreshTimer = null;
         var guildDetailState = null;
@@ -2211,13 +2201,10 @@
             if (isPremium) {
                 $('#profileAccountType')
                     .html('<span class="profile-premium">Premium</span>');
-                $('#profilePremiumStatus').html('<span class="profile-premium">Active</span>');
             } else {
                 $('#profileAccountType')
                     .html('Free <a href="#buy-premium" id="buyPremiumLink" class="text-primary">Buy Premium</a>');
-                $('#profilePremiumStatus').text('Inactive');
             }
-            updatePremiumCountdown(user);
             if (user.premiumExpired && hadPremium) {
                 $('#uploadSkinStatus')
                     .removeClass('text-success')
@@ -2254,71 +2241,11 @@
             $('#profileSkinRow').toggle(hasSkin || hasGuildSkin);
         }
 
-        function formatPremiumRemaining(ms) {
-            ms = Math.max(0, Number(ms || 0));
-            var totalHours = Math.floor(ms / (60 * 60 * 1000));
-            var days = Math.floor(totalHours / 24);
-            var hours = totalHours % 24;
-            var minutes = Math.floor((ms % (60 * 60 * 1000)) / (60 * 1000));
-
-            if (days > 0) {
-                return days + ' Days ' + hours + ' Hours';
-            }
-
-            if (hours > 0) {
-                return hours + ' Hours ' + minutes + ' Minutes';
-            }
-
-            return minutes + ' Minutes';
-        }
-
-        function refreshPremiumCountdown() {
-            var remaining = premiumCountdownDeadline - Date.now();
-            if (remaining <= 0) {
-                $('#profilePremiumRemainingRow').hide();
-                $('#profilePremiumStatus').text('Inactive');
-                $('#profileAccountType').html('Free <a href="#buy-premium" id="buyPremiumLink" class="text-primary">Buy Premium</a>');
-                if (currentUser) {
-                    currentUser.accountType = 'Free';
-                    localStorage.setItem('accountType', 'Free');
-                    updateChatAccessControls();
-                }
-                clearInterval(premiumCountdownTimer);
-                premiumCountdownTimer = null;
-                return;
-            }
-
-            $('#profilePremiumRemaining').text(formatPremiumRemaining(remaining));
-        }
-
-        function updatePremiumCountdown(user) {
-            if (premiumCountdownTimer) {
-                clearInterval(premiumCountdownTimer);
-                premiumCountdownTimer = null;
-            }
-
-            var remaining = Number(user.premiumRemainingMs || 0);
-            if (String(user.accountType || '').toLowerCase() == 'premium' && remaining > 0) {
-                premiumCountdownDeadline = Date.now() + remaining;
-                $('#profilePremiumRemainingRow').show();
-                refreshPremiumCountdown();
-                premiumCountdownTimer = setInterval(refreshPremiumCountdown, 1000);
-            } else {
-                premiumCountdownDeadline = 0;
-                $('#profilePremiumRemainingRow').hide();
-                $('#profilePremiumRemaining').text('-');
-            }
-        }
-
         function clearLoggedInUser() {
             currentUser = null;
             if (accountSyncTimer) {
                 clearInterval(accountSyncTimer);
                 accountSyncTimer = null;
-            }
-            if (premiumCountdownTimer) {
-                clearInterval(premiumCountdownTimer);
-                premiumCountdownTimer = null;
             }
             $('#loginLink, .account-menu-link').text('Login');
             $('#nick').prop('readonly', false);
