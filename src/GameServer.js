@@ -1086,22 +1086,14 @@ GameServer.prototype.setAsMovingNode = function(node) {
     this.movingNodes.push(node);
 }
 
-GameServer.prototype.useClassicSplitPhysics = function() {
-    var roomName = String(this.roomName || '').toLowerCase();
-    return roomName == 'ffa' || roomName == 'free for all' || roomName == 'hardcore';
-}
-
 GameServer.prototype.splitCells = function(client) {
-    var classicSplit = this.useClassicSplitPhysics();
-    if (!classicSplit) {
-        var splitCooldownMs = Number(this.config.playerSplitCooldownMs);
-        if (isNaN(splitCooldownMs)) splitCooldownMs = 120;
-        var now = Date.now();
-        if (client.lastSplitTime && (now - client.lastSplitTime) < splitCooldownMs) {
-            return;
-        }
-        client.lastSplitTime = now;
+    var splitCooldownMs = Number(this.config.playerSplitCooldownMs);
+    if (isNaN(splitCooldownMs)) splitCooldownMs = 120;
+    var now = Date.now();
+    if (client.lastSplitTime && (now - client.lastSplitTime) < splitCooldownMs) {
+        return;
     }
+    client.lastSplitTime = now;
 
     var len = client.cells.length;
     for (var i = 0; i < len; i++) {
@@ -1129,7 +1121,7 @@ GameServer.prototype.splitCells = function(client) {
         cell.calcMergeTime(this.config.playerRecombineTime);
         // Get starting position after mass split so large cells do not overlap and stutter
         var splitSize = Math.sqrt(100 * newMass + .25) >> 0;
-        var startDistance = classicSplit ? Math.min(splitSize * 0.35, 35) : Math.min(splitSize * 0.40, 42);
+        var startDistance = Math.min(splitSize * 0.40, 42);
         var startPos = {
             x: cell.position.x + ( startDistance * Math.sin(angle) ),
             y: cell.position.y + ( startDistance * Math.cos(angle) )
@@ -1143,21 +1135,12 @@ GameServer.prototype.splitCells = function(client) {
         var splitMaxSpeed = Number(this.config.playerSplitMaxSpeed);
         var splitMoveTicks = Number(this.config.playerSplitMoveTicks);
         var splitDecay = Number(this.config.playerSplitDecay);
-        if (classicSplit) {
-            splitSpeedBase = 95;
-            splitSpeedMultiplier = 4.5;
-            splitMinSpeed = 105;
-            splitMaxSpeed = 130;
-            splitMoveTicks = 10;
-            splitDecay = 0.82;
-        } else {
-            if (isNaN(splitSpeedBase)) splitSpeedBase = 120;
-            if (isNaN(splitSpeedMultiplier)) splitSpeedMultiplier = 8;
-            if (isNaN(splitMinSpeed)) splitMinSpeed = 170;
-            if (isNaN(splitMaxSpeed)) splitMaxSpeed = 245;
-            if (isNaN(splitMoveTicks)) splitMoveTicks = 24;
-            if (isNaN(splitDecay)) splitDecay = 0.82;
-        }
+        if (isNaN(splitSpeedBase)) splitSpeedBase = 120;
+        if (isNaN(splitSpeedMultiplier)) splitSpeedMultiplier = 8;
+        if (isNaN(splitMinSpeed)) splitMinSpeed = 170;
+        if (isNaN(splitMaxSpeed)) splitMaxSpeed = 245;
+        if (isNaN(splitMoveTicks)) splitMoveTicks = 24;
+        if (isNaN(splitDecay)) splitDecay = 0.82;
         var sizeScale = Math.max(0, Math.min(1, (cell.getSize() - 35) / 210));
         var heavyAssist = Math.sqrt(sizeScale) * 42;
         var smallBrake = (1 - sizeScale) * 28;
@@ -1165,9 +1148,7 @@ GameServer.prototype.splitCells = function(client) {
         var splitSpeed = Math.max(splitMinSpeed, Math.min(splitMaxSpeed, calculatedSplitSpeed));
         split.setMoveEngineData(splitSpeed, splitMoveTicks, splitDecay);
         split.calcMergeTime(this.config.playerRecombineTime);
-        if (!classicSplit) {
-            split.setCollisionOff(true);
-        }
+        split.setCollisionOff(true);
         split.firstSplit = true;
        setTimeout(function(){split.firstSplit = false;},1000)
        /* split.hasAte = true;
