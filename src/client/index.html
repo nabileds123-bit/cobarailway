@@ -28,7 +28,7 @@
     <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://code.jquery.com/jquery-1.11.3.min.js"></script>
     <script src="/client/Vector2.js"></script>
-    <script src="/client/main_out.js?567"></script>
+    <script src="/client/main_out.js?569"></script>
     <script>
     'use strict';
     // Hide overlays background (but not helloDialog) when ESC is pressed
@@ -2247,6 +2247,7 @@
             localStorage.setItem('loginName', user.username);
             localStorage.setItem('nick', user.username);
             localStorage.setItem('accountType', user.accountType || 'Free');
+            localStorage.setItem('adminRole', user.adminRole || user.role || '');
             localStorage.setItem('registerEmail', user.email);
 
             $('#nick').val(user.username).prop('readonly', true);
@@ -2304,6 +2305,14 @@
             $('#profileSkinRow').toggle(hasSkin || hasGuildSkin);
         }
 
+        window.updateAccountPoints = function(points) {
+            points = Number(points || 0);
+            if (currentUser) {
+                currentUser.points = points;
+            }
+            $('#profilePoints').text(points.toFixed(2));
+        };
+
         function clearLoggedInUser() {
             currentUser = null;
             if (accountSyncTimer) {
@@ -2313,6 +2322,7 @@
             $('#loginLink, .account-menu-link').text('Login');
             $('#nick').prop('readonly', false);
             localStorage.removeItem('accountType');
+            localStorage.removeItem('adminRole');
             $('#communityGuildShortcut').hide();
             $('#communityGuildShortcutText').text('');
             updateChatAccessControls();
@@ -2357,7 +2367,13 @@
         }
 
         function isPremiumAccount() {
-            return !!currentUser && String(currentUser.accountType || '').toLowerCase() == 'premium';
+            if (!currentUser) {
+                return false;
+            }
+
+            var accountType = String(currentUser.accountType || '').toLowerCase();
+            var adminRole = String(currentUser.adminRole || currentUser.role || '').toLowerCase();
+            return accountType == 'premium' || accountType == 'admin' || accountType == 'moderator' || adminRole == 'admin' || adminRole == 'moderator' || adminRole == 'mod';
         }
 
         function showChatAccessError() {

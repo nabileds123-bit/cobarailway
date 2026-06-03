@@ -91,6 +91,7 @@ function ensureMysql() {
                 'guild_description VARCHAR(240) NULL,' +
                 'guild_type VARCHAR(16) NULL,' +
                 'guild_role VARCHAR(16) NULL,' +
+                'admin_role VARCHAR(20) NULL,' +
                 'skin_url VARCHAR(255) NULL,' +
                 'guild_skin_url VARCHAR(255) NULL,' +
                 'cell_color VARCHAR(7) NOT NULL DEFAULT \'#6FCA36\',' +
@@ -118,6 +119,7 @@ function ensureMysql() {
                 'ALTER TABLE users ADD COLUMN guild_description VARCHAR(240) NULL',
                 'ALTER TABLE users ADD COLUMN guild_type VARCHAR(16) NULL',
                 'ALTER TABLE users ADD COLUMN guild_role VARCHAR(16) NULL',
+                'ALTER TABLE users ADD COLUMN admin_role VARCHAR(20) NULL',
                 'ALTER TABLE users ADD COLUMN skin_url VARCHAR(255) NULL',
                 'ALTER TABLE users ADD COLUMN guild_skin_url VARCHAR(255) NULL',
                 'ALTER TABLE users ADD COLUMN cell_color VARCHAR(7) NOT NULL DEFAULT \'#6FCA36\'',
@@ -574,6 +576,7 @@ function publicUser(user) {
         guildDescription: user.guildDescription || '',
         guildType: user.guildType || '',
         guildRole: user.guildRole || '',
+        adminRole: user.adminRole || user.role || '',
         skinUrl: user.skinUrl || '',
         guildSkinUrl: user.guildSkinUrl || '',
         cellColor: normalizeCellColor(user.cellColor),
@@ -603,6 +606,7 @@ function mysqlUser(row) {
         guildDescription: row.guild_description,
         guildType: row.guild_type,
         guildRole: row.guild_role,
+        adminRole: row.admin_role,
         skinUrl: row.skin_url,
         guildSkinUrl: row.guild_skin_url,
         cellColor: row.cell_color,
@@ -821,6 +825,19 @@ function findJsonUserByLogin(db, login) {
     return null;
 }
 
+function findJsonUserByUsername(db, username) {
+    var value = String(username || '').trim().toLowerCase();
+
+    for (var i = 0; i < db.users.length; i++) {
+        var user = db.users[i];
+        if (user.username && user.username.toLowerCase() == value) {
+            return user;
+        }
+    }
+
+    return null;
+}
+
 function findUserByLogin(login) {
     return ensureMysql().then(function(usingMysql) {
         if (usingMysql) {
@@ -835,6 +852,22 @@ function findUserByLogin(login) {
         }
 
         return findJsonUserByLogin(readJsonDb(), login);
+    });
+}
+
+function findUserByUsername(username) {
+    return ensureMysql().then(function(usingMysql) {
+        if (usingMysql) {
+            return getMysqlPool()
+                .query('SELECT * FROM users WHERE LOWER(username) = ? LIMIT 1', [
+                    String(username || '').trim().toLowerCase()
+                ])
+                .then(function(result) {
+                    return mysqlUser(result[0][0]);
+                });
+        }
+
+        return findJsonUserByUsername(readJsonDb(), username);
     });
 }
 
@@ -1097,6 +1130,44 @@ function adjustPoints(userId, amount, reason) {
                 return publicUser(savedUser);
             });
         });
+}
+
+function grantPointsByUsername(username, amount, reason) {
+    var delta = Number(amount || 0);
+    if (!username || !delta) {
+        return Promise.resolve(null);
+    }
+
+    return ensureMysql().then(function(usingMysql) {
+        if (usingMysql) {
+            return getMysqlPool()
+                .query('UPDATE users SET points = GREATEST(0, points + ?) WHERE LOWER(username) = ?', [
+                    delta,
+                    String(username || '').trim().toLowerCase()
+                ])
+                .then(function(result) {
+                    if (!result[0] || !result[0].affectedRows) {
+                        return null;
+                    }
+
+                    return findUserByUsername(username).then(function(savedUser) {
+                        console.log('[Auth] Points %s%s for %s (%s)', delta >= 0 ? '+' : '', delta, savedUser.username, reason || 'points');
+                        return publicUser(savedUser);
+                    });
+                });
+        }
+
+        var user = findJsonUserByUsername(readJsonDb(), username);
+        if (!user) {
+            return null;
+        }
+
+        user.points = Math.max(0, Number(user.points || 0) + delta);
+        return saveAccountFields(user).then(function(savedUser) {
+            console.log('[Auth] Points %s%s for %s (%s)', delta >= 0 ? '+' : '', delta, savedUser.username, reason || 'points');
+            return publicUser(savedUser);
+        });
+    });
 }
 
 function handleRegister(req, res) {
@@ -2709,8 +2780,11 @@ function handleAuth(req, res) {
 }
 
 handleAuth.getUserByToken = findUserByToken;
+handleAuth.getUserById = findUserById;
+handleAuth.getUserByUsername = findUserByUsername;
 handleAuth.awardXp = awardXp;
 handleAuth.adjustPoints = adjustPoints;
+handleAuth.grantPointsByUsername = grantPointsByUsername;
 handleAuth.getNextLevelXp = getNextLevelXp;
 handleAuth.isAllowedCellColor = isAllowedCellColor;
 handleAuth.normalizeCellColor = normalizeCellColor;

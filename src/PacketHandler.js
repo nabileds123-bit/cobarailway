@@ -169,6 +169,11 @@ this.merg = true;
     }
 
     var player = this.socket.playerTracker;
+    if (/^\/point(?:\s|$)/i.test(message)) {
+        this.handlePointCommand(message);
+        break;
+    }
+
     if (String(player.accountType || '').toLowerCase() != 'premium') {
         break;
     }
@@ -286,6 +291,192 @@ function hexToRgb(hex) {
     };
 }
 
+function normalizePermissionValue(value) {
+    if (Array.isArray(value)) {
+        return value.map(normalizePermissionValue).join(',');
+    }
+
+    return String(value || '').trim().toLowerCase();
+}
+
+function hasPointAdminRole(value) {
+    var text = normalizePermissionValue(value);
+    if (!text) {
+        return false;
+    }
+
+    var parts = text.split(/[\s,;|]+/);
+    for (var i = 0; i < parts.length; i++) {
+        if (parts[i] == 'admin' || parts[i] == 'moderator' || parts[i] == 'mod' || parts[i] == 'point-admin' || parts[i] == 'point-moderator') {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function formatPointValue(value) {
+    var number = Number(value || 0);
+    if (!isFinite(number)) {
+        number = 0;
+    }
+
+    if (Math.floor(number) == number) {
+        return String(number);
+    }
+
+    return number.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+}
+
+PacketHandler.prototype.sendPrivateSystemMessage = function(message, socket) {
+    socket = socket || this.socket;
+
+    if (!socket || !socket.sendPacket) {
+        return;
+    }
+
+    socket.sendPacket(new Packet.Message(String(message || '')));
+}
+
+PacketHandler.prototype.sendPointBalanceUpdate = function(socket, points) {
+    if (!socket || !socket.send || socket.readyState != 1) {
+        return;
+    }
+
+    var buf = new ArrayBuffer(9);
+    var view = new DataView(buf);
+    view.setUint8(0, 107);
+    view.setFloat64(1, Number(points || 0), true);
+    socket.send(buf);
+}
+
+PacketHandler.prototype.isPointAdmin = function(player) {
+    if (!player || !player.authUserId) {
+        return false;
+    }
+
+    if (hasPointAdminRole(player.adminRole) || hasPointAdminRole(player.accountType)) {
+        return true;
+    }
+
+    var allowList = String(process.env.POINT_COMMAND_ADMINS || process.env.ADMIN_USERS || '').toLowerCase();
+    if (!allowList) {
+        return false;
+    }
+
+    var actorNames = [
+        player.authUsername,
+        player.getName ? player.getName() : '',
+        player.authUserId
+    ].map(function(value) {
+        return String(value || '').trim().toLowerCase();
+    }).filter(function(value) {
+        return !!value;
+    });
+
+    var allowed = allowList.split(/[\s,;|]+/);
+    for (var i = 0; i < actorNames.length; i++) {
+        if (allowed.indexOf(actorNames[i]) != -1) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+PacketHandler.prototype.parsePointCommand = function(message) {
+    var parts = String(message || '').trim().split(/\s+/);
+    if (parts.length < 3) {
+        return { error: 'usage' };
+    }
+
+    var amountText = parts.pop();
+    var targetName = parts.slice(1).join(' ').trim();
+    if (!targetName) {
+        return { error: 'usage' };
+    }
+
+    var amount = Number(amountText);
+    if (!isFinite(amount) || amount <= 0) {
+        return { error: 'amount' };
+    }
+
+    return {
+        targetName: targetName,
+        amount: amount
+    };
+}
+
+PacketHandler.prototype.getOnlineSocketsByUserId = function(userId) {
+    var hub = this.gameServer && this.gameServer.getHub ? this.gameServer.getHub() : this.gameServer;
+    var sockets = hub && hub.getAllClients ? hub.getAllClients() : (this.gameServer && this.gameServer.clients ? this.gameServer.clients : []);
+    var matches = [];
+
+    for (var i = 0; i < sockets.length; i++) {
+        var player = sockets[i] && sockets[i].playerTracker;
+        if (player && String(player.authUserId || '') == String(userId || '')) {
+            matches.push(sockets[i]);
+        }
+    }
+
+    return matches;
+}
+
+PacketHandler.prototype.handlePointCommand = function(message) {
+    var admin = this.socket.playerTracker;
+    var adminName = (admin && (admin.authUsername || (admin.getName && admin.getName()))) || 'Unknown';
+
+    if (!this.isPointAdmin(admin)) {
+        console.log('[ADMIN POINT] Unauthorized attempt by %s.', adminName);
+        this.sendPrivateSystemMessage('[POINT] You do not have permission to use this command.');
+        return;
+    }
+
+    var parsed = this.parsePointCommand(message);
+    if (parsed.error == 'usage') {
+        this.sendPrivateSystemMessage('[POINT] Usage: /point <player> <amount>');
+        return;
+    }
+
+    if (parsed.error == 'amount') {
+        this.sendPrivateSystemMessage('[POINT] Invalid amount.');
+        return;
+    }
+
+    if (!Auth.grantPointsByUsername) {
+        this.sendPrivateSystemMessage('[POINT] Failed to update Points.');
+        console.log('[ADMIN POINT] Point command unavailable for %s.', adminName);
+        return;
+    }
+
+    Auth.grantPointsByUsername(parsed.targetName, parsed.amount, 'admin command by ' + adminName)
+        .then(function(target) {
+            if (!target) {
+                this.sendPrivateSystemMessage('[POINT] Player not found.');
+                return;
+            }
+
+            var amountText = formatPointValue(parsed.amount);
+            var pointsText = formatPointValue(target.points);
+            this.sendPrivateSystemMessage('[POINT] Added ' + amountText + ' Points to ' + target.username + '. Current Points: ' + pointsText);
+
+            var onlineSockets = this.getOnlineSocketsByUserId(target.id);
+            for (var i = 0; i < onlineSockets.length; i++) {
+                if (onlineSockets[i].playerTracker) {
+                    onlineSockets[i].playerTracker.accountPoints = Number(target.points || 0);
+                }
+                this.sendPointBalanceUpdate(onlineSockets[i], target.points);
+                this.sendPrivateSystemMessage('You received ' + amountText + ' Points from admin.', onlineSockets[i]);
+            }
+
+            console.log('[ADMIN POINT] %s added %s Points to %s. Current Points: %s', adminName, amountText, target.username, pointsText);
+        }.bind(this))
+        .catch(function(error) {
+            this.sendPrivateSystemMessage('[POINT] Failed to update Points.');
+            console.log('[ADMIN POINT] Failed for %s: %s', adminName, error && error.message ? error.message : error);
+        }.bind(this));
+}
+
 PacketHandler.prototype.applyCellColor = function(color) {
     var client = this.socket.playerTracker;
     var rgb = hexToRgb(color);
@@ -316,6 +507,8 @@ PacketHandler.prototype.setAuthToken = function(token) {
         client.authUserId = null;
         client.authUsername = null;
         client.accountType = 'Guest';
+        client.adminRole = '';
+        client.accountPoints = 0;
         client.guildTag = '';
         client.skinUrl = null;
         return;
@@ -330,6 +523,8 @@ PacketHandler.prototype.setAuthToken = function(token) {
             client.authUserId = user.id;
             client.authUsername = user.username;
             client.accountType = user.accountType || 'Free';
+            client.adminRole = user.adminRole || user.role || user.accountRole || '';
+            client.accountPoints = Number(user.points || 0);
             client.guildTag = user.guild || '';
             client.skinUrl = user.skinUrl || user.guildSkinUrl || null;
             client.lastPassiveXpTime = Date.now();

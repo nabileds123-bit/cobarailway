@@ -684,6 +684,14 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
                 nodesOnScreen.push(msg.getUint32(offset, true));
                 offset += 4;
                 break;
+            case 42:
+                var systemMessage = "";
+                while (offset + 1 < msg.byteLength) {
+                    systemMessage += String.fromCharCode(msg.getUint16(offset, true));
+                    offset += 2;
+                }
+                addSystemChat(systemMessage);
+                break;
             case 48: // update leaderboard (custom text)
                 setCustomLB = true;
                 noRanking = true;
@@ -766,6 +774,12 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
                     hideOverlays();
                 }
                 break;
+            case 107:
+                var updatedPoints = msg.getFloat64(offset, true);
+                if (wHandle.updateAccountPoints) {
+                    wHandle.updateAccountPoints(updatedPoints);
+                }
+                break;
 
         }
     }
@@ -814,6 +828,17 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         //drawChatBoardLine();
     }
 
+    function addSystemChat(message) {
+        chatBoard.push({
+            "name": "",
+            "color": "#666666",
+            "message": String(message || ''),
+            "time": Date.now(),
+            "system": true
+        });
+        drawChatBoard();
+    }
+
     function drawChatBoard() {
         //chatCanvas = null;
         if (!showChat) {
@@ -847,6 +872,14 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         var from = len - 15;
         if (from < 0) from = 0;
         for (var i = 0; i < (len - from); i++) {
+            if (chatBoard[i + from].system) {
+                var systemText = new UText(18, '#666666');
+                systemText.setValue(chatBoard[i + from].message);
+                var renderedSystemText = systemText.render();
+                safeDrawImage(ctx, renderedSystemText, 15, chatCanvas.height / scaleFactor - 24 * (len - i - from));
+                continue;
+            }
+
             var chatName = new UText(18, chatBoard[i + from].color);
             chatName.setValue(chatBoard[i + from].name);
             var width = chatName.getWidth();
@@ -1166,7 +1199,13 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
             return wHandle.canUsePremiumChat();
         }
 
-        return !!wHandle.localStorage && String(wHandle.localStorage.getItem('accountType') || '').toLowerCase() == 'premium';
+        if (!wHandle.localStorage) {
+            return false;
+        }
+
+        var accountType = String(wHandle.localStorage.getItem('accountType') || '').toLowerCase();
+        var adminRole = String(wHandle.localStorage.getItem('adminRole') || '').toLowerCase();
+        return accountType == 'premium' || accountType == 'admin' || accountType == 'moderator' || adminRole == 'admin' || adminRole == 'moderator' || adminRole == 'mod';
     }
 
     function isChatVisible() {

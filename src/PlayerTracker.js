@@ -13,6 +13,8 @@ function PlayerTracker(gameServer, socket) {
     this.authUserId = null;
     this.authUsername = null;
     this.accountType = 'Guest';
+    this.adminRole = '';
+    this.accountPoints = 0;
     this.guildTag = '';
     this.skinUrl = null;
     this.cellColor = null;
