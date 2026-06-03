@@ -60,8 +60,8 @@ function GameServer(mult, prt, gamemodeId) {
         virusStartMass: 100, // Starting virus size (In mass)
         virusBurstMass: 198, // Viruses explode past this size
         virusMassGain: null, // Mass gained when eating a virus. null = use virus mass
-        virusSplitMoveTicks: 6, // Virus split boost duration. Lower = closer burst
-        virusSplitDecay: 0.45, // Virus split boost decay. Lower = faster stop
+        virusSplitMoveTicks: 9, // Virus split boost duration. Lower = closer burst
+        virusSplitDecay: 0.62, // Virus split boost decay. Lower = faster stop
         ejectMass: 16, // Mass of ejected cells
         ejectMassGain: 12, // Amount of mass gained from consuming ejected cells
         ejectSpeed: 120, // Base speed of ejected cells
