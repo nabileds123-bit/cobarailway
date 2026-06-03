@@ -2045,13 +2045,14 @@ function handleGuildDetail(req, res) {
                     }
                 }
             }
-            return (currentUser && !currentUser.guild ? userHasPendingGuildInvite(currentUser.id, tag) : Promise.resolve(false)).then(function(canJoin) {
+            var isPublicGuild = String(guild.status || '').toLowerCase() == 'public';
+            return (currentUser && !currentUser.guild ? userHasPendingGuildInvite(currentUser.id, tag) : Promise.resolve(false)).then(function(hasInvite) {
                 sendJson(res, 200, {
                     ok: true,
                     guild: guild,
                     members: result[1],
                     viewer: viewer,
-                    canJoin: !!canJoin
+                    canJoin: !!(currentUser && !currentUser.guild && (isPublicGuild || hasInvite))
                 });
             });
         })
@@ -2374,13 +2375,7 @@ function handleGuildJoin(req, res) {
                 return null;
             }
 
-            return userHasPendingGuildInvite(user.id, tag).then(function(hasInvite) {
-                if (!hasInvite) {
-                    sendJson(res, 403, { ok: false, error: 'Invite guild tidak ditemukan.' });
-                    return null;
-                }
-
-                return listGuilds().then(function(guilds) {
+            return listGuilds().then(function(guilds) {
                     var guild = null;
                     for (var i = 0; i < guilds.length; i++) {
                         if (normalizeGuildTag(guilds[i].tag) == tag) {
@@ -2393,18 +2388,29 @@ function handleGuildJoin(req, res) {
                         return null;
                     }
 
-                    user.guild = tag;
-                    user.guildName = guild.name || tag;
-                    user.guildDescription = guild.description || '';
-                    user.guildType = String(guild.status || '').toLowerCase() == 'public' ? 'public' : '';
-                    user.guildRole = 'Member';
-                    user.guildSkinUrl = guild.logo || '';
-                    return saveAccountFields(user).then(function(savedUser) {
-                        return acceptGuildInvite(user.id, tag).then(function() {
-                            sendJson(res, 200, { ok: true, user: publicUser(savedUser) });
+                    var guildType = String(guild.status || '').toLowerCase() == 'public' ? 'public' : 'private';
+                    return userHasPendingGuildInvite(user.id, tag).then(function(hasInvite) {
+                        if (guildType != 'public' && !hasInvite) {
+                            sendJson(res, 403, { ok: false, error: 'Guild private hanya bisa join lewat invite.' });
+                            return null;
+                        }
+
+                        user.guild = tag;
+                        user.guildName = guild.name || tag;
+                        user.guildDescription = guild.description || '';
+                        user.guildType = guildType;
+                        user.guildRole = 'Member';
+                        user.guildSkinUrl = guild.logo || '';
+                        return saveAccountFields(user).then(function(savedUser) {
+                            if (!hasInvite) {
+                                sendJson(res, 200, { ok: true, user: publicUser(savedUser) });
+                                return null;
+                            }
+                            return acceptGuildInvite(user.id, tag).then(function() {
+                                sendJson(res, 200, { ok: true, user: publicUser(savedUser) });
+                            });
                         });
                     });
-                });
             });
         }).catch(function(error) {
             handleError(res, error);
