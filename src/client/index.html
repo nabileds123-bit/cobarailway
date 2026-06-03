@@ -322,10 +322,11 @@
         #overlays.only-dialog > #helloDialog {
     display: flex;
 }
-        #overlays.only-dialog > *:not(#helloDialog):not(#loginDialog):not(#registerDialog):not(#forgotDialog):not(#accountDialog):not(#uploadSkinDialog):not(#notificationDialog):not(#guildDialog):not(#guildCreateDialog):not(#highScoreDialog):not(#playerSearchDialog):not(#matchResultDialog):not(#battleCreateDialog) {
+        #overlays.only-dialog > *:not(#helloDialog):not(#loginDialog):not(#registerInfoDialog):not(#registerDialog):not(#forgotDialog):not(#accountDialog):not(#uploadSkinDialog):not(#notificationDialog):not(#guildDialog):not(#guildCreateDialog):not(#highScoreDialog):not(#playerSearchDialog):not(#matchResultDialog):not(#battleCreateDialog) {
     display: none !important;
 }
         #loginDialog,
+        #registerInfoDialog,
         #registerDialog,
         #forgotDialog,
         #accountDialog,
@@ -350,6 +351,7 @@
             min-height: 500px;
         }
         #loginDialog.login-open,
+        #registerInfoDialog.register-info-open,
         #registerDialog.register-open,
         #forgotDialog.forgot-open,
         #accountDialog.account-open,
@@ -368,6 +370,7 @@
             min-height: 520px;
         }
         #loginDialog h3,
+        #registerInfoDialog h3,
         #registerDialog h3,
         #forgotDialog h3,
         #accountDialog h3,
@@ -384,6 +387,7 @@
             font-size: 12px;
         }
         #loginDialog .dialog-brand,
+        #registerInfoDialog .dialog-brand,
         #registerDialog .dialog-brand,
         #forgotDialog .dialog-brand,
         #accountDialog .dialog-brand,
@@ -399,6 +403,7 @@
             text-decoration: none;
         }
         #loginDialog .dialog-brand:hover,
+        #registerInfoDialog .dialog-brand:hover,
         #registerDialog .dialog-brand:hover,
         #forgotDialog .dialog-brand:hover,
         #accountDialog .dialog-brand:hover,
@@ -440,7 +445,15 @@
             background-color: #449d44;
             border-color: #398439;
         }
+        #registerInfoDialog p {
+            margin: 0 0 10px 0;
+            line-height: 1.35;
+        }
+        #registerInfoDialog .login-actions {
+            margin-top: 14px;
+        }
         #loginDialog .dialog-footer,
+        #registerInfoDialog .dialog-footer,
         #registerDialog .dialog-footer,
         #forgotDialog .dialog-footer,
         #accountDialog .dialog-footer,
@@ -1654,6 +1667,26 @@
             <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">About</a>
         </div>
     </div>
+    <div id="registerInfoDialog">
+        <div class="form-group">
+            <a href="#home" class="dialog-brand" style="font-size:14px;">Bubble.am</a>
+            <span style="font-size:14px; color:#888;"> &raquo; Register</span>
+        </div>
+        <h3>Verify Your Email &amp; Earn Rewards</h3>
+        <p class="text-muted">Verify your email after registration and receive 6 Points for free.</p>
+        <p class="text-muted">The reward is automatically credited after successful email verification.</p>
+        <p class="text-muted">This reward can only be claimed once per account.</p>
+        <div class="login-actions">
+            <button id="registerInfoContinue" class="btn btn-primary">Continue</button>
+            <button id="registerInfoClose" class="btn btn-default">Close</button>
+        </div>
+        <div class="dialog-footer">
+            <a href="#home" class="text-primary spa-home-link">Home</a> |
+            <a href="#login" class="text-primary">Login</a> |
+            <a href="#community" class="text-primary community-menu-link">Community</a> |
+            <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">About</a>
+        </div>
+    </div>
     <div id="registerDialog">
         <div class="form-group">
             <a href="#home" class="dialog-brand" style="font-size:14px;">Bubble.am</a>
@@ -2372,6 +2405,7 @@
             stopGuildRefresh();
             $('#overlays').removeClass('only-dialog');
             $('#loginDialog').removeClass('login-open');
+            $('#registerInfoDialog').removeClass('register-info-open');
             $('#registerDialog').removeClass('register-open');
             $('#forgotDialog').removeClass('forgot-open');
             $('#accountDialog').removeClass('account-open');
@@ -2404,8 +2438,8 @@
                 setFooterActive('community');
             } else if ($('#matchResultDialog, #battleCreateDialog').hasClass('spa-open')) {
                 setFooterActive('home');
-            } else if ($('#loginDialog, #registerDialog, #forgotDialog, #accountDialog, #uploadSkinDialog').filter(function() {
-                return $(this).hasClass('login-open') || $(this).hasClass('register-open') || $(this).hasClass('forgot-open') || $(this).hasClass('account-open') || $(this).hasClass('upload-open');
+            } else if ($('#loginDialog, #registerInfoDialog, #registerDialog, #forgotDialog, #accountDialog, #uploadSkinDialog').filter(function() {
+                return $(this).hasClass('login-open') || $(this).hasClass('register-info-open') || $(this).hasClass('register-open') || $(this).hasClass('forgot-open') || $(this).hasClass('account-open') || $(this).hasClass('upload-open');
             }).length) {
                 setFooterActive('account');
             } else {
@@ -3088,6 +3122,25 @@
             showNavigationOverlay();
             $('#uploadSkinDialog').addClass('upload-open');
             setFooterActive('account');
+        }
+
+        function openRegisterInfoDialog() {
+            closeSpaDialogs();
+            $('#loginStatus').hide();
+            $('#helloDialog').hide();
+            showNavigationOverlay();
+            $('#registerInfoDialog').addClass('register-info-open');
+            setFooterActive('account');
+        }
+
+        function openRegisterDialogWithName(name) {
+            closeSpaDialogs();
+            $('#loginStatus').hide();
+            $('#registerName').val(name || $('#loginName').val().trim());
+            showNavigationOverlay();
+            $('#registerDialog').addClass('register-open');
+            setFooterActive('account');
+            $('#registerName').focus();
         }
 
         function formatProfileDate(value) {
@@ -3972,14 +4025,15 @@
         });
         $('#registerOpen').on('click', function(e) {
             e.preventDefault();
-            var name = $('#loginName').val().trim();
-            closeSpaDialogs();
-            $('#loginStatus').hide();
-            $('#registerName').val(name);
-            showNavigationOverlay();
-            $('#registerDialog').addClass('register-open');
-            setFooterActive('account');
-            $('#registerName').focus();
+            openRegisterInfoDialog();
+        });
+        $('#registerInfoContinue').on('click', function(e) {
+            e.preventDefault();
+            openRegisterDialogWithName($('#loginName').val().trim());
+        });
+        $('#registerInfoClose').on('click', function(e) {
+            e.preventDefault();
+            showHomeDialog();
         });
         $('#registerCreate').on('click', function(e) {
             e.preventDefault();

@@ -11,6 +11,7 @@ var mysqlReady = null;
 var premiumExpiryTimer = null;
 var BUY_PREMIUM_COST = 2;
 var PREMIUM_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
+var EMAIL_VERIFICATION_REWARD = 6;
 var UPLOAD_SKIN_COST = 150;
 var CREATE_GUILD_COST = 50;
 var PLAYER_SKIN_UPLOAD_SIZE = 500 * 1024;
@@ -94,6 +95,7 @@ function ensureMysql() {
                 'guild_skin_url VARCHAR(255) NULL,' +
                 'cell_color VARCHAR(7) NOT NULL DEFAULT \'#6FCA36\',' +
                 'email_verified TINYINT(1) NOT NULL DEFAULT 0,' +
+                'verification_reward_claimed TINYINT(1) NOT NULL DEFAULT 0,' +
                 'verification_token VARCHAR(64) NULL,' +
                 'last_login DATETIME NULL,' +
                 'reset_token VARCHAR(64) NULL,' +
@@ -120,6 +122,7 @@ function ensureMysql() {
                 'ALTER TABLE users ADD COLUMN guild_skin_url VARCHAR(255) NULL',
                 'ALTER TABLE users ADD COLUMN cell_color VARCHAR(7) NOT NULL DEFAULT \'#6FCA36\'',
                 'ALTER TABLE users ADD COLUMN email_verified TINYINT(1) NOT NULL DEFAULT 0',
+                'ALTER TABLE users ADD COLUMN verification_reward_claimed TINYINT(1) NOT NULL DEFAULT 0',
                 'ALTER TABLE users ADD COLUMN verification_token VARCHAR(64) NULL',
                 'ALTER TABLE users ADD COLUMN last_login DATETIME NULL'
             ];
@@ -606,6 +609,7 @@ function mysqlUser(row) {
         lastLogin: row.last_login,
         createdAt: row.created_at,
         emailVerified: row.email_verified,
+        verificationRewardClaimed: row.verification_reward_claimed,
         verificationToken: row.verification_token
     };
 }
@@ -860,8 +864,8 @@ function createUser(user) {
         if (usingMysql) {
             return getMysqlPool()
                 .query(
-                    'INSERT INTO users (id, username, email, salt, password_hash, email_verified, verification_token) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                    [user.id, user.username, user.email, user.salt, user.passwordHash, Number(user.emailVerified || 0), user.verificationToken || null]
+                    'INSERT INTO users (id, username, email, salt, password_hash, email_verified, verification_reward_claimed, verification_token) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                    [user.id, user.username, user.email, user.salt, user.passwordHash, Number(user.emailVerified || 0), Number(user.verificationRewardClaimed || 0), user.verificationToken || null]
                 )
                 .then(function() {
                     return user;
@@ -959,11 +963,19 @@ function verifyEmailToken(token) {
                         return null;
                     }
 
+                    var shouldReward = Number(user.verificationRewardClaimed || 0) !== 1;
+                    var rewardPoints = shouldReward ? EMAIL_VERIFICATION_REWARD : 0;
                     return getMysqlPool()
-                        .query('UPDATE users SET email_verified = 1, verification_token = NULL WHERE id = ?', [user.id])
+                        .query(
+                            'UPDATE users SET email_verified = 1, verification_token = NULL, verification_reward_claimed = 1, points = points + ? WHERE id = ?',
+                            [rewardPoints, user.id]
+                        )
                         .then(function() {
                             user.emailVerified = 1;
                             user.verificationToken = null;
+                            user.verificationRewardClaimed = 1;
+                            user.points = Number(user.points || 0) + rewardPoints;
+                            user.verificationRewardPoints = rewardPoints;
                             return user;
                         });
                 });
@@ -972,9 +984,14 @@ function verifyEmailToken(token) {
         var db = readJsonDb();
         for (var i = 0; i < db.users.length; i++) {
             if (db.users[i].verificationToken == token) {
+                var shouldReward = Number(db.users[i].verificationRewardClaimed || 0) !== 1;
+                var rewardPoints = shouldReward ? EMAIL_VERIFICATION_REWARD : 0;
                 db.users[i].emailVerified = 1;
+                db.users[i].verificationRewardClaimed = 1;
+                db.users[i].points = Number(db.users[i].points || 0) + rewardPoints;
                 db.users[i].verificationToken = null;
                 writeJsonDb(db);
+                db.users[i].verificationRewardPoints = rewardPoints;
                 return db.users[i];
             }
         }
@@ -1125,6 +1142,7 @@ function handleRegister(req, res) {
                     guildSkinUrl: '',
                     cellColor: '#6FCA36',
                     emailVerified: 0,
+                    verificationRewardClaimed: 0,
                     verificationToken: verificationToken,
                     lastLogin: null,
                     createdAt: new Date().toISOString()
@@ -1240,7 +1258,11 @@ function handleVerifyEmail(req, res) {
                 return;
             }
 
-            sendHtml(res, 200, '<h2>Email berhasil diverifikasi</h2><p>Silakan kembali ke game dan login.</p><p><a href="/">Kembali ke Bubble.am</a></p>');
+            var rewardPoints = Number(user.verificationRewardPoints || 0);
+            var rewardText = rewardPoints > 0
+                ? '<h2>Congratulations!</h2><p>Your email has been verified.</p><p>You received ' + rewardPoints + ' Points.</p>'
+                : '<h2>Email sudah diverifikasi</h2><p>Akun ini sudah terverifikasi dan reward verifikasi sudah pernah diklaim.</p>';
+            sendHtml(res, 200, rewardText + '<p>Silakan kembali ke game dan login.</p><p><a href="/">Kembali ke Bubble.am</a></p>');
         })
         .catch(function(error) {
             handleError(res, error);
