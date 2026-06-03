@@ -67,5 +67,22 @@ PlayerCell.prototype.onRemove = function(gameServer) {
 }
 
 PlayerCell.prototype.moveDone = function(gameServer) {
-	this.setCollisionOff(false);
+    if (this.firstSplit && this.owner && this.owner.cells) {
+        for (var i = 0; i < this.owner.cells.length; i++) {
+            var cell = this.owner.cells[i];
+            if (!cell || cell.nodeId == this.nodeId) {
+                continue;
+            }
+
+            var dx = this.position.x - cell.position.x;
+            var dy = this.position.y - cell.position.y;
+            var dist = Math.sqrt(dx * dx + dy * dy);
+            var minDist = (this.getSize() + cell.getSize()) * 0.94;
+            if (dist > 0 && dist < minDist) {
+                this.position.x = (cell.position.x + (minDist * Math.sin(this.angle))) >> 0;
+                this.position.y = (cell.position.y + (minDist * Math.cos(this.angle))) >> 0;
+            }
+        }
+    }
+    this.setCollisionOff(false);
 }
