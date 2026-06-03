@@ -1165,11 +1165,13 @@ GameServer.prototype.splitCells = function(client) {
         var splitSpeed = Math.max(splitMinSpeed, Math.min(splitMaxSpeed, calculatedSplitSpeed));
         split.setMoveEngineData(splitSpeed, splitMoveTicks, splitDecay);
         split.calcMergeTime(this.config.playerRecombineTime);
-        if (!classicSplit) {
-            split.setCollisionOff(true);
+        split.setCollisionOff(true);
+        if (classicSplit) {
+            split.skipSplitSnap = true;
+        } else {
+            split.firstSplit = true;
+            setTimeout(function(){split.firstSplit = false;},1000)
         }
-        split.firstSplit = true;
-       setTimeout(function(){split.firstSplit = false;},1000)
        /* split.hasAte = true;
             setTimeout(function(){split.hasAte = false},100);*/
         // Add to moving cells list

@@ -67,7 +67,7 @@ PlayerCell.prototype.onRemove = function(gameServer) {
 }
 
 PlayerCell.prototype.moveDone = function(gameServer) {
-    if (this.firstSplit && this.owner && this.owner.cells) {
+    if (this.firstSplit && !this.skipSplitSnap && this.owner && this.owner.cells) {
         for (var i = 0; i < this.owner.cells.length; i++) {
             var cell = this.owner.cells[i];
             if (!cell || cell.nodeId == this.nodeId) {
