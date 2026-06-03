@@ -8,6 +8,7 @@ var dbPath = path.join(__dirname, '..', 'data', 'users.json');
 var memorySessions = {};
 var mysqlPool = null;
 var mysqlReady = null;
+var premiumExpiryTimer = null;
 var BUY_PREMIUM_COST = 2;
 var PREMIUM_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 var UPLOAD_SKIN_COST = 150;
@@ -1336,6 +1337,51 @@ function expirePremiumIfNeeded(user) {
     return Promise.resolve(user);
 }
 
+function expirePremiumAccounts() {
+    return ensureMysql().then(function(usingMysql) {
+        if (usingMysql) {
+            return getMysqlPool()
+                .query(
+                    'UPDATE users SET account_type = ?, premium_activated_at = NULL, premium_expires_at = NULL WHERE account_type = ? AND premium_expires_at IS NOT NULL AND premium_expires_at <= NOW()',
+                    ['Free', 'Premium']
+                )
+                .then(function(result) {
+                    var changed = result && result[0] ? Number(result[0].affectedRows || 0) : 0;
+                    if (changed > 0) {
+                        console.log('[Auth] Expired Premium accounts:', changed);
+                    }
+                });
+        }
+
+        var db = readJsonDb();
+        var changed = 0;
+        (db.users || []).forEach(function(user) {
+            var expiresAt = parseDateValue(user.premiumExpiresAt);
+            if (String(user.accountType || '').toLowerCase() == 'premium' && (!expiresAt || expiresAt.getTime() <= Date.now())) {
+                user.accountType = 'Free';
+                user.premiumActivatedAt = null;
+                user.premiumExpiresAt = null;
+                changed++;
+            }
+        });
+        if (changed > 0) {
+            writeJsonDb(db);
+            console.log('[Auth] Expired Premium accounts:', changed);
+        }
+    }).catch(function(error) {
+        console.error('[Auth] Premium expiry sweep failed:', error && error.message ? error.message : error);
+    });
+}
+
+function startPremiumExpiryRuntime() {
+    if (premiumExpiryTimer) {
+        return;
+    }
+
+    expirePremiumAccounts();
+    premiumExpiryTimer = setInterval(expirePremiumAccounts, 60 * 1000);
+}
+
 function normalizeGuildTag(tag) {
     return String(tag || '').trim().toUpperCase();
 }
@@ -2571,5 +2617,7 @@ handleAuth.adjustPoints = adjustPoints;
 handleAuth.getNextLevelXp = getNextLevelXp;
 handleAuth.isAllowedCellColor = isAllowedCellColor;
 handleAuth.normalizeCellColor = normalizeCellColor;
+
+startPremiumExpiryRuntime();
 
 module.exports = handleAuth;
