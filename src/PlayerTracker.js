@@ -25,6 +25,7 @@ function PlayerTracker(gameServer, socket) {
     this.currentMode = gameServer && gameServer.roomName ? gameServer.roomName : '';
     this.currentRoom = gameServer || null;
     this.matchId = null;
+    this.lastSplitTime = 0;
 
     this.mouse = {x: 0, y: 0};
     this.tickLeaderboard = 0; // 

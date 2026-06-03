@@ -159,6 +159,9 @@ Cell.prototype.calcMove = function(x2, y2, gameServer) {
         if ((this.nodeId == cell.nodeId) || (this.ignoreCollision) || (cell.getCollision())) {
             continue;
         }
+        if (this.owner == cell.owner && (this.firstSplit || cell.firstSplit)) {
+            continue;
+        }
 		
         if ((cell.recombineTicks > 0) || (this.recombineTicks > 0)) {
             // Cannot recombine - Collision with your own cells
