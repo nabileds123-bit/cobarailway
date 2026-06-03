@@ -356,7 +356,6 @@
         #registerDialog.register-open,
         #forgotDialog.forgot-open,
         #accountDialog.account-open,
-        #changePasswordDialog.change-password-open,
         #notificationDialog.spa-open,
         #guildDialog.spa-open,
         #guildCreateDialog.spa-open,
@@ -630,6 +629,27 @@
         }
         .account-actions a {
             font-weight: bold;
+        }
+        .change-password-title {
+            margin: 10px 0 18px 0;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .change-password-form {
+            flex: 1;
+        }
+        .change-password-form label {
+            display: block;
+            margin: 0 0 5px 0;
+            font-weight: bold;
+        }
+        .change-password-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        .change-password-actions .btn {
+            flex: 1;
         }
         #changePasswordStatus {
             display: none;
@@ -1797,14 +1817,20 @@
             <a href="#account" id="changePasswordAccountLink" class="dialog-brand" style="font-size:14px;">Bubble.am</a>
             <span style="font-size:14px; color:#888;"> &raquo; Change Password</span>
         </div>
-        <input id="changeCurrentPassword" type="password" class="form-control" placeholder="Current password"/>
-        <input id="changeNewPassword" type="password" class="form-control" placeholder="New password"/>
-        <input id="changeConfirmPassword" type="password" class="form-control" placeholder="Confirm new password"/>
-        <div class="login-actions">
-            <button id="changePasswordSubmit" class="btn btn-primary">Save</button>
-            <button id="changePasswordCancel" class="btn btn-default">Cancel</button>
+        <div class="change-password-title">Change Password</div>
+        <div class="change-password-form">
+            <label for="changeCurrentPassword">Current password</label>
+            <input id="changeCurrentPassword" type="password" class="form-control" autocomplete="current-password"/>
+            <label for="changeNewPassword">New password</label>
+            <input id="changeNewPassword" type="password" class="form-control" autocomplete="new-password"/>
+            <label for="changeConfirmPassword">Confirm new password</label>
+            <input id="changeConfirmPassword" type="password" class="form-control" autocomplete="new-password"/>
+            <div class="change-password-actions">
+                <button id="changePasswordSubmit" class="btn btn-primary">Save</button>
+                <button id="changePasswordCancel" class="btn btn-default">Cancel</button>
+            </div>
+            <p id="changePasswordStatus" class="text-muted"></p>
         </div>
-        <p id="changePasswordStatus" class="text-muted"></p>
         <div class="dialog-footer">
             <a href="#home" id="changePasswordHomeLink" class="text-primary">Home</a> |
             <a href="#account" id="changePasswordAccountFooterLink" class="text-primary">Account</a> |
@@ -2369,7 +2395,6 @@
             $('#registerDialog').removeClass('register-open');
             $('#forgotDialog').removeClass('forgot-open');
             $('#accountDialog').removeClass('account-open');
-            $('#changePasswordDialog').removeClass('change-password-open');
             $('#uploadSkinDialog').removeClass('upload-open');
             $('#notificationDialog, #guildDialog, #guildCreateDialog, #highScoreDialog, #playerSearchDialog, #changePasswordDialog, #matchResultDialog, #battleCreateDialog').removeClass('spa-open');
             closeCommunityDropup(true);
@@ -2937,6 +2962,11 @@
 
         function routeSpaHash() {
             var route = String(window.location.hash || '').replace(/^#/, '');
+
+            if (route == 'account') {
+                openAccountDialog();
+                return;
+            }
 
             if (route == 'notification' || route == 'guild' || route == 'guilds' || route == 'create-guild' || route == 'high-score' || route == 'player-search' || route == 'change-password' || route == 'match-result') {
                 if (route == 'guilds') {
@@ -3772,6 +3802,7 @@
         });
         $('#changePasswordAccountLink, #changePasswordAccountFooterLink').on('click', function(e) {
             e.preventDefault();
+            window.location.hash = 'account';
             openAccountDialog();
         });
         $('#uploadAccountLink, #uploadAccountFooterLink').on('click', function(e) {
@@ -3849,6 +3880,7 @@
         });
         $('#changePasswordCancel').on('click', function(e) {
             e.preventDefault();
+            window.location.hash = 'account';
             openAccountDialog();
         });
         $('#changePasswordSubmit').on('click', function(e) {
