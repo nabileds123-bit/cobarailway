@@ -623,6 +623,17 @@
         .account-actions a {
             font-weight: bold;
         }
+        #changePasswordPanel {
+            margin: 10px 0;
+        }
+        #changePasswordPanel .form-control {
+            margin-bottom: 8px;
+        }
+        #changePasswordStatus {
+            display: none;
+            margin-top: 8px;
+            font-size: 12px;
+        }
         #uploadSkinButton {
             margin-top: 40px;
             background-color: #f0ad4e;
@@ -1729,6 +1740,16 @@
             <strong>Account details</strong> |
             <a href="#change-password" id="changePasswordLink" class="text-primary">Change Password</a> |
             <a href="#logout" id="logoutLink" class="text-primary">Logout</a>
+        </div>
+        <div id="changePasswordPanel" style="display:none">
+            <input id="changeCurrentPassword" type="password" class="form-control" placeholder="Current password"/>
+            <input id="changeNewPassword" type="password" class="form-control" placeholder="New password"/>
+            <input id="changeConfirmPassword" type="password" class="form-control" placeholder="Confirm new password"/>
+            <div class="login-actions">
+                <button id="changePasswordSubmit" class="btn btn-primary">Save</button>
+                <button id="changePasswordCancel" class="btn btn-default">Cancel</button>
+            </div>
+            <p id="changePasswordStatus" class="text-muted"></p>
         </div>
         <div class="profile-row">
             <span class="profile-label">Account:</span>
@@ -3790,7 +3811,56 @@
         });
         $('#changePasswordLink').on('click', function(e) {
             e.preventDefault();
-            $('#uploadSkinStatus').removeClass('text-success').addClass('text-danger').text('Change password belum tersedia.').show();
+            $('#changePasswordPanel').show();
+            $('#changePasswordStatus').hide().removeClass('text-danger text-success').addClass('text-muted').text('');
+            $('#changeCurrentPassword, #changeNewPassword, #changeConfirmPassword').val('');
+            $('#changeCurrentPassword').focus();
+        });
+        $('#changePasswordCancel').on('click', function(e) {
+            e.preventDefault();
+            $('#changePasswordPanel').hide();
+            $('#changePasswordStatus').hide();
+            $('#changeCurrentPassword, #changeNewPassword, #changeConfirmPassword').val('');
+        });
+        $('#changePasswordSubmit').on('click', function(e) {
+            e.preventDefault();
+            var currentPassword = $('#changeCurrentPassword').val();
+            var newPassword = $('#changeNewPassword').val();
+            var confirmPassword = $('#changeConfirmPassword').val();
+            var status = $('#changePasswordStatus');
+
+            if (!currentPassword) {
+                status.removeClass('text-muted text-success').addClass('text-danger').text('Current password wajib diisi.').show();
+                return;
+            }
+
+            if (newPassword.length < 4) {
+                status.removeClass('text-muted text-success').addClass('text-danger').text('New password minimal 4 karakter.').show();
+                return;
+            }
+
+            if (newPassword !== confirmPassword) {
+                status.removeClass('text-muted text-success').addClass('text-danger').text('Confirm new password tidak sama.').show();
+                return;
+            }
+
+            status.removeClass('text-danger').addClass('text-success').text('Mengubah password...').show();
+            $('#changePasswordSubmit').prop('disabled', true);
+
+            authPost('/api/account/change-password', {
+                currentPassword: currentPassword,
+                newPassword: newPassword
+            })
+                .done(function(result) {
+                    status.removeClass('text-danger').addClass('text-success').text(result.message || 'Password berhasil diubah.').show();
+                    $('#changeCurrentPassword, #changeNewPassword, #changeConfirmPassword').val('');
+                })
+                .fail(function(xhr) {
+                    showAuthError(status, xhr, 'Change password gagal.');
+                })
+                .always(function() {
+                    $('#changePasswordSubmit').prop('disabled', false);
+                });
         });
         $('#uploadSkinButton').on('click', function(e) {
             e.preventDefault();

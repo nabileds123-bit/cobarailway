@@ -947,6 +947,25 @@ function setResetToken(userId, token) {
     });
 }
 
+function savePasswordCredentials(userId, salt, passwordHash) {
+    return ensureMysql().then(function(usingMysql) {
+        if (usingMysql) {
+            return getMysqlPool()
+                .query('UPDATE users SET salt = ?, password_hash = ? WHERE id = ?', [salt, passwordHash, userId]);
+        }
+
+        var db = readJsonDb();
+        for (var i = 0; i < db.users.length; i++) {
+            if (db.users[i].id == userId) {
+                db.users[i].salt = salt;
+                db.users[i].passwordHash = passwordHash;
+                writeJsonDb(db);
+                return;
+            }
+        }
+    });
+}
+
 function verifyEmailToken(token) {
     token = String(token || '').trim();
     if (!token) {
@@ -1856,6 +1875,51 @@ function handleAccountColor(req, res) {
     });
 }
 
+function handleChangePassword(req, res) {
+    readBody(req, function(err, body) {
+        if (err) {
+            sendJson(res, 400, { ok: false, error: 'JSON tidak valid.' });
+            return;
+        }
+
+        var currentPassword = String(body.currentPassword || body.oldPassword || '');
+        var newPassword = String(body.newPassword || body.password || '');
+
+        if (!currentPassword) {
+            sendJson(res, 400, { ok: false, error: 'Current password wajib diisi.' });
+            return;
+        }
+
+        if (newPassword.length < 4) {
+            sendJson(res, 400, { ok: false, error: 'New password minimal 4 karakter.' });
+            return;
+        }
+
+        requireUser(req, res)
+            .then(function(user) {
+                if (!user) {
+                    return;
+                }
+
+                if (hashPassword(currentPassword, user.salt) != user.passwordHash) {
+                    sendJson(res, 401, { ok: false, error: 'Current password salah.' });
+                    return;
+                }
+
+                var salt = crypto.randomBytes(16).toString('hex');
+                var passwordHash = hashPassword(newPassword, salt);
+                return savePasswordCredentials(user.id, salt, passwordHash).then(function() {
+                    user.salt = salt;
+                    user.passwordHash = passwordHash;
+                    sendJson(res, 200, { ok: true, message: 'Password berhasil diubah.', user: publicUser(user) });
+                });
+            })
+            .catch(function(error) {
+                handleError(res, error);
+            });
+    });
+}
+
 function handleBuyPremium(req, res) {
     requireUser(req, res)
         .then(function(user) {
@@ -2552,6 +2616,11 @@ function handleAuth(req, res) {
 
     if (req.method == 'POST' && req.url == '/api/account/color') {
         handleAccountColor(req, res);
+        return true;
+    }
+
+    if (req.method == 'POST' && req.url == '/api/account/change-password') {
+        handleChangePassword(req, res);
         return true;
     }
 
