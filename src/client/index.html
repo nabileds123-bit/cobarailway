@@ -322,7 +322,7 @@
         #overlays.only-dialog > #helloDialog {
     display: flex;
 }
-        #overlays.only-dialog > *:not(#helloDialog):not(#loginDialog):not(#registerInfoDialog):not(#registerDialog):not(#forgotDialog):not(#accountDialog):not(#uploadSkinDialog):not(#notificationDialog):not(#guildDialog):not(#guildCreateDialog):not(#highScoreDialog):not(#playerSearchDialog):not(#matchResultDialog):not(#battleCreateDialog) {
+        #overlays.only-dialog > *:not(#helloDialog):not(#loginDialog):not(#registerInfoDialog):not(#registerDialog):not(#forgotDialog):not(#accountDialog):not(#changePasswordDialog):not(#uploadSkinDialog):not(#notificationDialog):not(#guildDialog):not(#guildCreateDialog):not(#highScoreDialog):not(#playerSearchDialog):not(#matchResultDialog):not(#battleCreateDialog) {
     display: none !important;
 }
         #loginDialog,
@@ -330,6 +330,7 @@
         #registerDialog,
         #forgotDialog,
         #accountDialog,
+        #changePasswordDialog,
         #notificationDialog,
         #guildDialog,
         #guildCreateDialog,
@@ -355,11 +356,13 @@
         #registerDialog.register-open,
         #forgotDialog.forgot-open,
         #accountDialog.account-open,
+        #changePasswordDialog.change-password-open,
         #notificationDialog.spa-open,
         #guildDialog.spa-open,
         #guildCreateDialog.spa-open,
         #highScoreDialog.spa-open,
         #playerSearchDialog.spa-open,
+        #changePasswordDialog.spa-open,
         #matchResultDialog.spa-open,
         #battleCreateDialog.spa-open {
             display: flex;
@@ -374,6 +377,7 @@
         #registerDialog h3,
         #forgotDialog h3,
         #accountDialog h3,
+        #changePasswordDialog h3,
         #uploadSkinDialog h3,
         #notificationDialog h3,
         #guildDialog h3,
@@ -391,6 +395,7 @@
         #registerDialog .dialog-brand,
         #forgotDialog .dialog-brand,
         #accountDialog .dialog-brand,
+        #changePasswordDialog .dialog-brand,
         #uploadSkinDialog .dialog-brand,
         #notificationDialog .dialog-brand,
         #guildDialog .dialog-brand,
@@ -407,13 +412,15 @@
         #registerDialog .dialog-brand:hover,
         #forgotDialog .dialog-brand:hover,
         #accountDialog .dialog-brand:hover,
+        #changePasswordDialog .dialog-brand:hover,
         #uploadSkinDialog .dialog-brand:hover {
             color: #23527c;
             text-decoration: underline;
         }
         #loginDialog .form-control,
         #registerDialog .form-control,
-        #forgotDialog .form-control {
+        #forgotDialog .form-control,
+        #changePasswordDialog .form-control {
             margin-bottom: 10px;
         }
         #loginDialog .login-actions,
@@ -457,6 +464,7 @@
         #registerDialog .dialog-footer,
         #forgotDialog .dialog-footer,
         #accountDialog .dialog-footer,
+        #changePasswordDialog .dialog-footer,
         #uploadSkinDialog .dialog-footer,
         #notificationDialog .dialog-footer,
         #guildDialog .dialog-footer,
@@ -622,12 +630,6 @@
         }
         .account-actions a {
             font-weight: bold;
-        }
-        #changePasswordPanel {
-            margin: 10px 0;
-        }
-        #changePasswordPanel .form-control {
-            margin-bottom: 8px;
         }
         #changePasswordStatus {
             display: none;
@@ -1741,16 +1743,6 @@
             <a href="#change-password" id="changePasswordLink" class="text-primary">Change Password</a> |
             <a href="#logout" id="logoutLink" class="text-primary">Logout</a>
         </div>
-        <div id="changePasswordPanel" style="display:none">
-            <input id="changeCurrentPassword" type="password" class="form-control" placeholder="Current password"/>
-            <input id="changeNewPassword" type="password" class="form-control" placeholder="New password"/>
-            <input id="changeConfirmPassword" type="password" class="form-control" placeholder="Confirm new password"/>
-            <div class="login-actions">
-                <button id="changePasswordSubmit" class="btn btn-primary">Save</button>
-                <button id="changePasswordCancel" class="btn btn-default">Cancel</button>
-            </div>
-            <p id="changePasswordStatus" class="text-muted"></p>
-        </div>
         <div class="profile-row">
             <span class="profile-label">Account:</span>
             <span id="profileAccountType" class="profile-value">Free</span>
@@ -1796,6 +1788,26 @@
         <div class="dialog-footer">
             <a href="#home" id="accountHomeLink" class="text-primary">Home</a> |
             <a href="#account" class="footer-current">Account</a> |
+            <a href="#community" class="text-primary community-menu-link">Community</a> |
+            <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">About</a>
+        </div>
+    </div>
+    <div id="changePasswordDialog">
+        <div class="form-group">
+            <a href="#account" id="changePasswordAccountLink" class="dialog-brand" style="font-size:14px;">Bubble.am</a>
+            <span style="font-size:14px; color:#888;"> &raquo; Change Password</span>
+        </div>
+        <input id="changeCurrentPassword" type="password" class="form-control" placeholder="Current password"/>
+        <input id="changeNewPassword" type="password" class="form-control" placeholder="New password"/>
+        <input id="changeConfirmPassword" type="password" class="form-control" placeholder="Confirm new password"/>
+        <div class="login-actions">
+            <button id="changePasswordSubmit" class="btn btn-primary">Save</button>
+            <button id="changePasswordCancel" class="btn btn-default">Cancel</button>
+        </div>
+        <p id="changePasswordStatus" class="text-muted"></p>
+        <div class="dialog-footer">
+            <a href="#home" id="changePasswordHomeLink" class="text-primary">Home</a> |
+            <a href="#account" id="changePasswordAccountFooterLink" class="text-primary">Account</a> |
             <a href="#community" class="text-primary community-menu-link">Community</a> |
             <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">About</a>
         </div>
@@ -2357,8 +2369,9 @@
             $('#registerDialog').removeClass('register-open');
             $('#forgotDialog').removeClass('forgot-open');
             $('#accountDialog').removeClass('account-open');
+            $('#changePasswordDialog').removeClass('change-password-open');
             $('#uploadSkinDialog').removeClass('upload-open');
-            $('#notificationDialog, #guildDialog, #guildCreateDialog, #highScoreDialog, #playerSearchDialog, #matchResultDialog, #battleCreateDialog').removeClass('spa-open');
+            $('#notificationDialog, #guildDialog, #guildCreateDialog, #highScoreDialog, #playerSearchDialog, #changePasswordDialog, #matchResultDialog, #battleCreateDialog').removeClass('spa-open');
             closeCommunityDropup(true);
         }
 
@@ -2386,8 +2399,8 @@
                 setFooterActive('community');
             } else if ($('#matchResultDialog, #battleCreateDialog').hasClass('spa-open')) {
                 setFooterActive('home');
-            } else if ($('#loginDialog, #registerInfoDialog, #registerDialog, #forgotDialog, #accountDialog, #uploadSkinDialog').filter(function() {
-                return $(this).hasClass('login-open') || $(this).hasClass('register-info-open') || $(this).hasClass('register-open') || $(this).hasClass('forgot-open') || $(this).hasClass('account-open') || $(this).hasClass('upload-open');
+            } else if ($('#loginDialog, #registerInfoDialog, #registerDialog, #forgotDialog, #accountDialog, #changePasswordDialog, #uploadSkinDialog').filter(function() {
+                return $(this).hasClass('login-open') || $(this).hasClass('register-info-open') || $(this).hasClass('register-open') || $(this).hasClass('forgot-open') || $(this).hasClass('account-open') || $(this).hasClass('spa-open') || $(this).hasClass('upload-open');
             }).length) {
                 setFooterActive('account');
             } else {
@@ -2439,6 +2452,7 @@
                 'create-guild': '#guildCreateDialog',
                 'high-score': '#highScoreDialog',
                 'player-search': '#playerSearchDialog',
+                'change-password': '#changePasswordDialog',
                 'match-result': '#matchResultDialog'
             }[page];
 
@@ -2450,7 +2464,7 @@
             $('#helloDialog').hide();
             $(target).addClass('spa-open');
             showNavigationOverlay();
-            setFooterActive('community');
+            setFooterActive(page == 'change-password' ? 'account' : 'community');
             if (page == 'notification') {
                 loadNotifications();
             } else if (page == 'guild') {
@@ -2458,6 +2472,8 @@
                 startGuildRefresh();
             } else if (page == 'high-score') {
                 loadHighscores();
+            } else if (page == 'change-password') {
+                resetChangePasswordDialog();
             }
             return true;
         }
@@ -2922,7 +2938,7 @@
         function routeSpaHash() {
             var route = String(window.location.hash || '').replace(/^#/, '');
 
-            if (route == 'notification' || route == 'guild' || route == 'guilds' || route == 'create-guild' || route == 'high-score' || route == 'player-search' || route == 'match-result') {
+            if (route == 'notification' || route == 'guild' || route == 'guilds' || route == 'create-guild' || route == 'high-score' || route == 'player-search' || route == 'change-password' || route == 'match-result') {
                 if (route == 'guilds') {
                     route = 'guild';
                 }
@@ -3053,6 +3069,15 @@
                 .removeAttr('src')
                 .replaceWith('<div id="uploadSkinPreview" class="upload-preview-empty">skin</div>');
             updateUploadPreviewName();
+        }
+
+        function resetChangePasswordDialog() {
+            $('#changeCurrentPassword, #changeNewPassword, #changeConfirmPassword').val('');
+            $('#changePasswordStatus').hide().removeClass('text-danger text-success').addClass('text-muted').text('');
+            $('#changePasswordSubmit').prop('disabled', false);
+            setTimeout(function() {
+                $('#changeCurrentPassword').focus();
+            }, 0);
         }
 
         function openAccountDialog() {
@@ -3741,6 +3766,14 @@
             e.preventDefault();
             showHomeDialog();
         });
+        $('#changePasswordHomeLink').on('click', function(e) {
+            e.preventDefault();
+            showHomeDialog();
+        });
+        $('#changePasswordAccountLink, #changePasswordAccountFooterLink').on('click', function(e) {
+            e.preventDefault();
+            openAccountDialog();
+        });
         $('#uploadAccountLink, #uploadAccountFooterLink').on('click', function(e) {
             e.preventDefault();
             openAccountDialog();
@@ -3811,16 +3844,12 @@
         });
         $('#changePasswordLink').on('click', function(e) {
             e.preventDefault();
-            $('#changePasswordPanel').show();
-            $('#changePasswordStatus').hide().removeClass('text-danger text-success').addClass('text-muted').text('');
-            $('#changeCurrentPassword, #changeNewPassword, #changeConfirmPassword').val('');
-            $('#changeCurrentPassword').focus();
+            window.location.hash = 'change-password';
+            openSpaPage('change-password');
         });
         $('#changePasswordCancel').on('click', function(e) {
             e.preventDefault();
-            $('#changePasswordPanel').hide();
-            $('#changePasswordStatus').hide();
-            $('#changeCurrentPassword, #changeNewPassword, #changeConfirmPassword').val('');
+            openAccountDialog();
         });
         $('#changePasswordSubmit').on('click', function(e) {
             e.preventDefault();
