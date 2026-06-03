@@ -1,0 +1,83 @@
+{
+  "users": [
+    {
+      "id": "83af4538ace4eb565c35e028",
+      "username": "123",
+      "email": "123123@gmail.com",
+      "salt": "761323bb773ea179f315727296d2394b",
+      "passwordHash": "566dbb8817fab4a07154788483173de63c6779a9afc229de4b0b3c89b1d6a1ebb1315baddd71c55ee5748d64109f6041956fe709eb281cd57442ed2f1eeeb475",
+      "createdAt": "2026-06-01T03:15:30.543Z"
+    },
+    {
+      "id": "c9ef2f109fde910e3689d7b3",
+      "username": "+=+=+",
+      "email": "asd123@gmail.com",
+      "salt": "22aa7fbc50f2df52a7ca6ea56ce65b19",
+      "passwordHash": "3ddee3978bcb87646ad29c6c04864cb281eefc69f335ff3dd9b37877c7174a5934807ef95ce40672716a06ccab2d950d2ea90ea748ca6462640679c573bd285e",
+      "createdAt": "2026-06-01T03:19:38.668Z"
+    },
+    {
+      "id": "e45af4f994b7ff83eeb4d0d1",
+      "username": "Epad",
+      "email": "121233123@gmail.com",
+      "salt": "66087a0bfe1126cbb61445478506b146",
+      "passwordHash": "c309a94d7a31bcdb51c5521f4b67b60bdb32250697018ce8a522a47cc2d657662c5884f5167e279d9fabbdf3f8de15deecdffd6d3a60291c9ea549698564b68c",
+      "accountType": "Premium",
+      "level": 5,
+      "xp": 697,
+      "points": 24949.3,
+      "guild": "COBA",
+      "skinUrl": "",
+      "guildSkinUrl": "",
+      "cellColor": "#6FCA36",
+      "emailVerified": 1,
+      "verificationToken": "null",
+      "lastLogin": "2026-06-03T03:08:22.731Z",
+      "createdAt": "2026-06-02T18:45:44.942Z",
+      "guildName": "cobainaja",
+      "guildDescription": "",
+      "guildType": "public"
+    },
+    {
+      "id": "833c9ee761b241215bd2bd5e",
+      "username": "cameron",
+      "email": "123123123@gmail.com",
+      "salt": "a816536bf00c03834b2eae9987a9d3ed",
+      "passwordHash": "7f71cdf160b5cff83b3da2f76ec7327223c8bca9bc854039d5f1a20ee8285a0ffe208b1e2f53ff1bea3baaede4f6088b2b7ad7e1f45156469a3985cf5111ffd5",
+      "accountType": "Free",
+      "level": 3,
+      "xp": 887,
+      "points": 13.100000000000001,
+      "guild": "",
+      "skinUrl": "",
+      "guildSkinUrl": "",
+      "cellColor": "#6FCA36",
+      "emailVerified": 1,
+      "verificationToken": "null",
+      "lastLogin": "2026-06-03T02:51:50.937Z",
+      "createdAt": "2026-06-02T19:10:50.873Z",
+      "guildName": "",
+      "guildDescription": "",
+      "guildType": ""
+    },
+    {
+      "id": "05f947de04ee75170bd5f351",
+      "username": "w",
+      "email": "nabileds.17@gmail.com",
+      "salt": "92a62f6d4c6407775f9ec744627bb15f",
+      "passwordHash": "c2bc9ee836826e08059cfc086fc6fc225d27a649b03a0b2d9e081e389a8a41b582d4ed1b48507eaf3db19648c4d0c8e0e74515ab174feb666e6e1806540fc7d7",
+      "accountType": "Free",
+      "level": 1,
+      "xp": 0,
+      "points": 0,
+      "guild": "",
+      "skinUrl": "",
+      "guildSkinUrl": "",
+      "cellColor": "#6FCA36",
+      "emailVerified": 0,
+      "verificationToken": "3b32ce2bab0a262a46258f7b7e2eb9f2cba4b409e70457cf6d5dc342d42607fb",
+      "lastLogin": null,
+      "createdAt": "2026-06-03T01:51:50.572Z"
+    }
+  ]
+}

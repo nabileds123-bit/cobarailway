@@ -1,5 +1,42 @@
 // ===== Ogar3 Server Starter with Enhanced Commands =====
 
+const fs = require('fs');
+const path = require('path');
+
+function loadEnvFile(filePath) {
+    if (!fs.existsSync(filePath)) {
+        return;
+    }
+
+    fs.readFileSync(filePath, 'utf8').split(/\r?\n/).forEach(function(line) {
+        var text = line.trim();
+        if (!text || text.charAt(0) == '#') {
+            return;
+        }
+
+        var equalsAt = text.indexOf('=');
+        if (equalsAt <= 0) {
+            return;
+        }
+
+        var key = text.slice(0, equalsAt).trim();
+        var value = text.slice(equalsAt + 1).trim();
+        if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) || Object.prototype.hasOwnProperty.call(process.env, key)) {
+            return;
+        }
+
+        if ((value.charAt(0) == '"' && value.charAt(value.length - 1) == '"') ||
+            (value.charAt(0) == "'" && value.charAt(value.length - 1) == "'")) {
+            value = value.slice(1, -1);
+        }
+
+        process.env[key] = value;
+    });
+}
+
+loadEnvFile(path.join(__dirname, '..', '.env'));
+loadEnvFile(path.join(__dirname, '.env'));
+
 let runMaster = false;
 let runGame = true;
 

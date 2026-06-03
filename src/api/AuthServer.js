@@ -732,6 +732,12 @@ function handleError(res, err) {
     sendJson(res, 500, { ok: false, error: 'Server auth error.' });
 }
 
+function handleUploadError(res, error, fallback) {
+    var message = error && error.message ? String(error.message) : fallback;
+    console.error('[Auth] Upload error:', message);
+    sendJson(res, 400, { ok: false, error: message || fallback || 'Upload gagal.' });
+}
+
 function findJsonUserByLogin(db, login) {
     var value = String(login || '').trim().toLowerCase();
 
@@ -1758,7 +1764,7 @@ function handleUploadSkin(req, res) {
                     });
                 })
                 .catch(function(error) {
-                    handleError(res, error);
+                    handleUploadError(res, error, 'Upload skin gagal.');
                 });
         }, 'Player skin size must not exceed 500 KB.');
         return;
@@ -2288,7 +2294,7 @@ function handleCreateGuild(req, res) {
                 });
             })
             .catch(function(error) {
-                handleError(res, error);
+                handleUploadError(res, error, 'Upload skin guild gagal.');
             });
     });
 }
