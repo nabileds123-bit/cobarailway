@@ -1139,6 +1139,7 @@ GameServer.prototype.splitCells = function(client) {
         var splitSpeed = Math.max(splitMinSpeed, Math.min(splitMaxSpeed, calculatedSplitSpeed));
         split.setMoveEngineData(splitSpeed, splitMoveTicks, splitDecay);
         split.calcMergeTime(this.config.playerRecombineTime);
+        split.setCollisionOff(true);
         split.firstSplit = true;
        setTimeout(function(){split.firstSplit = false;},1000)
        /* split.hasAte = true;
