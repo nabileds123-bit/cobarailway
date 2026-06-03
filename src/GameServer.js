@@ -72,12 +72,12 @@ function GameServer(mult, prt, gamemodeId) {
         playerMinMassSplit: 36, // Mass required to split
         playerMaxCells: 16, // Max cells the player is allowed to have
         playerRecombineTime: 15, // Base amount of ticks before a cell is allowed to recombine (1 tick = 2000 milliseconds)
-        playerSplitSpeedBase: 95,
-        playerSplitSpeedMultiplier: 4.5,
-        playerSplitMinSpeed: 105,
-        playerSplitMaxSpeed: 130,
-        playerSplitMoveTicks: 10,
-        playerSplitDecay: 0.82,
+        playerSplitSpeedBase: 88,
+        playerSplitSpeedMultiplier: 4.2,
+        playerSplitMinSpeed: 96,
+        playerSplitMaxSpeed: 118,
+        playerSplitMoveTicks: 9,
+        playerSplitDecay: 0.78,
         playerMassDecayRate: 4, // Amount of mass lost per tick (Multiplier) (1 tick = 2000 milliseconds)
         playerMinMassDecay: 9, // Minimum mass for decay to occur
         gameLBlength: 10, // Amount of players shown on the leaderboard
@@ -1112,7 +1112,7 @@ GameServer.prototype.splitCells = function(client) {
         cell.calcMergeTime(this.config.playerRecombineTime);
         // Get starting position after mass split so large cells do not overlap and stutter
         var splitSize = Math.sqrt(100 * newMass + .25) >> 0;
-        var startDistance = Math.min(splitSize * 0.35, 35);
+        var startDistance = Math.min(splitSize * 0.28, 28);
         var startPos = {
             x: cell.position.x + ( startDistance * Math.sin(angle) ),
             y: cell.position.y + ( startDistance * Math.cos(angle) )
