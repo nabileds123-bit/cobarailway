@@ -59,9 +59,6 @@ function GameServer(mult, prt, gamemodeId) {
         virusMaxAmount: 50, // Maximum amount of viruses on the map. If this amount is reached, then ejected cells will pass through viruses.
         virusStartMass: 100, // Starting virus size (In mass)
         virusBurstMass: 198, // Viruses explode past this size
-        virusMassGain: null, // Mass gained when eating a virus. null = use virus mass
-        virusSplitMoveTicks: 9, // Virus split boost duration. Lower = closer burst
-        virusSplitDecay: 0.62, // Virus split boost decay. Lower = faster stop
         ejectMass: 16, // Mass of ejected cells
         ejectMassGain: 12, // Amount of mass gained from consuming ejected cells
         ejectSpeed: 120, // Base speed of ejected cells
@@ -72,12 +69,6 @@ function GameServer(mult, prt, gamemodeId) {
         playerMinMassSplit: 36, // Mass required to split
         playerMaxCells: 16, // Max cells the player is allowed to have
         playerRecombineTime: 15, // Base amount of ticks before a cell is allowed to recombine (1 tick = 2000 milliseconds)
-        playerSplitSpeedBase: 95,
-        playerSplitSpeedMultiplier: 4.5,
-        playerSplitMinSpeed: 105,
-        playerSplitMaxSpeed: 130,
-        playerSplitMoveTicks: 10,
-        playerSplitDecay: 0.82,
         playerMassDecayRate: 4, // Amount of mass lost per tick (Multiplier) (1 tick = 2000 milliseconds)
         playerMinMassDecay: 9, // Minimum mass for decay to occur
         gameLBlength: 10, // Amount of players shown on the leaderboard
@@ -574,7 +565,6 @@ GameServer.prototype.configureBattleArena = function(match, battleType) {
     match.config.virusMaxAmount = isTwoVsTwo ? 18 : 10;
     match.config.virusStartMass = 100;
     match.config.virusBurstMass = 198;
-    match.config.virusMassGain = 15;
     match.config.playerStartMass = 300;
     match.config.playerMaxCells = 16;
     match.config.tourneyAutoFill = 0;
@@ -1106,38 +1096,21 @@ GameServer.prototype.splitCells = function(client) {
         var deltaX = client.mouse.x - cell.position.x;
         var angle = Math.atan2(deltaX,deltaY);
         
+        // Get starting position
+        var size = cell.getSize();
+        var startPos = {
+            x: cell.position.x + ( (size + this.config.ejectMass) * Math.sin(angle) ), 
+            y: cell.position.y + ( (size + this.config.ejectMass) * Math.cos(angle) )
+        };
         // Calculate mass of splitting cell
         var newMass = cell.mass / 2;
         cell.mass = newMass;
         cell.calcMergeTime(this.config.playerRecombineTime);
-        // Get starting position after mass split so large cells do not overlap and stutter
-        var splitSize = Math.sqrt(100 * newMass + .25) >> 0;
-        var startDistance = Math.min(splitSize * 0.35, 35);
-        var startPos = {
-            x: cell.position.x + ( startDistance * Math.sin(angle) ),
-            y: cell.position.y + ( startDistance * Math.cos(angle) )
-        };
         // Create cell
         var split = new Entity.PlayerCell(this.getNextNodeId(), client, startPos, newMass);
         split.setAngle(angle);
-        var splitSpeedBase = Number(this.config.playerSplitSpeedBase);
-        var splitSpeedMultiplier = Number(this.config.playerSplitSpeedMultiplier);
-        var splitMinSpeed = Number(this.config.playerSplitMinSpeed);
-        var splitMaxSpeed = Number(this.config.playerSplitMaxSpeed);
-        var splitMoveTicks = Number(this.config.playerSplitMoveTicks);
-        var splitDecay = Number(this.config.playerSplitDecay);
-        if (isNaN(splitSpeedBase)) splitSpeedBase = 120;
-        if (isNaN(splitSpeedMultiplier)) splitSpeedMultiplier = 8;
-        if (isNaN(splitMinSpeed)) splitMinSpeed = 170;
-        if (isNaN(splitMaxSpeed)) splitMaxSpeed = 245;
-        if (isNaN(splitMoveTicks)) splitMoveTicks = 24;
-        if (isNaN(splitDecay)) splitDecay = 0.82;
-        var sizeScale = Math.max(0, Math.min(1, (cell.getSize() - 35) / 210));
-        var heavyAssist = Math.sqrt(sizeScale) * 42;
-        var smallBrake = (1 - sizeScale) * 28;
-        var calculatedSplitSpeed = splitSpeedBase + (cell.getSpeed() * splitSpeedMultiplier) + heavyAssist - smallBrake;
-        var splitSpeed = Math.max(splitMinSpeed, Math.min(splitMaxSpeed, calculatedSplitSpeed));
-        split.setMoveEngineData(splitSpeed, splitMoveTicks, splitDecay);
+        var splitCellSpeed = 745.28 * Math.pow(cell.mass, -0.222) * 50 / 1000;
+        split.setMoveEngineData(60 + (splitCellSpeed * 4), 20);
         split.calcMergeTime(this.config.playerRecombineTime);
         split.firstSplit = true;
        setTimeout(function(){split.firstSplit = false;},1000)
@@ -1217,13 +1190,9 @@ GameServer.prototype.newCellVirused = function(client, parent, angle, mass, spee
     };
     
     // Create cell
-    var newCell = new Entity.PlayerCell(this.getNextNodeId(), client, startPos, mass);
+    newCell = new Entity.PlayerCell(this.getNextNodeId(), client, startPos, mass);
     newCell.setAngle(angle);
-    var moveTicks = Number(this.config.virusSplitMoveTicks);
-    var moveDecay = Number(this.config.virusSplitDecay);
-    if (isNaN(moveTicks)) moveTicks = 6;
-    if (isNaN(moveDecay)) moveDecay = 0.45;
-    newCell.setMoveEngineData(speed, moveTicks, moveDecay);
+    newCell.setMoveEngineData(speed, 10);
     newCell.calcMergeTime(this.config.playerRecombineTime);
     newCell.setCollisionOff(true); // Turn off collision
     
