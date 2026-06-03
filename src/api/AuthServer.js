@@ -9,6 +9,7 @@ var memorySessions = {};
 var mysqlPool = null;
 var mysqlReady = null;
 var BUY_PREMIUM_COST = 2;
+var PREMIUM_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 var UPLOAD_SKIN_COST = 150;
 var CREATE_GUILD_COST = 50;
 var PLAYER_SKIN_UPLOAD_SIZE = 500 * 1024;
@@ -77,7 +78,9 @@ function ensureMysql() {
                 'email VARCHAR(255) NOT NULL UNIQUE,' +
                 'salt VARCHAR(64) NOT NULL,' +
                 'password_hash VARCHAR(256) NOT NULL,' +
-                'account_type VARCHAR(16) NOT NULL DEFAULT \'Free\',' +
+                'account_type VARCHAR(20) NOT NULL DEFAULT \'Free\',' +
+                'premium_activated_at DATETIME NULL,' +
+                'premium_expires_at DATETIME NULL,' +
                 'level INT NOT NULL DEFAULT 1,' +
                 'xp INT NOT NULL DEFAULT 0,' +
                 'points DECIMAL(12,2) NOT NULL DEFAULT 0,' +
@@ -100,7 +103,10 @@ function ensureMysql() {
         })
         .then(function() {
             var alters = [
-                'ALTER TABLE users ADD COLUMN account_type VARCHAR(16) NOT NULL DEFAULT \'Free\'',
+                'ALTER TABLE users ADD COLUMN account_type VARCHAR(20) NOT NULL DEFAULT \'Free\'',
+                'ALTER TABLE users MODIFY COLUMN account_type VARCHAR(20) NOT NULL DEFAULT \'Free\'',
+                'ALTER TABLE users ADD COLUMN premium_activated_at DATETIME NULL',
+                'ALTER TABLE users ADD COLUMN premium_expires_at DATETIME NULL',
                 'ALTER TABLE users ADD COLUMN level INT NOT NULL DEFAULT 1',
                 'ALTER TABLE users ADD COLUMN xp INT NOT NULL DEFAULT 0',
                 'ALTER TABLE users ADD COLUMN points DECIMAL(12,2) NOT NULL DEFAULT 0',
@@ -489,15 +495,72 @@ function isAllowedCellColor(color) {
     return allowedCellColors.indexOf(String(color || '').trim().toUpperCase()) != -1;
 }
 
+function parseDateValue(value) {
+    if (!value) {
+        return null;
+    }
+
+    var date = value instanceof Date ? value : new Date(value);
+    return isNaN(date.getTime()) ? null : date;
+}
+
+function toMysqlDate(date) {
+    if (!date) {
+        return null;
+    }
+
+    return date.toISOString().slice(0, 19).replace('T', ' ');
+}
+
+function toPublicDate(value) {
+    var date = parseDateValue(value);
+    return date ? date.toISOString() : null;
+}
+
+function isPremiumActive(user, now) {
+    var expiresAt = parseDateValue(user && user.premiumExpiresAt);
+    return !!expiresAt && expiresAt.getTime() > (now || Date.now());
+}
+
+function applyPremiumState(user, now) {
+    if (!user) {
+        return user;
+    }
+
+    if (isPremiumActive(user, now)) {
+        user.accountType = 'Premium';
+    } else {
+        if (String(user.accountType || '').toLowerCase() == 'premium' && user.premiumExpiresAt && parseDateValue(user.premiumExpiresAt) && parseDateValue(user.premiumExpiresAt).getTime() <= (now || Date.now())) {
+            user._premiumExpired = true;
+        }
+        user.accountType = 'Free';
+        if (user.premiumExpiresAt && parseDateValue(user.premiumExpiresAt) && parseDateValue(user.premiumExpiresAt).getTime() <= (now || Date.now())) {
+            user.premiumExpiresAt = null;
+            user.premiumActivatedAt = null;
+        }
+    }
+
+    return user;
+}
+
 function publicUser(user) {
+    applyPremiumState(user);
     var level = Number(user.level || 1);
     var xp = Number(user.xp || 0);
+    var premiumExpiresAt = toPublicDate(user.premiumExpiresAt);
+    var premiumActivatedAt = toPublicDate(user.premiumActivatedAt);
+    var premiumRemainingMs = premiumExpiresAt ? Math.max(0, parseDateValue(premiumExpiresAt).getTime() - Date.now()) : 0;
 
     return {
         id: user.id,
         username: user.username,
         email: user.email,
         accountType: user.accountType || 'Free',
+        premiumStatus: isPremiumActive(user) ? 'Active' : 'Inactive',
+        premiumActivatedAt: premiumActivatedAt,
+        premiumExpiresAt: premiumExpiresAt,
+        premiumRemainingMs: premiumRemainingMs,
+        premiumExpired: !!user._premiumExpired,
         level: level,
         xp: xp,
         nextLevelXp: getNextLevelXp(level),
@@ -526,6 +589,8 @@ function mysqlUser(row) {
         salt: row.salt,
         passwordHash: row.password_hash,
         accountType: row.account_type,
+        premiumActivatedAt: row.premium_activated_at,
+        premiumExpiresAt: row.premium_expires_at,
         level: row.level,
         xp: row.xp,
         points: row.points,
@@ -715,7 +780,7 @@ function requireUser(req, res) {
             return null;
         }
 
-        return user;
+        return expirePremiumIfNeeded(user);
     });
 }
 
@@ -724,7 +789,7 @@ function optionalUser(req) {
     if (!token) {
         return Promise.resolve(null);
     }
-    return findUserByToken(token);
+    return findUserByToken(token).then(expirePremiumIfNeeded);
 }
 
 function handleError(res, err) {
@@ -1049,6 +1114,8 @@ function handleRegister(req, res) {
                     salt: salt,
                     passwordHash: hashPassword(password, salt),
                     accountType: 'Free',
+                    premiumActivatedAt: null,
+                    premiumExpiresAt: null,
                     level: 1,
                     xp: 0,
                     points: 0,
@@ -1216,8 +1283,8 @@ function saveAccountFields(user) {
         if (usingMysql) {
             return getMysqlPool()
                 .query(
-                    'UPDATE users SET account_type = ?, points = ?, guild = ?, guild_name = ?, guild_description = ?, guild_type = ?, guild_role = ?, skin_url = ?, guild_skin_url = ? WHERE id = ?',
-                    [user.accountType || 'Free', Number(user.points || 0), user.guild || null, user.guildName || null, user.guildDescription || null, user.guildType || null, user.guildRole || null, user.skinUrl || null, user.guildSkinUrl || null, user.id]
+                    'UPDATE users SET account_type = ?, premium_activated_at = ?, premium_expires_at = ?, points = ?, guild = ?, guild_name = ?, guild_description = ?, guild_type = ?, guild_role = ?, skin_url = ?, guild_skin_url = ? WHERE id = ?',
+                    [user.accountType || 'Free', toMysqlDate(parseDateValue(user.premiumActivatedAt)), toMysqlDate(parseDateValue(user.premiumExpiresAt)), Number(user.points || 0), user.guild || null, user.guildName || null, user.guildDescription || null, user.guildType || null, user.guildRole || null, user.skinUrl || null, user.guildSkinUrl || null, user.id]
                 )
                 .then(function() {
                     return user;
@@ -1228,6 +1295,8 @@ function saveAccountFields(user) {
         for (var i = 0; i < db.users.length; i++) {
             if (db.users[i].id == user.id) {
                 db.users[i].accountType = user.accountType || 'Free';
+                db.users[i].premiumActivatedAt = user.premiumActivatedAt || null;
+                db.users[i].premiumExpiresAt = user.premiumExpiresAt || null;
                 db.users[i].points = Number(user.points || 0);
                 db.users[i].guild = user.guild || '';
                 db.users[i].guildName = user.guildName || user.guild || '';
@@ -1243,6 +1312,28 @@ function saveAccountFields(user) {
 
         return user;
     });
+}
+
+function expirePremiumIfNeeded(user) {
+    if (!user) {
+        return Promise.resolve(user);
+    }
+
+    var wasPremium = String(user.accountType || '').toLowerCase() == 'premium';
+    var expiresAt = parseDateValue(user.premiumExpiresAt);
+    if (wasPremium && (!expiresAt || expiresAt.getTime() <= Date.now())) {
+        user.accountType = 'Free';
+        user.premiumActivatedAt = null;
+        user.premiumExpiresAt = null;
+        user._premiumExpired = true;
+        return saveAccountFields(user).then(function(savedUser) {
+            savedUser._premiumExpired = true;
+            return savedUser;
+        });
+    }
+
+    applyPremiumState(user);
+    return Promise.resolve(user);
 }
 
 function normalizeGuildTag(tag) {
@@ -1578,6 +1669,7 @@ function listHighscores(mode, region) {
 }
 
 function publicPlayerProfile(user) {
+    applyPremiumState(user);
     return {
         id: user.id,
         name: user.username,
@@ -1703,19 +1795,25 @@ function handleBuyPremium(req, res) {
                 return;
             }
 
-            if (String(user.accountType || '').toLowerCase() == 'premium') {
-                sendJson(res, 200, { ok: true, message: 'Account sudah Premium.', user: publicUser(user) });
-                return;
-            }
-
             if (!spendPoints(user, BUY_PREMIUM_COST)) {
                 sendJson(res, 400, { ok: false, error: 'Point tidak cukup. Buy Premium membutuhkan 2 point.' });
                 return;
             }
 
+            var now = new Date();
+            var currentExpiry = parseDateValue(user.premiumExpiresAt);
+            var baseTime = currentExpiry && currentExpiry.getTime() > now.getTime() ? currentExpiry.getTime() : now.getTime();
+            var newExpiry = new Date(baseTime + PREMIUM_DURATION_MS);
+
             user.accountType = 'Premium';
+            user.premiumActivatedAt = now.toISOString();
+            user.premiumExpiresAt = newExpiry.toISOString();
             return saveAccountFields(user).then(function(savedUser) {
-                sendJson(res, 200, { ok: true, message: 'Account berhasil menjadi Premium.', user: publicUser(savedUser) });
+                sendJson(res, 200, {
+                    ok: true,
+                    message: 'Premium Activated Successfully! Your Premium membership is valid for 7 days.',
+                    user: publicUser(savedUser)
+                });
             });
         })
         .catch(function(error) {
