@@ -1087,14 +1087,6 @@ GameServer.prototype.setAsMovingNode = function(node) {
 }
 
 GameServer.prototype.splitCells = function(client) {
-    var splitCooldownMs = Number(this.config.playerSplitCooldownMs);
-    if (isNaN(splitCooldownMs)) splitCooldownMs = 120;
-    var now = Date.now();
-    if (client.lastSplitTime && (now - client.lastSplitTime) < splitCooldownMs) {
-        return;
-    }
-    client.lastSplitTime = now;
-
     var len = client.cells.length;
     for (var i = 0; i < len; i++) {
         
@@ -1115,40 +1107,20 @@ GameServer.prototype.splitCells = function(client) {
         var deltaX = client.mouse.x - cell.position.x;
         var angle = Math.atan2(deltaX,deltaY);
         
+        // Get starting position
+        var size = cell.getSize();
+        var startPos = {
+            x: cell.position.x + ( (size + this.config.ejectMass) * Math.sin(angle) ), 
+            y: cell.position.y + ( (size + this.config.ejectMass) * Math.cos(angle) )
+        };
         // Calculate mass of splitting cell
         var newMass = cell.mass / 2;
         cell.mass = newMass;
-        cell.calcMergeTime(this.config.playerRecombineTime);
-        // Get starting position after mass split so large cells do not overlap and stutter
-        var splitSize = Math.sqrt(100 * newMass + .25) >> 0;
-        var startDistance = Math.min(splitSize * 0.40, 42);
-        var startPos = {
-            x: cell.position.x + ( startDistance * Math.sin(angle) ),
-            y: cell.position.y + ( startDistance * Math.cos(angle) )
-        };
         // Create cell
         var split = new Entity.PlayerCell(this.getNextNodeId(), client, startPos, newMass);
         split.setAngle(angle);
-        var splitSpeedBase = Number(this.config.playerSplitSpeedBase);
-        var splitSpeedMultiplier = Number(this.config.playerSplitSpeedMultiplier);
-        var splitMinSpeed = Number(this.config.playerSplitMinSpeed);
-        var splitMaxSpeed = Number(this.config.playerSplitMaxSpeed);
-        var splitMoveTicks = Number(this.config.playerSplitMoveTicks);
-        var splitDecay = Number(this.config.playerSplitDecay);
-        if (isNaN(splitSpeedBase)) splitSpeedBase = 120;
-        if (isNaN(splitSpeedMultiplier)) splitSpeedMultiplier = 8;
-        if (isNaN(splitMinSpeed)) splitMinSpeed = 170;
-        if (isNaN(splitMaxSpeed)) splitMaxSpeed = 245;
-        if (isNaN(splitMoveTicks)) splitMoveTicks = 24;
-        if (isNaN(splitDecay)) splitDecay = 0.82;
-        var sizeScale = Math.max(0, Math.min(1, (cell.getSize() - 35) / 210));
-        var heavyAssist = Math.sqrt(sizeScale) * 42;
-        var smallBrake = (1 - sizeScale) * 28;
-        var calculatedSplitSpeed = splitSpeedBase + (cell.getSpeed() * splitSpeedMultiplier) + heavyAssist - smallBrake;
-        var splitSpeed = Math.max(splitMinSpeed, Math.min(splitMaxSpeed, calculatedSplitSpeed));
-        split.setMoveEngineData(splitSpeed, splitMoveTicks, splitDecay);
+        split.setMoveEngineData(60 + (cell.getSpeed() * 4), 20);
         split.calcMergeTime(this.config.playerRecombineTime);
-        split.setCollisionOff(true);
         split.firstSplit = true;
        setTimeout(function(){split.firstSplit = false;},1000)
        /* split.hasAte = true;
