@@ -1121,7 +1121,7 @@ GameServer.prototype.splitCells = function(client) {
         cell.calcMergeTime(this.config.playerRecombineTime);
         // Get starting position after mass split so large cells do not overlap and stutter
         var splitSize = Math.sqrt(100 * newMass + .25) >> 0;
-        var startDistance = Math.min(splitSize * 0.30, 30);
+        var startDistance = Math.min(splitSize * 0.34, 34);
         var startPos = {
             x: cell.position.x + ( startDistance * Math.sin(angle) ),
             y: cell.position.y + ( startDistance * Math.cos(angle) )
