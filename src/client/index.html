@@ -28,7 +28,7 @@
     <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://code.jquery.com/jquery-1.11.3.min.js"></script>
     <script src="/client/Vector2.js"></script>
-    <script src="/client/main_out.js?553"></script>
+    <script src="/client/main_out.js?567"></script>
     <script>
     'use strict';
     // Hide overlays background (but not helloDialog) when ESC is pressed
@@ -160,6 +160,57 @@
             background: #f7f7f7;
             border-color: #ccc;
         }
+        .mode-btn.active {
+            background: #f2f2f2;
+            border-color: #bfbfbf;
+            color: #555;
+        }
+        #tournament-buttons {
+            display: flex;
+            gap: 4px;
+            margin: 4px 0 6px 0;
+            justify-content: center;
+        }
+        .tournament-btn {
+            min-width: 96px;
+            height: 34px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            background: #fff;
+            color: #777;
+            font-size: 13px;
+            font-weight: 700;
+            padding: 0 14px;
+            cursor: pointer;
+            line-height: 30px;
+        }
+        .tournament-btn:hover {
+            background: #f7f7f7;
+            border-color: #ccc;
+        }
+        .tournament-btn.active {
+            background: #f2f2f2;
+            border-color: #bfbfbf;
+            color: #555;
+        }
+        #playBtn.play-ffa {
+            background: #337ab7;
+            border-color: #2e6da4;
+        }
+        #playBtn.play-ffa:hover,
+        #playBtn.play-ffa:focus {
+            background: #286090;
+            border-color: #204d74;
+        }
+        #playBtn.play-battle {
+            background: #d3322f;
+            border-color: #c62d2a;
+        }
+        #playBtn.play-battle:hover,
+        #playBtn.play-battle:focus {
+            background: #c62d2a;
+            border-color: #b52926;
+        }
         :root {
             --dialog-width: 380px;
         }
@@ -271,7 +322,7 @@
         #overlays.only-dialog > #helloDialog {
     display: flex;
 }
-        #overlays.only-dialog > *:not(#helloDialog):not(#loginDialog):not(#registerDialog):not(#forgotDialog):not(#accountDialog):not(#uploadSkinDialog):not(#notificationDialog):not(#guildDialog):not(#highScoreDialog):not(#matchResultDialog) {
+        #overlays.only-dialog > *:not(#helloDialog):not(#loginDialog):not(#registerDialog):not(#forgotDialog):not(#accountDialog):not(#uploadSkinDialog):not(#notificationDialog):not(#guildDialog):not(#guildCreateDialog):not(#highScoreDialog):not(#playerSearchDialog):not(#matchResultDialog):not(#battleCreateDialog) {
     display: none !important;
 }
         #loginDialog,
@@ -280,8 +331,11 @@
         #accountDialog,
         #notificationDialog,
         #guildDialog,
+        #guildCreateDialog,
         #highScoreDialog,
-        #matchResultDialog {
+        #playerSearchDialog,
+        #matchResultDialog,
+        #battleCreateDialog {
             display: none;
             width: var(--dialog-width);
             background-color: #FFFFFF;
@@ -301,8 +355,11 @@
         #accountDialog.account-open,
         #notificationDialog.spa-open,
         #guildDialog.spa-open,
+        #guildCreateDialog.spa-open,
         #highScoreDialog.spa-open,
-        #matchResultDialog.spa-open {
+        #playerSearchDialog.spa-open,
+        #matchResultDialog.spa-open,
+        #battleCreateDialog.spa-open {
             display: flex;
             flex-direction: column;
         }
@@ -317,8 +374,11 @@
         #uploadSkinDialog h3,
         #notificationDialog h3,
         #guildDialog h3,
+        #guildCreateDialog h3,
         #highScoreDialog h3,
-        #matchResultDialog h3 {
+        #playerSearchDialog h3,
+        #matchResultDialog h3,
+        #battleCreateDialog h3 {
             margin: 0 0 14px 0;
             font-weight: bold;
             font-size: 12px;
@@ -330,8 +390,11 @@
         #uploadSkinDialog .dialog-brand,
         #notificationDialog .dialog-brand,
         #guildDialog .dialog-brand,
+        #guildCreateDialog .dialog-brand,
         #highScoreDialog .dialog-brand,
-        #matchResultDialog .dialog-brand {
+        #playerSearchDialog .dialog-brand,
+        #matchResultDialog .dialog-brand,
+        #battleCreateDialog .dialog-brand {
             color: #337ab7;
             text-decoration: none;
         }
@@ -384,7 +447,9 @@
         #uploadSkinDialog .dialog-footer,
         #notificationDialog .dialog-footer,
         #guildDialog .dialog-footer,
+        #guildCreateDialog .dialog-footer,
         #highScoreDialog .dialog-footer,
+        #playerSearchDialog .dialog-footer,
         #matchResultDialog .dialog-footer {
             margin-top: auto;
             padding-top: 12px;
@@ -621,6 +686,502 @@
         .spa-page-body p {
             margin: 0 0 10px 0;
         }
+        .guild-search {
+            height: 34px;
+            margin-bottom: 10px;
+        }
+        .guild-table-head {
+            display: grid;
+            grid-template-columns: 44px 1fr 50px 34px;
+            align-items: center;
+            min-height: 28px;
+            border-bottom: 1px solid #e5e5e5;
+            color: #333;
+            font-size: 12px;
+            font-weight: bold;
+            text-align: center;
+        }
+        .guild-list {
+            height: 282px;
+            overflow-y: auto;
+            border-bottom: 1px solid #eee;
+        }
+        .guild-row {
+            display: grid;
+            grid-template-columns: 44px 1fr 50px 34px;
+            align-items: center;
+            min-height: 54px;
+            border-bottom: 1px solid #eee;
+            color: #555;
+        }
+        .guild-icon {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            border: 1px solid #cfcfcf;
+            background: #2f2f2f;
+            object-fit: cover;
+        }
+        .guild-icon-fallback {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .guild-name {
+            min-width: 0;
+            color: #337ab7;
+            font-size: 14px;
+            line-height: 1.2;
+            word-break: break-word;
+        }
+        .guild-tag {
+            color: #777;
+            font-size: 12px;
+        }
+        .guild-members,
+        .guild-status {
+            text-align: center;
+            color: #777;
+            font-size: 13px;
+        }
+        .guild-empty {
+            padding: 24px 8px;
+            text-align: center;
+            color: #777;
+        }
+        .guild-create-link-wrap {
+            padding: 14px 0 6px 0;
+            text-align: center;
+        }
+        .guild-detail {
+            display: none;
+            flex: 1;
+            min-height: 0;
+        }
+        .guild-detail.is-open {
+            display: flex;
+            flex-direction: column;
+        }
+        .guild-detail-head {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            padding: 8px 0 12px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .guild-detail-logo {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            border: 1px solid #ddd;
+            object-fit: cover;
+            background: #f4f4f4;
+        }
+        .guild-detail-name {
+            color: #000;
+            font-size: 15px;
+            font-weight: bold;
+        }
+        .guild-detail-description {
+            max-width: 230px;
+            margin-top: 4px;
+            color: #777;
+            font-size: 12px;
+            line-height: 1.3;
+            word-break: break-word;
+        }
+        .guild-tabs {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            margin-top: 8px;
+        }
+        .guild-tab {
+            min-width: 88px;
+            padding: 8px 12px;
+            border: 1px solid transparent;
+            border-bottom: 0;
+            background: transparent;
+            color: #337ab7;
+        }
+        .guild-tab.active {
+            margin-bottom: -1px;
+            border-color: #ddd;
+            border-bottom-color: #fff;
+            border-radius: 4px 4px 0 0;
+            background: #fff;
+            color: #000;
+        }
+        .guild-members-head,
+        .guild-member-row {
+            display: grid;
+            grid-template-columns: 42px minmax(0, 1fr) 52px 78px;
+            align-items: center;
+            gap: 4px;
+        }
+        .guild-members-head {
+            min-height: 34px;
+            font-weight: bold;
+            text-align: center;
+        }
+        .guild-members-list {
+            flex: 1;
+            overflow-y: auto;
+            border-bottom: 1px solid #eee;
+        }
+        .guild-member-row {
+            min-height: 42px;
+            border-bottom: 1px solid #eee;
+            font-size: 13px;
+        }
+        .guild-member-row.is-leader {
+            background: #ffed96;
+        }
+        .guild-member-nick {
+            min-width: 0;
+            font-weight: bold;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .guild-member-level,
+        .guild-member-rank {
+            text-align: center;
+        }
+        .guild-member-role {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 4px;
+            padding-right: 4px;
+        }
+        .guild-member-action {
+            border: 0;
+            background: transparent;
+            color: #d9534f;
+            padding: 0 2px;
+        }
+        .guild-member-role-btn {
+            border: 0;
+            background: transparent;
+            color: #337ab7;
+            padding: 0 2px;
+            font-size: 11px;
+        }
+        .guild-detail-actions {
+            display: flex;
+            gap: 4px;
+            justify-content: flex-end;
+            padding: 10px 0 0 0;
+        }
+        .guild-detail-actions:empty {
+            display: none;
+        }
+        .notification-list {
+            height: 350px;
+            overflow-y: auto;
+        }
+        .notification-item {
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+            font-size: 13px;
+        }
+        .notification-action {
+            margin-top: 6px;
+        }
+        .guild-form-label {
+            margin: 7px 0 4px 0;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        #guildCreateDialog {
+            width: 400px;
+            min-height: 500px;
+            padding: 0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        #guildCreateDialog.spa-open {
+            display: flex;
+            flex-direction: column;
+        }
+        #guildCreateDialog .guild-create-header {
+            position: relative;
+            padding: 18px 36px 18px 15px;
+            border-bottom: 1px solid #e5e5e5;
+            font-size: 18px;
+            line-height: 1.1;
+            color: #333;
+        }
+        #guildCreateDialog .guild-create-close {
+            position: absolute;
+            top: 12px;
+            right: 14px;
+            padding: 0;
+            border: 0;
+            background: transparent;
+            color: #c7c7c7;
+            font-size: 28px;
+            font-weight: bold;
+            line-height: 1;
+        }
+        #guildCreateDialog .guild-create-close:hover {
+            color: #999;
+        }
+        #guildCreateForm {
+            display: flex;
+            flex: 1;
+            flex-direction: column;
+            padding: 18px 15px 16px 15px;
+        }
+        #guildCreateDialog .guild-create-fields {
+            flex: 1;
+        }
+        #guildCreateDialog .guild-create-price {
+            margin: 0 0 6px 0;
+            text-align: center;
+            font-weight: bold;
+        }
+        #guildCreateDialog .guild-form-label {
+            margin: 13px 0 5px 0;
+            font-size: 14px;
+        }
+        #guildCreateDialog .form-control {
+            height: 34px;
+            margin-bottom: 0;
+        }
+        #guildCreateLogo {
+            width: 100%;
+            height: 34px;
+            padding: 6px 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background: #fff;
+        }
+        #guildCreateDialog .guild-upload-warning {
+            margin: 18px 0 6px 0;
+            color: #f00;
+            text-align: center;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        #guildCreateDialog .guild-create-actions {
+            margin: 14px -15px -16px -15px;
+            padding: 16px 15px 8px 15px;
+            border-top: 1px solid #e5e5e5;
+        }
+        #guildCreateSubmit {
+            height: 35px;
+            border-color: #428bca;
+            background-color: #428bca;
+        }
+        #guildCreateStatus {
+            display: none;
+            margin-top: 8px;
+            font-size: 12px;
+            text-align: center;
+        }
+        @media (max-height: 620px) {
+            .guild-list {
+                height: 210px;
+            }
+        }
+        .highscore-filters {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .highscore-filters .form-control {
+            height: 34px;
+        }
+        .highscore-table-head,
+        .highscore-row {
+            display: grid;
+            grid-template-columns: 34px minmax(0, 1fr) 96px;
+            align-items: center;
+            column-gap: 4px;
+        }
+        .highscore-table-head {
+            min-height: 32px;
+            border-bottom: 1px solid #e5e5e5;
+            color: #000;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .highscore-list {
+            height: 282px;
+            overflow-y: auto;
+            border-bottom: 1px solid #eee;
+        }
+        .highscore-row {
+            min-height: 42px;
+            border-bottom: 1px solid #eee;
+            font-size: 13px;
+        }
+        .highscore-rank {
+            text-align: center;
+            color: #666;
+        }
+        .highscore-player {
+            min-width: 0;
+            color: #000;
+            font-weight: bold;
+            text-decoration: none;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .highscore-player:hover {
+            color: #23527c;
+            text-decoration: underline;
+        }
+        .highscore-time {
+            color: #0067c5;
+            text-align: right;
+            font-weight: bold;
+            line-height: 1.2;
+            word-break: break-word;
+        }
+        .highscore-empty {
+            padding: 24px 8px;
+            text-align: center;
+            color: #777;
+        }
+        .highscore-trophy-gold {
+            color: #f5b700;
+        }
+        .highscore-trophy-silver {
+            color: #aeb4ba;
+        }
+        .highscore-trophy-bronze {
+            color: #c97a32;
+        }
+        @media (max-height: 620px) {
+            .highscore-list {
+                height: 210px;
+            }
+        }
+        .player-search-body {
+            display: flex;
+            flex: 1;
+            flex-direction: column;
+            min-height: 0;
+        }
+        .player-breadcrumb {
+            margin-bottom: 10px;
+            color: #333;
+            font-size: 13px;
+        }
+        .player-breadcrumb .dialog-brand {
+            color: #337ab7;
+        }
+        .player-tabs {
+            display: flex;
+            align-items: flex-end;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 10px;
+        }
+        .player-tab {
+            min-width: 72px;
+            padding: 8px 12px;
+            border: 1px solid transparent;
+            border-bottom: 0;
+            background: transparent;
+            color: #337ab7;
+            font-size: 14px;
+        }
+        .player-tab.active {
+            margin-bottom: -1px;
+            border-color: #ddd;
+            border-bottom-color: #fff;
+            border-radius: 4px 4px 0 0;
+            background: #fff;
+            color: #000;
+        }
+        .player-profile-content {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+        }
+        .player-profile-row {
+            display: grid;
+            grid-template-columns: 90px 1fr;
+            align-items: center;
+            min-height: 34px;
+            border-bottom: 1px solid #eee;
+            font-size: 13px;
+        }
+        .player-profile-label {
+            color: #000;
+            font-weight: bold;
+        }
+        .player-profile-value {
+            min-width: 0;
+            color: #000;
+        }
+        .player-profile-premium {
+            color: green;
+            font-weight: bold;
+        }
+        .player-skins {
+            display: flex;
+            gap: 24px;
+            padding: 20px 4px 12px 4px;
+        }
+        .player-avatar {
+            width: 98px;
+            height: 98px;
+            border: 2px solid #d8d8d8;
+            border-radius: 50%;
+            object-fit: cover;
+            background: #e9e9e9;
+        }
+        .player-history-row {
+            display: grid;
+            grid-template-columns: 88px minmax(0, 1fr) 74px;
+            gap: 6px;
+            align-items: center;
+            min-height: 30px;
+            border-bottom: 1px solid #eee;
+            font-size: 12px;
+        }
+        .player-history-age {
+            color: #777;
+        }
+        .player-history-server {
+            color: #000;
+            font-weight: bold;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            text-align: center;
+        }
+        .player-history-time {
+            color: #0067c5;
+            text-align: right;
+            font-weight: bold;
+        }
+        .player-empty {
+            padding: 42px 8px;
+            text-align: center;
+            color: #999;
+            font-size: 13px;
+        }
+        .player-search-form {
+            display: flex;
+            margin-top: 12px;
+        }
+        .player-search-form .form-control {
+            height: 36px;
+            border-radius: 4px 0 0 4px;
+        }
+        .player-search-form .btn {
+            width: 44px;
+            border-radius: 0 4px 4px 0;
+        }
         .match-result-title {
             margin: 6px 0 16px 0;
             text-align: center;
@@ -679,6 +1240,143 @@
         }
         #matchResultBack {
             margin-top: 4px;
+        }
+        #battleCreateDialog {
+            width: min(1120px, calc(100vw - 24px));
+            min-height: min(720px, calc(100vh - 24px));
+            border-radius: 7px;
+            padding: 0;
+            overflow: hidden;
+        }
+        .battle-lobby-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 72px;
+            padding: 0 28px;
+            border-bottom: 1px solid #ddd;
+            background: #fff;
+        }
+        .battle-lobby-header h2 {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 700;
+            color: #333;
+        }
+        .battle-lobby-close {
+            border: 0;
+            background: transparent;
+            color: #999;
+            font-size: 28px;
+            line-height: 1;
+            padding: 0;
+        }
+        .battle-lobby-body {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            padding: 16px;
+            flex: 1 1 auto;
+            min-height: 0;
+        }
+        .battle-panel {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            border: 1px solid #ddd;
+            border-radius: 7px;
+            background: #fff;
+            overflow: hidden;
+        }
+        .battle-panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 52px;
+            padding: 0 22px;
+            background: #f0f0f0;
+            border-bottom: 1px solid #ddd;
+            color: #444;
+            font-size: 16px;
+            font-weight: 700;
+        }
+        .battle-settings-row {
+            display: grid;
+            grid-template-columns: 150px 1fr;
+            align-items: center;
+            min-height: 48px;
+            padding: 0 24px;
+            border-bottom: 1px solid #eee;
+            color: #999;
+            font-size: 16px;
+        }
+        .battle-settings-row strong {
+            color: #5c65c8;
+            font-weight: 700;
+        }
+        .battle-settings-row .battle-loss {
+            color: #d85b5b;
+        }
+        .battle-player-list {
+            flex: 1 1 auto;
+            min-height: 230px;
+        }
+        .battle-player-row {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            min-height: 66px;
+            padding: 0 20px;
+            border-bottom: 1px solid #eee;
+            color: #555;
+            font-size: 15px;
+        }
+        .battle-player-avatar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background: #ff5722;
+            color: #fff;
+            font-weight: 700;
+        }
+        #battleCreateStart {
+            height: 50px;
+            border: 0;
+            border-radius: 0;
+            background: #d9534f;
+            font-size: 16px;
+            font-weight: 700;
+        }
+        .battle-chat-body,
+        .battle-friends-body {
+            flex: 1 1 auto;
+            min-height: 230px;
+            background: #fff;
+        }
+        .battle-chat-input {
+            height: 48px;
+            border: 0;
+            border-top: 1px solid #eee;
+            border-radius: 0;
+            box-shadow: none;
+        }
+        .battle-invite-link {
+            display: block;
+            margin-top: 30px;
+            text-align: center;
+            color: #78b7c4;
+            font-size: 16px;
+        }
+        .battle-friends-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 0;
+            color: #999;
+            font-weight: 400;
         }
         #matchResultDialog.fade-in {
             animation: matchResultFadeIn .35s ease forwards;
@@ -846,13 +1544,17 @@
             </div>
             <div class="form-group main-input-row">
                 <input id="nick" class="form-control" placeholder="Nick" maxlength="15"/>
-                <select id="gamemode" class="form-control" onchange="setGameMode($(this).val());" required>
+                <select id="gamemode" class="form-control" required>
                     <option selected value="">FFA</option>
                     <option value=":teams">Teams</option>
                     <option value=":hardcore">Hardcore</option>
-                    <option value=":tournament">Tournament</option>
+                    <option value=":tournament">Battle</option>
                 </select>
                 <br clear="both"/>
+            </div>
+            <div id="tournament-buttons">
+                <button class="tournament-btn" type="button" data-tournament="1v1">Battle 1v1</button>
+                <button class="tournament-btn" type="button" data-tournament="2v2">Battle 2v2</button>
             </div>
             <div id="mode-buttons">
                 <button class="mode-btn" type="button" data-mode="hc" data-server="bubbleam.site/hc" data-alt-server="bubbleam.site/hc">Hardcore</button>
@@ -875,7 +1577,7 @@
             <div><div class="text-muted region-message CN-China"></div></div>
             <div class="form-group">
                 <button type="submit" id="playBtn"
-                        class="btn btn-play btn-primary btn-needs-server">Play</button>
+                        class="btn btn-play btn-primary btn-needs-server play-ffa">Play</button>
                 <button onclick="$('#settings, #instructions').toggle();return false;"
                         class="btn btn-info btn-settings"><i class="glyphicon glyphicon-cog"></i></button>
                 <br clear="both"/>
@@ -1035,7 +1737,7 @@
             <span id="profileEmail" class="profile-value">-</span>
         </div>
         <button id="uploadSkinButton" class="btn btn-block">Upload your skin (required. 150 points)</button>
-        <input id="uploadSkinInput" type="file" accept="image/*" style="display:none"/>
+        <input id="uploadSkinInput" type="file" accept="image/png" style="display:none"/>
         <p id="uploadSkinStatus" class="text-muted"></p>
         <div class="dialog-footer">
             <a href="#home" id="accountHomeLink" class="text-primary">Home</a> |
@@ -1050,7 +1752,7 @@
             <span style="font-size:14px; color:#888;"> &raquo; Upload skin</span>
         </div>
         <div class="upload-label">Upload skin</div>
-        <input id="uploadSkinFile" type="file" accept="image/png,image/jpeg,image/webp"/>
+        <input id="uploadSkinFile" type="file" accept="image/png"/>
         <button id="uploadSkinSubmit" class="btn btn-primary btn-block">Upload</button>
         <p id="uploadSkinDialogStatus" class="upload-status text-muted"></p>
         <div id="uploadPreviewWrap">
@@ -1071,7 +1773,9 @@
             <span style="font-size:14px; color:#888;"> &raquo; Notification</span>
         </div>
         <div class="spa-page-body">
-            <p>Belum ada notifikasi baru.</p>
+            <div id="notificationList" class="notification-list">
+                <div class="guild-empty">Loading notifications...</div>
+            </div>
         </div>
         <div class="dialog-footer">
             <a href="#home" class="text-primary spa-home-link">Home</a> |
@@ -1083,11 +1787,75 @@
     <div id="guildDialog">
         <div class="form-group">
             <a href="#home" class="dialog-brand" style="font-size:14px;">Bubble.am</a>
-            <span style="font-size:14px; color:#888;"> &raquo; Guild</span>
+            <span style="font-size:14px; color:#888;"> &raquo; Guilds</span>
         </div>
         <div class="spa-page-body">
-            <p>Guild page.</p>
+            <div id="guildListView">
+                <input id="guildSearch" type="text" class="form-control guild-search" placeholder="Search">
+                <div class="guild-table-head">
+                    <span></span>
+                    <span>Guild name</span>
+                    <span class="glyphicon glyphicon-user"></span>
+                    <span>?</span>
+                </div>
+                <div id="guildList" class="guild-list">
+                    <div class="guild-empty">Loading guilds...</div>
+                </div>
+                <div class="guild-create-link-wrap">
+                    <a href="#create-guild" id="guildCreateLink" class="text-primary">Create new Guild</a>
+                </div>
+            </div>
+            <div id="guildDetailView" class="guild-detail">
+                <div class="guild-detail-head">
+                    <div id="guildDetailLogoWrap"></div>
+                    <div>
+                        <div id="guildDetailName" class="guild-detail-name">Guild</div>
+                        <div id="guildDetailDescription" class="guild-detail-description"></div>
+                        <a href="#guild" id="guildDetailBack" class="text-primary">Back to Guilds</a>
+                    </div>
+                </div>
+                <div class="guild-tabs">
+                    <button type="button" class="guild-tab active" data-guild-tab="members">Members</button>
+                    <button type="button" class="guild-tab" data-guild-tab="info">Info</button>
+                    <button type="button" class="guild-tab" data-guild-tab="statistics">Statistics</button>
+                </div>
+                <div id="guildDetailContent" class="guild-members-list"></div>
+            </div>
         </div>
+        <div id="guildDetailActions" class="guild-detail-actions"></div>
+        <div class="dialog-footer">
+            <a href="#home" class="text-primary spa-home-link">Home</a> |
+            <a href="#login" class="text-primary account-menu-link">Login</a> |
+            <a href="#community" class="text-primary community-menu-link">Community</a> |
+            <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">About</a>
+        </div>
+    </div>
+    <div id="guildCreateDialog">
+        <div class="guild-create-header">
+            Create new Guild
+            <button id="guildCreateClose" class="guild-create-close" type="button" aria-label="Close">&times;</button>
+        </div>
+        <form id="guildCreateForm" class="spa-page-body">
+            <div class="guild-create-fields">
+                <div class="guild-create-price">Price: 50 Pt.</div>
+                <div class="guild-form-label">Prefix</div>
+                <input id="guildCreateTag" type="text" class="form-control" maxlength="4" autocomplete="off" required>
+                <div class="guild-form-label">Guild name</div>
+                <input id="guildCreateName" type="text" class="form-control" maxlength="32" autocomplete="off" required>
+                <div class="guild-form-label">Type</div>
+                <select id="guildCreateType" class="form-control" required>
+                    <option value="private">Private</option>
+                    <option value="public">Public</option>
+                </select>
+                <div class="guild-form-label">Upload skin</div>
+                <input id="guildCreateLogo" type="file" accept="image/png">
+                <div id="guildCreateWarning" class="guild-upload-warning">You can upload only Clip art images.</div>
+                <div id="guildCreateStatus"></div>
+            </div>
+            <div class="guild-create-actions">
+                <button id="guildCreateSubmit" type="submit" class="btn btn-primary btn-block">Submit</button>
+            </div>
+        </form>
         <div class="dialog-footer">
             <a href="#home" class="text-primary spa-home-link">Home</a> |
             <a href="#login" class="text-primary account-menu-link">Login</a> |
@@ -1098,16 +1866,67 @@
     <div id="highScoreDialog">
         <div class="form-group">
             <a href="#home" class="dialog-brand" style="font-size:14px;">Bubble.am</a>
-            <span style="font-size:14px; color:#888;"> &raquo; High Score</span>
+            <span style="font-size:14px; color:#888;"> &raquo; Highscore</span>
         </div>
         <div class="spa-page-body">
-            <p>High score page.</p>
+            <div class="highscore-filters">
+                <select id="highScoreMode" class="form-control">
+                    <option value="ffa">FFA</option>
+                    <option value="hardcore">Hardcore</option>
+                    <option value="x5">x5</option>
+                    <option value="battle_1v1">Battle 1v1</option>
+                    <option value="battle_2v2">Battle 2v2</option>
+                </select>
+                <select id="highScoreRegion" class="form-control">
+                    <option value="global">Global</option>
+                    <option value="indonesia">Indonesia</option>
+                    <option value="asia">Asia</option>
+                    <option value="europe">Europe</option>
+                    <option value="america">America</option>
+                </select>
+            </div>
+            <div class="highscore-table-head">
+                <span>#</span>
+                <span>Player</span>
+                <span style="text-align:right;">Top 1 Time</span>
+            </div>
+            <div id="highScoreList" class="highscore-list">
+                <div class="highscore-empty">Loading highscore...</div>
+            </div>
         </div>
         <div class="dialog-footer">
             <a href="#home" class="text-primary spa-home-link">Home</a> |
             <a href="#login" class="text-primary account-menu-link">Login</a> |
             <a href="#community" class="text-primary community-menu-link">Community</a> |
             <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">About</a>
+        </div>
+    </div>
+    <div id="playerSearchDialog">
+        <div class="player-search-body">
+            <div class="player-breadcrumb">
+                <a href="#home" class="dialog-brand">Bubble.am</a>
+                <span> &raquo; Search &raquo; </span>
+                <span id="playerProfileCrumb">Player</span>
+            </div>
+            <div class="player-tabs">
+                <button type="button" class="player-tab active" data-player-tab="profile">Profile</button>
+                <button type="button" class="player-tab" data-player-tab="top1">Top 1</button>
+                <button type="button" class="player-tab" data-player-tab="battle2v2">2 vs 2</button>
+                <button type="button" class="player-tab" data-player-tab="battle1v1">1 vs 1</button>
+            </div>
+            <div id="playerProfileContent" class="player-profile-content">
+                <div class="player-empty">Search player.</div>
+            </div>
+            <form id="playerSearchForm" class="player-search-form">
+                <input id="playerSearchInput" type="text" class="form-control" placeholder="Search" autocomplete="off">
+                <button type="submit" class="btn btn-primary" aria-label="Search"><span class="glyphicon glyphicon-search"></span></button>
+            </form>
+        </div>
+        <div class="dialog-footer">
+            <a href="#home" class="text-primary spa-home-link">Home</a> |
+            <a href="#login" class="text-primary account-menu-link">Login</a> |
+            <a href="#community" class="text-primary community-menu-link">Community</a> |
+            <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">Contact</a>
         </div>
     </div>
     <div id="matchResultDialog">
@@ -1153,11 +1972,66 @@
             <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">About</a>
         </div>
     </div>
+    <div id="battleCreateDialog">
+        <div class="battle-lobby-header">
+            <h2>Create Battle</h2>
+            <button id="battleCreateClose" class="battle-lobby-close" type="button" aria-label="Close">&times;</button>
+        </div>
+        <div class="battle-lobby-body">
+            <section class="battle-panel">
+                <div class="battle-panel-header">
+                    <span><i class="glyphicon glyphicon-cog"></i> Settings</span>
+                </div>
+                <div class="battle-settings-row"><span>Mode</span><strong id="battleLobbyMode">1 vs 1</strong></div>
+                <div class="battle-settings-row">
+                    <span>Battle Type</span>
+                    <strong>
+                        <button class="btn btn-xs btn-danger battle-type-btn" type="button" data-battle-type="1v1">1v1</button>
+                        <button class="btn btn-xs btn-default battle-type-btn" type="button" data-battle-type="2v2">2v2</button>
+                    </strong>
+                </div>
+                <div class="battle-settings-row"><span>Region</span><strong id="battleLobbyRegion">Oceania</strong></div>
+                <div class="battle-settings-row"><span>Queue</span><strong>~1 minute</strong></div>
+                <div class="battle-settings-row"><span>Status</span><strong id="battleLobbyStatus">Waiting for start</strong></div>
+                <div class="battle-settings-row"><span>Reward</span><strong id="battleLobbyReward">1.5 pt.</strong></div>
+                <div class="battle-settings-row"><span>If defeated</span><strong id="battleLobbyDefeated" class="battle-loss">-0.7 pt.</strong></div>
+            </section>
+            <section class="battle-panel">
+                <div class="battle-panel-header">
+                    <span><i class="glyphicon glyphicon-user"></i> <span id="battleLobbyPlayersTitle">Players 1/2</span></span>
+                </div>
+                <div class="battle-player-list">
+                    <div class="battle-player-row">
+                        <span id="battleLobbyPlayerAvatar" class="battle-player-avatar">A</span>
+                        <span id="battleLobbyPlayerName">admin</span>
+                    </div>
+                </div>
+                <button id="battleCreateStart" type="button" class="btn btn-danger btn-block">Start</button>
+            </section>
+            <section class="battle-panel">
+                <div class="battle-panel-header">
+                    <span><i class="glyphicon glyphicon-comment"></i> Chat</span>
+                </div>
+                <div class="battle-chat-body"></div>
+                <input id="battleLobbyChatInput" class="form-control battle-chat-input" placeholder="Message.."/>
+            </section>
+            <section class="battle-panel">
+                <div class="battle-panel-header">
+                    <span><i class="glyphicon glyphicon-plus"></i> Friends</span>
+                    <label class="battle-friends-toggle"><input id="battleInviteAllCheckbox" type="checkbox" checked> show all invitations</label>
+                </div>
+                <div class="battle-friends-body">
+                    <a id="battleInviteAllLink" href="#" class="battle-invite-link">Send invitation to all players</a>
+                </div>
+            </section>
+        </div>
+    </div>
 </div>
 <div id="communityDropup">
     <a href="#notification" data-route="notification"><span class="dropup-icon glyphicon glyphicon-bell"></span><span>Notifications</span></a>
     <a href="#high-score" data-route="high-score"><span class="dropup-icon glyphicon glyphicon-stats"></span><span>Highscore</span></a>
     <a href="#guild" data-route="guild"><span class="dropup-icon glyphicon glyphicon-tower"></span><span>Guilds</span></a>
+    <a href="#guild" id="communityGuildShortcut" style="display:none;"><span class="dropup-icon"></span><span id="communityGuildShortcutText"></span></a>
 </div>
 <div id="connecting" style="display:none;position:absolute; left:0; right:0; top:0; bottom:0; z-index:100; background-color:rgba(0,0,0,0.5);">
     <div style="width:350px; background-color:#FFFFFF; margin:100px auto; border-radius:15px; padding:5px 15px 5px 15px;">
@@ -1175,6 +2049,12 @@
         var currentUser = null;
         var accountSyncTimer = null;
         var chatAccessErrorTimer = null;
+        var guildsCache = [];
+        var guildRefreshTimer = null;
+        var guildDetailState = null;
+        var guildDetailTab = 'members';
+        var playerProfileState = null;
+        var playerProfileTab = 'profile';
         var cellColors = [
             '#6FCA36',
             '#4379EF',
@@ -1208,6 +2088,17 @@
                     Authorization: 'Bearer ' + localStorage.getItem('authToken')
                 },
                 data: JSON.stringify(data)
+            });
+        }
+
+        function authGet(path) {
+            return $.ajax({
+                url: path,
+                method: 'GET',
+                dataType: 'json',
+                headers: {
+                    Authorization: 'Bearer ' + localStorage.getItem('authToken')
+                }
             });
         }
 
@@ -1284,9 +2175,13 @@
             updateXpBar(user);
             $('#profilePoints').text(Number(user.points || 0).toFixed(2));
             if (user.guild) {
-                $('#profileGuild').text(user.guild);
+                $('#profileGuild').html('<a href="#guild" id="accountGuildDetailLink" class="text-primary">' + escapeHtml(user.guild) + '</a>');
+                $('#communityGuildShortcutText').text(user.guild);
+                $('#communityGuildShortcut').show();
             } else {
                 $('#profileGuild').html('n/A - <a href="#guilds" id="joinGuildLink" class="text-primary">Join Guild</a>');
+                $('#communityGuildShortcut').hide();
+                $('#communityGuildShortcutText').text('');
             }
             $('#profileLastLogin').text(formatProfileDate(user.lastLogin));
 
@@ -1314,6 +2209,8 @@
             $('#loginLink, .account-menu-link').text('Login');
             $('#nick').prop('readonly', false);
             localStorage.removeItem('accountType');
+            $('#communityGuildShortcut').hide();
+            $('#communityGuildShortcutText').text('');
             updateChatAccessControls();
             $('#helloXpPanel').removeClass('is-visible');
             $('#indexXpBar').css('width', '0%');
@@ -1391,13 +2288,14 @@
         window.updateChatAccessControls = updateChatAccessControls;
 
         function closeSpaDialogs() {
+            stopGuildRefresh();
             $('#overlays').removeClass('only-dialog');
             $('#loginDialog').removeClass('login-open');
             $('#registerDialog').removeClass('register-open');
             $('#forgotDialog').removeClass('forgot-open');
             $('#accountDialog').removeClass('account-open');
             $('#uploadSkinDialog').removeClass('upload-open');
-            $('#notificationDialog, #guildDialog, #highScoreDialog, #matchResultDialog').removeClass('spa-open');
+            $('#notificationDialog, #guildDialog, #guildCreateDialog, #highScoreDialog, #playerSearchDialog, #matchResultDialog, #battleCreateDialog').removeClass('spa-open');
             closeCommunityDropup(true);
         }
 
@@ -1421,9 +2319,9 @@
         }
 
         function updateFooterActiveFromVisible() {
-            if ($('#communityDropup').hasClass('is-open') || $('#notificationDialog, #guildDialog, #highScoreDialog').hasClass('spa-open')) {
+            if ($('#communityDropup').hasClass('is-open') || $('#notificationDialog, #guildDialog, #guildCreateDialog, #highScoreDialog, #playerSearchDialog').hasClass('spa-open')) {
                 setFooterActive('community');
-            } else if ($('#matchResultDialog').hasClass('spa-open')) {
+            } else if ($('#matchResultDialog, #battleCreateDialog').hasClass('spa-open')) {
                 setFooterActive('home');
             } else if ($('#loginDialog, #registerDialog, #forgotDialog, #accountDialog, #uploadSkinDialog').filter(function() {
                 return $(this).hasClass('login-open') || $(this).hasClass('register-open') || $(this).hasClass('forgot-open') || $(this).hasClass('account-open') || $(this).hasClass('upload-open');
@@ -1475,7 +2373,9 @@
             var target = {
                 notification: '#notificationDialog',
                 guild: '#guildDialog',
+                'create-guild': '#guildCreateDialog',
                 'high-score': '#highScoreDialog',
+                'player-search': '#playerSearchDialog',
                 'match-result': '#matchResultDialog'
             }[page];
 
@@ -1488,13 +2388,481 @@
             $(target).addClass('spa-open');
             showNavigationOverlay();
             setFooterActive('community');
+            if (page == 'notification') {
+                loadNotifications();
+            } else if (page == 'guild') {
+                showGuildListView();
+                startGuildRefresh();
+            } else if (page == 'high-score') {
+                loadHighscores();
+            }
             return true;
+        }
+
+        function stopGuildRefresh() {
+            if (guildRefreshTimer) {
+                clearInterval(guildRefreshTimer);
+                guildRefreshTimer = null;
+            }
+        }
+
+        function startGuildRefresh() {
+            loadGuilds();
+            stopGuildRefresh();
+            guildRefreshTimer = setInterval(function() {
+                if ($('#guildDialog').hasClass('spa-open')) {
+                    loadGuilds(true);
+                } else {
+                    stopGuildRefresh();
+                }
+            }, 8000);
+        }
+
+        function renderGuilds() {
+            var query = String($('#guildSearch').val() || '').trim().toLowerCase();
+            var list = $('#guildList');
+            var guilds = guildsCache.filter(function(guild) {
+                if (!query) {
+                    return true;
+                }
+                return String(guild.name || '').toLowerCase().indexOf(query) != -1 ||
+                    String(guild.tag || '').toLowerCase().indexOf(query) != -1;
+            });
+
+            list.empty();
+            if (!guilds.length) {
+                $('<div class="guild-empty"></div>')
+                    .text(guildsCache.length ? 'Guild tidak ditemukan.' : 'Belum ada guild.')
+                    .appendTo(list);
+                return;
+            }
+
+            guilds.forEach(function(guild) {
+                var row = $('<div class="guild-row"></div>');
+                var iconWrap = $('<div></div>');
+                var logo = String(guild.logo || '').trim();
+                if (logo) {
+                    $('<img class="guild-icon" alt="">').attr('src', logo).appendTo(iconWrap);
+                } else {
+                    $('<div class="guild-icon guild-icon-fallback"></div>')
+                        .text(String(guild.tag || guild.name || '?').charAt(0).toUpperCase())
+                        .appendTo(iconWrap);
+                }
+
+                $('<div class="guild-name"></div>')
+                    .html(escapeHtml(guild.name || 'Unnamed Guild') + ' <span class="guild-tag">[' + escapeHtml(guild.tag || '-') + ']</span>')
+                    .appendTo(row);
+
+                iconWrap.prependTo(row);
+                $('<div class="guild-members"></div>').text(Number(guild.members || 0)).appendTo(row);
+                $('<div class="guild-status"></div>').text(guild.status || '-').appendTo(row);
+                row.attr('data-guild-tag', guild.tag || '');
+                row.appendTo(list);
+            });
+        }
+
+        function showGuildListView() {
+            guildDetailState = null;
+            $('#guildDetailActions').empty();
+            $('#guildDetailView').removeClass('is-open');
+            $('#guildListView').show();
+        }
+
+        function viewerGuildRole() {
+            return guildDetailState && guildDetailState.viewer ? String(guildDetailState.viewer.role || 'Member') : '';
+        }
+
+        function canViewerKick(member) {
+            var viewer = viewerGuildRole();
+            var role = String(member.role || 'Member');
+            if (guildDetailState && guildDetailState.viewer && guildDetailState.viewer.id == member.id) {
+                return false;
+            }
+            if (viewer == 'Leader') {
+                return role != 'Leader';
+            }
+            return viewer == 'Staff' && role == 'Member';
+        }
+
+        function renderGuildDetail() {
+            var data = guildDetailState || {};
+            var guild = data.guild || {};
+            var members = Array.isArray(data.members) ? data.members : [];
+            $('#guildListView').hide();
+            $('#guildDetailView').addClass('is-open');
+            $('#guildDetailName').text((guild.name || 'Guild') + ' [' + (guild.tag || '-') + ']');
+            $('#guildDetailDescription').text(guild.description || '').toggle(!!guild.description);
+            $('#guildDetailLogoWrap').empty();
+            if (guild.logo) {
+                $('<img class="guild-detail-logo" alt="Guild logo">').attr('src', guild.logo).appendTo('#guildDetailLogoWrap');
+            } else {
+                $('<div class="guild-detail-logo guild-icon-fallback"></div>').text(String(guild.tag || '?').charAt(0)).appendTo('#guildDetailLogoWrap');
+            }
+
+            $('.guild-tab').removeClass('active');
+            $('.guild-tab[data-guild-tab="' + guildDetailTab + '"]').addClass('active');
+            var content = $('#guildDetailContent').empty();
+            var actions = $('#guildDetailActions').empty();
+
+            if (guildDetailTab != 'members') {
+                $('<div class="guild-empty"></div>').text(guildDetailTab == 'info' ? (guild.description || 'No guild info.') : 'No statistics available.').appendTo(content);
+            } else {
+                $('<div class="guild-members-head"><span>#</span><span>Nick</span><span>Level</span><span></span></div>').appendTo(content);
+                members.forEach(function(member, index) {
+                    var row = $('<div class="guild-member-row"></div>').toggleClass('is-leader', member.role == 'Leader');
+                    $('<div class="guild-member-rank"></div>').text(member.role == 'Leader' ? '👑' : (index + 1) + '.').appendTo(row);
+                    $('<div class="guild-member-nick"></div>').text(member.nick || '-').appendTo(row);
+                    $('<div class="guild-member-level"></div>').text(member.level || 1).appendTo(row);
+                    var role = $('<div class="guild-member-role"></div>');
+                    $('<span></span>').text(member.role == 'Leader' ? '👑 Leader' : member.role).appendTo(role);
+                    if (viewerGuildRole() == 'Leader' && member.role != 'Leader' && guildDetailState.viewer && guildDetailState.viewer.id != member.id) {
+                        $('<button type="button" class="guild-member-role-btn"></button>')
+                            .attr('data-user-id', member.id)
+                            .attr('data-role', member.role == 'Staff' ? 'Member' : 'Staff')
+                            .text(member.role == 'Staff' ? 'Demote' : 'Promote')
+                            .appendTo(role);
+                    }
+                    if (canViewerKick(member)) {
+                        $('<button type="button" class="guild-member-action" title="Kick member">🗑️</button>')
+                            .attr('data-user-id', member.id)
+                            .appendTo(role);
+                    }
+                    role.appendTo(row);
+                    row.appendTo(content);
+                });
+            }
+
+            var role = viewerGuildRole();
+            if (role == 'Leader') {
+                $('<button id="guildInviteButton" type="button" class="btn btn-success btn-sm">Invite</button>').appendTo(actions);
+                $('<button id="guildEditButton" type="button" class="btn btn-success btn-sm">Edit</button>').appendTo(actions);
+                $('<button id="guildDeleteButton" type="button" class="btn btn-danger btn-sm">Delete</button>').appendTo(actions);
+            } else if (role == 'Staff') {
+                $('<button id="guildInviteButton" type="button" class="btn btn-success btn-sm">Invite</button>').appendTo(actions);
+                $('<button id="guildLeaveButton" type="button" class="btn btn-default btn-sm">Leave</button>').appendTo(actions);
+            } else if (role == 'Member') {
+                $('<button id="guildLeaveButton" type="button" class="btn btn-default btn-sm">Leave</button>').appendTo(actions);
+            } else if (guildDetailState && guildDetailState.canJoin) {
+                $('<button id="guildJoinButton" type="button" class="btn btn-success btn-sm">Join</button>').appendTo(actions);
+            }
+        }
+
+        function loadGuildDetail(tag) {
+            $('#guildDetailContent').html('<div class="guild-empty">Loading guild...</div>');
+            authGet('/api/guild/detail?tag=' + encodeURIComponent(tag))
+                .done(function(result) {
+                    guildDetailState = result;
+                    guildDetailTab = 'members';
+                    renderGuildDetail();
+                })
+                .fail(function() {
+                    $('#guildDetailContent').html('<div class="guild-empty">Gagal memuat guild.</div>');
+                });
+        }
+
+        function openCurrentUserGuildDetail() {
+            if (!currentUser || !currentUser.guild) {
+                window.location.hash = 'guild';
+                openSpaPage('guild');
+                return;
+            }
+
+            window.location.hash = 'guild';
+            openSpaPage('guild');
+            loadGuildDetail(currentUser.guild);
+        }
+
+        function renderNotifications(rows) {
+            var list = $('#notificationList').empty();
+            rows = Array.isArray(rows) ? rows : [];
+            if (!rows.length) {
+                $('<div class="guild-empty"></div>').text('Belum ada notifikasi baru.').appendTo(list);
+                return;
+            }
+
+            rows.forEach(function(item) {
+                var row = $('<div class="notification-item"></div>');
+                $('<div></div>').text('You have been invited to join guild [' + item.guild + '] ' + (item.guildName || '') + '.').appendTo(row);
+                $('<a href="#guild" class="notification-action text-primary">Open guild detail</a>')
+                    .attr('data-guild-tag', item.guild)
+                    .appendTo(row);
+                row.appendTo(list);
+            });
+        }
+
+        function loadNotifications() {
+            $('#notificationList').html('<div class="guild-empty">Loading notifications...</div>');
+            authGet('/api/notifications')
+                .done(function(result) {
+                    renderNotifications(result.notifications || []);
+                })
+                .fail(function() {
+                    $('#notificationList').html('<div class="guild-empty">Gagal memuat notifikasi.</div>');
+                });
+        }
+
+        function loadGuilds(silent) {
+            if (!silent) {
+                $('#guildList').html('<div class="guild-empty">Loading guilds...</div>');
+            }
+
+            authGet('/api/guilds')
+                .done(function(result) {
+                    guildsCache = Array.isArray(result.guilds) ? result.guilds : [];
+                    renderGuilds();
+                })
+                .fail(function() {
+                    if (!silent) {
+                        $('#guildList').html('<div class="guild-empty">Gagal memuat guild.</div>');
+                    }
+                });
+        }
+
+        function formatHighscoreTime(value) {
+            var totalSeconds = Math.max(0, Math.floor(Number(value || 0)));
+            var hours = Math.floor(totalSeconds / 3600);
+            var minutes = Math.floor((totalSeconds % 3600) / 60);
+            var seconds = totalSeconds % 60;
+
+            if (hours > 0) {
+                return hours + 'h' + (minutes ? ' ' + minutes + 'm' : '');
+            }
+
+            if (minutes > 0) {
+                return minutes + 'm';
+            }
+
+            return seconds + 's';
+        }
+
+        function getHighscoreRankLabel(rank) {
+            if (rank == 1) {
+                return '<span class="highscore-trophy-gold" title="Rank 1">🏆</span>';
+            }
+
+            if (rank == 2) {
+                return '<span class="highscore-trophy-silver" title="Rank 2">🥈</span>';
+            }
+
+            if (rank == 3) {
+                return '<span class="highscore-trophy-bronze" title="Rank 3">🥉</span>';
+            }
+
+            return String(rank);
+        }
+
+        function renderHighscores(rows) {
+            var list = $('#highScoreList');
+            rows = Array.isArray(rows) ? rows : [];
+            list.empty();
+
+            if (!rows.length) {
+                $('<div class="highscore-empty"></div>').text('Belum ada data highscore.').appendTo(list);
+                return;
+            }
+
+            rows.forEach(function(row, index) {
+                var rank = index + 1;
+                var item = $('<div class="highscore-row"></div>');
+                $('<div class="highscore-rank"></div>').html(getHighscoreRankLabel(rank)).appendTo(item);
+                $('<a class="highscore-player" href="#player-profile"></a>')
+                    .attr('data-player-id', row.playerId || '')
+                    .text(row.playerName || 'Unknown')
+                    .appendTo(item);
+                $('<div class="highscore-time"></div>')
+                    .text(formatHighscoreTime(row.top1Time))
+                    .appendTo(item);
+                item.appendTo(list);
+            });
+        }
+
+        function loadHighscores() {
+            var mode = $('#highScoreMode').val() || 'ffa';
+            var region = $('#highScoreRegion').val() || 'global';
+            $('#highScoreList').html('<div class="highscore-empty">Loading highscore...</div>');
+
+            authGet('/api/highscores?mode=' + encodeURIComponent(mode) + '&region=' + encodeURIComponent(region))
+                .done(function(result) {
+                    renderHighscores(result.highscores || []);
+                })
+                .fail(function() {
+                    $('#highScoreList').html('<div class="highscore-empty">Gagal memuat highscore.</div>');
+                });
+        }
+
+        function formatRelativeTime(value) {
+            if (!value) {
+                return '-';
+            }
+
+            var time = new Date(value).getTime();
+            if (!isFinite(time)) {
+                return '-';
+            }
+
+            var diff = Math.max(0, Date.now() - time);
+            var minute = 60000;
+            var hour = minute * 60;
+            var day = hour * 24;
+            if (diff >= day) {
+                var days = Math.floor(diff / day);
+                return days + ' day' + (days == 1 ? '' : 's') + ' ago';
+            }
+            if (diff >= hour) {
+                return Math.floor(diff / hour) + 'h ago';
+            }
+            if (diff >= minute) {
+                return Math.floor(diff / minute) + 'm ago';
+            }
+            return 'just now';
+        }
+
+        function renderPlayerProfileTab() {
+            var content = $('#playerProfileContent');
+            var data = playerProfileState;
+            content.empty();
+
+            if (!data || !data.player) {
+                $('<div class="player-empty"></div>').text('Search player.').appendTo(content);
+                return;
+            }
+
+            var player = data.player;
+            $('#playerProfileCrumb').text(player.name || 'Player');
+            $('.player-tab').removeClass('active');
+            $('.player-tab[data-player-tab="' + playerProfileTab + '"]').addClass('active');
+
+            if (playerProfileTab == 'profile') {
+                [
+                    ['Name:', player.name || '-'],
+                    ['Level:', player.level || 1],
+                    ['Points:', Number(player.points || 0).toFixed(2)],
+                    ['Guild:', player.guild || '-'],
+                    ['Game:', formatRelativeTime(player.game)],
+                    ['Status:', player.status || 'Free']
+                ].forEach(function(row) {
+                    var item = $('<div class="player-profile-row"></div>');
+                    $('<div class="player-profile-label"></div>').text(row[0]).appendTo(item);
+                    var value = $('<div class="player-profile-value"></div>').text(row[1]);
+                    if (row[0] == 'Status:' && String(row[1]).toLowerCase() == 'premium') {
+                        value.addClass('player-profile-premium');
+                    }
+                    value.appendTo(item);
+                    item.appendTo(content);
+                });
+
+                var skins = $('<div class="player-skins"></div>');
+                if (player.guildSkinUrl) {
+                    $('<img class="player-avatar" alt="Guild skin">').attr('src', player.guildSkinUrl).appendTo(skins);
+                }
+                if (player.playerSkinUrl) {
+                    $('<img class="player-avatar" alt="Player skin">').attr('src', player.playerSkinUrl).appendTo(skins);
+                }
+                if (skins.children().length) {
+                    skins.appendTo(content);
+                }
+                return;
+            }
+
+            var rows = playerProfileTab == 'top1' ? data.top1 :
+                (playerProfileTab == 'battle2v2' ? data.battle2v2 : data.battle1v1);
+
+            rows = Array.isArray(rows) ? rows : [];
+            if (!rows.length) {
+                $('<div class="player-empty"></div>').text('No matches found.').appendTo(content);
+                return;
+            }
+
+            rows.forEach(function(row) {
+                var item = $('<div class="player-history-row"></div>');
+                $('<div class="player-history-age"></div>').text(formatRelativeTime(row.createdAt)).appendTo(item);
+                $('<div class="player-history-server"></div>').text(row.server || '-').appendTo(item);
+                $('<div class="player-history-time"></div>')
+                    .text(playerProfileTab == 'top1' ? formatHighscoreTime(row.top1Time) : (row.result || formatHighscoreTime(row.duration)))
+                    .appendTo(item);
+                item.appendTo(content);
+            });
+        }
+
+        function searchPlayerProfile(name) {
+            name = String(name || '').trim();
+            var content = $('#playerProfileContent');
+
+            if (!name) {
+                content.html('<div class="player-empty">Search player.</div>');
+                return;
+            }
+
+            playerProfileTab = 'profile';
+            $('#playerProfileCrumb').text(name);
+            content.html('<div class="player-empty">Loading player...</div>');
+            authGet('/api/player-profile?name=' + encodeURIComponent(name))
+                .done(function(result) {
+                    playerProfileState = result.profile || null;
+                    $('#playerSearchInput').val(playerProfileState && playerProfileState.player ? playerProfileState.player.name : name);
+                    renderPlayerProfileTab();
+                })
+                .fail(function(xhr) {
+                    playerProfileState = null;
+                    $('#playerProfileCrumb').text(name);
+                    $('.player-tab').removeClass('active');
+                    $('.player-tab[data-player-tab="profile"]').addClass('active');
+                    var error = xhr && xhr.responseJSON && xhr.responseJSON.error ? xhr.responseJSON.error : 'Player not found.';
+                    content.html('<div class="player-empty">' + escapeHtml(error) + '</div>');
+                });
+        }
+
+        function escapeHtml(value) {
+            return String(value == null ? '' : value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function getGuildSkinFile() {
+            var input = $('#guildCreateLogo')[0];
+            return input && input.files && input.files[0] ? input.files[0] : null;
+        }
+
+        function isValidGuildSkinFile(file) {
+            return !getGuildSkinError(file);
+        }
+
+        function getGuildSkinError(file) {
+            if (!file) {
+                return '';
+            }
+
+            if (!/^image\/png$/i.test(file.type || '')) {
+                return 'Guild skin must be a PNG file.';
+            }
+
+            if (file.size > 200 * 1024) {
+                return 'Guild skin size must not exceed 200 KB.';
+            }
+
+            return '';
+        }
+
+        function uploadCreatedGuildSkin(file) {
+            if (!file) {
+                return $.Deferred().resolve({ user: currentUser }).promise();
+            }
+
+            var formData = new FormData();
+            formData.append('skin', file);
+            return authUpload('/api/guild/upload-skin', formData);
         }
 
         function routeSpaHash() {
             var route = String(window.location.hash || '').replace(/^#/, '');
 
-            if (route == 'notification' || route == 'guild' || route == 'high-score' || route == 'match-result') {
+            if (route == 'notification' || route == 'guild' || route == 'guilds' || route == 'create-guild' || route == 'high-score' || route == 'player-search' || route == 'match-result') {
+                if (route == 'guilds') {
+                    route = 'guild';
+                }
                 openSpaPage(route);
             }
         }
@@ -1724,6 +3092,10 @@
             if (window.location.hash != '#home') {
                 window.location.hash = '#home';
             }
+            showEscHelloDialog();
+        }
+
+        function showEscHelloDialog() {
             closeSpaDialogs();
             $('#loginStatus, #registerStatus, #forgotStatus').hide();
             showNavigationOverlay();
@@ -1732,20 +3104,229 @@
             setFooterActive('home');
         }
 
-        function playOrResumeGame() {
-            var nick = $('#nick').val();
-            localStorage.setItem('nick', nick);
+        window.showHomeDialog = showHomeDialog;
+        window.showEscHelloDialog = showEscHelloDialog;
+        window.showBattleHomeFromGame = function() {
+            $('#gamemode').val(':tournament');
+            syncModeButtons(getSelectedTournamentMode());
+            showHomeDialog();
+        };
 
-            if (window.resumeGameSession && window.resumeGameSession()) {
+        function getSelectedFfaVariant() {
+            return $('.mode-btn.active').attr('data-mode') || '';
+        }
+
+        function getSelectedTournamentMode() {
+            return $('.tournament-btn.active').attr('data-tournament') || '1v1';
+        }
+
+        function getFfaGameMode() {
+            var ffaVariant = getSelectedFfaVariant();
+
+            if (ffaVariant == 'hc') {
+                return ':hardcore';
+            }
+
+            if (ffaVariant == 'ms') {
+                return ':x5';
+            }
+
+            return '';
+        }
+
+        function getSelectedGameMode() {
+            return $('#gamemode').val() == '' ? getFfaGameMode() : $('#gamemode').val();
+        }
+
+        function canResumeSelectedMode(selectedGameMode) {
+            if (!window.getCurrentGameMode) {
+                return false;
+            }
+
+            return window.getCurrentGameMode() == selectedGameMode;
+        }
+
+        function setPlayButtonMode(mode) {
+            $('#playBtn')
+                .toggleClass('play-battle', mode == 'battle')
+                .toggleClass('play-ffa', mode != 'battle');
+        }
+
+        function getBattleCreatorName() {
+            var name = currentUser && currentUser.username ? currentUser.username : $('#nick').val();
+            return $.trim(name || '') || 'Player';
+        }
+
+        function getSelectedRegionLabel() {
+            var selected = $('#region option:selected');
+            return $.trim(selected.text() || selected.val() || 'Oceania').replace(/\s*\(\d+\s+players\)\s*$/i, '');
+        }
+
+        function requireLoginForBattle() {
+            if (currentUser) {
+                return true;
+            }
+
+            var nick = $.trim($('#nick').val() || '');
+            closeSpaDialogs();
+            $('#helloDialog').hide();
+            showNavigationOverlay();
+            $('#loginDialog').addClass('login-open');
+            $('#loginName').val(nick);
+            $('#loginStatus')
+                .removeClass('text-success')
+                .addClass('text-danger')
+                .text('Battle hanya untuk player yang sudah login.')
+                .show();
+            setFooterActive('account');
+            $('#loginName').focus();
+            return false;
+        }
+
+        function showBattleCreateDialog(tournamentMode) {
+            if (!requireLoginForBattle()) {
                 return;
             }
 
-            setNick(nick);
+            tournamentMode = tournamentMode || '1v1';
+            var isTwoVsTwo = tournamentMode == '2v2';
+            var creatorName = getBattleCreatorName();
+            var maxPlayers = isTwoVsTwo ? 4 : 2;
+
+            closeSpaDialogs();
+            $('#helloDialog').hide();
+            $('#battleLobbyMode').text(isTwoVsTwo ? '2 vs 2' : '1 vs 1');
+            $('#battleLobbyRegion').text(getSelectedRegionLabel());
+            $('#battleLobbyPlayersTitle').text('Players 1/' + maxPlayers);
+            $('#battleLobbyPlayerName').text(creatorName);
+            $('#battleLobbyPlayerAvatar').text(creatorName.charAt(0).toUpperCase());
+            $('#battleLobbyReward').text(isTwoVsTwo ? '3 pt.' : '1.5 pt.');
+            $('#battleLobbyDefeated').text(isTwoVsTwo ? '-1.4 pt.' : '-0.7 pt.');
+            $('#battleLobbyStatus').text('Waiting for start');
+            $('#battleCreateStart').prop('disabled', false);
+            $('#battleCreateStart').data('tournament', tournamentMode);
+            $('.battle-type-btn').removeClass('btn-danger').addClass('btn-default');
+            $('.battle-type-btn[data-battle-type="' + tournamentMode + '"]').removeClass('btn-default').addClass('btn-danger');
+            console.log("[SHOW_BATTLE_LOBBY]");
+            console.log("[BATTLE_LOBBY_STATE]", 'idle', tournamentMode);
+            showNavigationOverlay();
+            $('#battleCreateDialog').addClass('spa-open');
+            setFooterActive('home');
+        }
+
+        function playOrResumeGame() {
+            var nick = $('#nick').val();
+            var selectedGameMode = getSelectedGameMode();
+            localStorage.setItem('nick', nick);
+            console.log("[PLAY_CLICK]", selectedGameMode);
+
+            if (selectedGameMode == ':tournament') {
+                if (!requireLoginForBattle()) {
+                    return;
+                }
+                var tournamentMode = getSelectedTournamentMode();
+                showBattleCreateDialog(tournamentMode);
+                return;
+            }
+
+            if (window.resumeGameSession && canResumeSelectedMode(selectedGameMode) && window.resumeGameSession()) {
+                return;
+            }
+
+            if (window.startGameInMode) {
+                window.startGameInMode(selectedGameMode, nick);
+            } else {
+                setGameMode(selectedGameMode);
+                setNick(nick);
+            }
         }
 
         $('#playBtn').on('click', function(e) {
             e.preventDefault();
             playOrResumeGame();
+        });
+        function syncModeButtons(selectedMode, resetSelection) {
+            var gameMode = $('#gamemode').val();
+            var isFfaMode = gameMode == '';
+            var isBattleMode = gameMode == ':tournament';
+            $('.mode-btn').removeClass('active');
+            $('.tournament-btn').removeClass('active');
+            $('#mode-buttons').toggle(isFfaMode);
+            $('#tournament-buttons').toggle(isBattleMode);
+
+            if (isFfaMode) {
+                setPlayButtonMode('ffa');
+                if (!resetSelection && selectedMode) {
+                    $('.mode-btn[data-mode="' + selectedMode + '"]').addClass('active');
+                    localStorage.setItem('ffaModeVariant', selectedMode);
+                } else {
+                    localStorage.removeItem('ffaModeVariant');
+                }
+                localStorage.removeItem('tournamentMode');
+                return;
+            }
+
+            if (isBattleMode) {
+                setPlayButtonMode('battle');
+                selectedMode = resetSelection ? '1v1' : selectedMode || '1v1';
+                $('.tournament-btn[data-tournament="' + selectedMode + '"]').addClass('active');
+                localStorage.setItem('tournamentMode', selectedMode);
+                localStorage.removeItem('ffaModeVariant');
+                return;
+            }
+
+            setPlayButtonMode('ffa');
+            localStorage.removeItem('ffaModeVariant');
+            localStorage.removeItem('tournamentMode');
+        }
+        $('.mode-btn').on('click', function(e) {
+            e.preventDefault();
+            $('#gamemode').val('');
+            syncModeButtons($(this).attr('data-mode') || 'hc');
+        });
+        $('.tournament-btn').on('click', function(e) {
+            e.preventDefault();
+            var tournamentMode = $(this).attr('data-tournament') || '1v1';
+            $('#gamemode').val(':tournament');
+            syncModeButtons(tournamentMode);
+        });
+        $('.battle-type-btn').on('click', function(e) {
+            e.preventDefault();
+            var tournamentMode = $(this).attr('data-battle-type') || '1v1';
+            localStorage.setItem('tournamentMode', tournamentMode);
+            $('#battleCreateStart').data('tournament', tournamentMode);
+            showBattleCreateDialog(tournamentMode);
+        });
+        $('#gamemode').on('change', function() {
+            syncModeButtons(null, true);
+        });
+        syncModeButtons(null, true);
+        $('#battleCreateStart').on('click', function(e) {
+            e.preventDefault();
+            if (!requireLoginForBattle()) {
+                return;
+            }
+            var nick = $('#nick').val();
+            localStorage.setItem('nick', nick);
+            var tournamentMode = $('#battleCreateStart').data('tournament') || getSelectedTournamentMode();
+            console.log("[BATTLE_START_CLICK]", tournamentMode);
+            $('#battleLobbyStatus').text('Waiting for Players...');
+            $('#battleLobbyPlayersTitle').text(tournamentMode == '2v2' ? 'Players 1/4' : 'Players 1/2');
+            $('#battleCreateStart').prop('disabled', true);
+            console.log("[BATTLE_LOBBY_STATE]", 'finding', tournamentMode);
+            if (window.joinBattleQueue) {
+                window.joinBattleQueue(tournamentMode, nick);
+            } else {
+                setGameMode(':tournament');
+                setNick(nick);
+            }
+        });
+        $('#battleCreateClose').on('click', function(e) {
+            e.preventDefault();
+            showHomeDialog();
+        });
+        $('#battleInviteAllLink').on('click', function(e) {
+            e.preventDefault();
         });
         $('#matchResultBack').on('click', function(e) {
             e.preventDefault();
@@ -1787,10 +3368,283 @@
         $('#communityDropup').on('click', 'a', function(e) {
             e.preventDefault();
             e.stopPropagation();
+            if ($(this).attr('id') == 'communityGuildShortcut') {
+                closeCommunityDropup();
+                openCurrentUserGuildDetail();
+                return;
+            }
             var route = $(this).attr('data-route');
             closeCommunityDropup();
             window.location.hash = route;
             openSpaPage(route);
+        });
+        $('#guildSearch').on('input', function() {
+            renderGuilds();
+        });
+        $('#guildList').on('click', '.guild-row', function() {
+            var tag = $(this).attr('data-guild-tag');
+            if (tag) {
+                loadGuildDetail(tag);
+            }
+        });
+        $('#guildDetailBack').on('click', function(e) {
+            e.preventDefault();
+            showGuildListView();
+        });
+        $('.guild-tab').on('click', function(e) {
+            e.preventDefault();
+            guildDetailTab = $(this).attr('data-guild-tab') || 'members';
+            renderGuildDetail();
+        });
+        $('#guildDetailContent').on('click', '.guild-member-action', function(e) {
+            e.preventDefault();
+            if (!confirm('Are you sure you want to remove this player from the guild?')) {
+                return;
+            }
+            authPost('/api/guild/member/kick', { userId: $(this).attr('data-user-id') })
+                .done(function(result) {
+                    if (guildDetailState) {
+                        guildDetailState.members = result.members || [];
+                        renderGuildDetail();
+                    }
+                    loadGuilds(true);
+                });
+        });
+        $('#guildDetailContent').on('click', '.guild-member-role-btn', function(e) {
+            e.preventDefault();
+            authPost('/api/guild/member/role', {
+                userId: $(this).attr('data-user-id'),
+                role: $(this).attr('data-role')
+            }).done(function(result) {
+                if (guildDetailState) {
+                    guildDetailState.members = result.members || [];
+                    renderGuildDetail();
+                }
+            });
+        });
+        $('#guildDetailActions').on('click', '#guildLeaveButton', function(e) {
+            e.preventDefault();
+            if (!confirm('Are you sure you want to leave this guild?')) {
+                return;
+            }
+            authPost('/api/guild/leave', {})
+                .done(function(result) {
+                    if (result.user) {
+                        applyLoggedInUser(result.user);
+                        if (window.refreshAccountSkin) {
+                            window.refreshAccountSkin();
+                        }
+                    }
+                    showGuildListView();
+                    loadGuilds();
+                })
+                .fail(function(xhr) {
+                    alert((xhr.responseJSON && xhr.responseJSON.error) || 'Leave guild gagal.');
+                });
+        });
+        $('#guildDetailActions').on('click', '#guildEditButton', function(e) {
+            e.preventDefault();
+            var currentDescription = guildDetailState && guildDetailState.guild ? guildDetailState.guild.description || '' : '';
+            var description = prompt('Guild description:', currentDescription);
+            if (description === null) {
+                return;
+            }
+            authPost('/api/guild/edit', { description: String(description || '').trim() })
+                .done(function(result) {
+                    if (guildDetailState && guildDetailState.guild) {
+                        guildDetailState.guild.description = result.description || '';
+                    }
+                    renderGuildDetail();
+                    loadGuilds(true);
+                    if (result.user) {
+                        applyLoggedInUser(result.user);
+                    }
+                })
+                .fail(function(xhr) {
+                    alert((xhr.responseJSON && xhr.responseJSON.error) || 'Edit guild gagal.');
+                });
+        });
+        $('#guildDetailActions').on('click', '#guildDeleteButton', function(e) {
+            e.preventDefault();
+            if (!confirm('Are you sure you want to delete this guild?')) {
+                return;
+            }
+            authPost('/api/guild/delete', {})
+                .done(function(result) {
+                    if (result.user) {
+                        applyLoggedInUser(result.user);
+                        if (window.refreshAccountSkin) {
+                            window.refreshAccountSkin();
+                        }
+                    }
+                    showGuildListView();
+                    loadGuilds();
+                    loadNotifications();
+                })
+                .fail(function(xhr) {
+                    alert((xhr.responseJSON && xhr.responseJSON.error) || 'Delete guild gagal.');
+                });
+        });
+        $('#guildDetailActions').on('click', '#guildInviteButton', function(e) {
+            e.preventDefault();
+            var playerName = prompt('Player name to invite:');
+            if (playerName === null) {
+                return;
+            }
+            playerName = String(playerName || '').trim();
+            if (!playerName) {
+                return;
+            }
+            authPost('/api/guild/invite', { playerName: playerName })
+                .done(function(result) {
+                    alert(result.message || 'Invite berhasil dikirim.');
+                })
+                .fail(function(xhr) {
+                    alert((xhr.responseJSON && xhr.responseJSON.error) || 'Invite gagal.');
+                });
+        });
+        $('#guildDetailActions').on('click', '#guildJoinButton', function(e) {
+            e.preventDefault();
+            var tag = guildDetailState && guildDetailState.guild ? guildDetailState.guild.tag : '';
+            authPost('/api/guild/join', { guild: tag })
+                .done(function(result) {
+                    if (result.user) {
+                        applyLoggedInUser(result.user);
+                        if (window.refreshAccountSkin) {
+                            window.refreshAccountSkin();
+                        }
+                    }
+                    loadGuildDetail(tag);
+                    loadNotifications();
+                })
+                .fail(function(xhr) {
+                    alert((xhr.responseJSON && xhr.responseJSON.error) || 'Join guild gagal.');
+                });
+        });
+        $('#notificationList').on('click', '.notification-action', function(e) {
+            e.preventDefault();
+            var tag = $(this).attr('data-guild-tag');
+            window.location.hash = 'guild';
+            openSpaPage('guild');
+            loadGuildDetail(tag);
+        });
+        $('#highScoreMode, #highScoreRegion').on('change', function() {
+            loadHighscores();
+        });
+        $('#highScoreList').on('click', '.highscore-player', function(e) {
+            e.preventDefault();
+            window.location.hash = 'player-search';
+            openSpaPage('player-search');
+            searchPlayerProfile($(this).text());
+        });
+        $('.player-tab').on('click', function(e) {
+            e.preventDefault();
+            playerProfileTab = $(this).attr('data-player-tab') || 'profile';
+            renderPlayerProfileTab();
+        });
+        $('#playerSearchForm').on('submit', function(e) {
+            e.preventDefault();
+            searchPlayerProfile($('#playerSearchInput').val());
+        });
+        $('#guildCreateLink').on('click', function(e) {
+            e.preventDefault();
+            window.location.hash = 'create-guild';
+            openSpaPage('create-guild');
+        });
+        $('#guildCreateClose').on('click', function(e) {
+            e.preventDefault();
+            window.location.hash = 'guild';
+            openSpaPage('guild');
+        });
+        $('#guildCreateLogo').on('change', function() {
+            var status = $('#guildCreateStatus');
+            var file = getGuildSkinFile();
+            var error = getGuildSkinError(file);
+            if (error) {
+                status.removeClass('text-success').addClass('text-danger').text(error).show();
+                return;
+            }
+
+            status.hide();
+        });
+        $('#guildCreateForm').on('submit', function(e) {
+            e.preventDefault();
+            var status = $('#guildCreateStatus');
+            var name = String($('#guildCreateName').val() || '').trim();
+            var tag = String($('#guildCreateTag').val() || '').trim().toUpperCase();
+            var type = String($('#guildCreateType').val() || '').trim();
+            var file = getGuildSkinFile();
+
+            if (!currentUser) {
+                status.removeClass('text-success').addClass('text-danger').text('Login dulu untuk membuat guild.').show();
+                return;
+            }
+
+            if (!tag) {
+                status.removeClass('text-success').addClass('text-danger').text('Prefix wajib diisi.').show();
+                return;
+            }
+
+            if (!/^[A-Z0-9]{1,4}$/.test(tag)) {
+                status.removeClass('text-success').addClass('text-danger').text('Prefix guild wajib A-Z atau 0-9, maksimal 4 karakter, tanpa spasi atau emoji.').show();
+                return;
+            }
+
+            if (!name) {
+                status.removeClass('text-success').addClass('text-danger').text('Guild name wajib diisi.').show();
+                return;
+            }
+
+            if (!type) {
+                status.removeClass('text-success').addClass('text-danger').text('Type wajib dipilih.').show();
+                return;
+            }
+
+            var skinError = getGuildSkinError(file);
+            if (skinError) {
+                status.removeClass('text-success').addClass('text-danger').text(skinError).show();
+                return;
+            }
+
+            status.removeClass('text-danger').addClass('text-success').text('Membuat guild...').show();
+            $('#guildCreateSubmit').prop('disabled', true);
+
+            authPost('/api/guild/create', {
+                guild: tag,
+                name: name,
+                tag: tag,
+                type: type
+            })
+                .done(function(result) {
+                    applyLoggedInUser(result.user);
+                    if (window.refreshAccountSkin) {
+                        window.refreshAccountSkin();
+                    }
+                    status.removeClass('text-danger').addClass('text-success').text(file ? 'Mengupload skin guild...' : 'Guild berhasil dibuat.').show();
+                    uploadCreatedGuildSkin(file)
+                        .done(function(uploadResult) {
+                            if (uploadResult && uploadResult.user) {
+                                applyLoggedInUser(uploadResult.user);
+                                if (window.refreshAccountSkin) {
+                                    window.refreshAccountSkin();
+                                }
+                            }
+                            $('#guildCreateForm')[0].reset();
+                            guildsCache = [];
+                            window.location.hash = 'guild';
+                            openSpaPage('guild');
+                        })
+                        .fail(function(xhr) {
+                            showAuthError(status, xhr, 'Upload skin guild gagal.');
+                        })
+                        .always(function() {
+                            $('#guildCreateSubmit').prop('disabled', false);
+                        });
+                })
+                .fail(function(xhr) {
+                    showAuthError(status, xhr, 'Membuat guild gagal.');
+                    $('#guildCreateSubmit').prop('disabled', false);
+                });
         });
         $(document).on('click', function(e) {
             if (!$(e.target).closest('#communityDropup, .community-menu-link').length) {
@@ -1825,22 +3679,12 @@
         });
         $('#accountDialog').on('click', '#joinGuildLink', function(e) {
             e.preventDefault();
-            var guild = prompt('Nama guild baru (2-12 karakter A-Z 0-9). Membutuhkan 50 point:');
-            if (guild === null) {
-                return;
-            }
-
-            var status = $('#uploadSkinStatus');
-            status.removeClass('text-danger').addClass('text-success').text('Membuat guild...').show();
-
-            authPost('/api/guild/create', { guild: guild })
-                .done(function(result) {
-                    applyLoggedInUser(result.user);
-                    status.removeClass('text-danger').addClass('text-success').text(result.message || 'Guild berhasil dibuat.').show();
-                })
-                .fail(function(xhr) {
-                    showAuthError(status, xhr, 'Membuat guild gagal.');
-                });
+            window.location.hash = 'guild';
+            openSpaPage('guild');
+        });
+        $('#accountDialog').on('click', '#accountGuildDetailLink', function(e) {
+            e.preventDefault();
+            openCurrentUserGuildDetail();
         });
         $('#profileCellColor').on('click', function(e) {
             e.preventDefault();
@@ -1909,8 +3753,13 @@
                 return;
             }
 
-            if (!/^image\/(png|jpeg|jpg|webp)$/i.test(file.type)) {
-                status.removeClass('text-muted text-success').addClass('text-danger').text('Format harus PNG, JPG, atau WEBP.').show();
+            if (!/^image\/png$/i.test(file.type || '')) {
+                status.removeClass('text-muted text-success').addClass('text-danger').text('Player skin must be a PNG file.').show();
+                return;
+            }
+
+            if (file.size > 500 * 1024) {
+                status.removeClass('text-muted text-success').addClass('text-danger').text('Player skin size must not exceed 500 KB.').show();
                 return;
             }
 
@@ -1927,6 +3776,16 @@
 
             if (!file) {
                 status.removeClass('text-muted text-success').addClass('text-danger').text('Pilih file skin dulu.').show();
+                return;
+            }
+
+            if (!/^image\/png$/i.test(file.type || '')) {
+                status.removeClass('text-muted text-success').addClass('text-danger').text('Player skin must be a PNG file.').show();
+                return;
+            }
+
+            if (file.size > 500 * 1024) {
+                status.removeClass('text-muted text-success').addClass('text-danger').text('Player skin size must not exceed 500 KB.').show();
                 return;
             }
 

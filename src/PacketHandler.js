@@ -56,6 +56,45 @@ PacketHandler.prototype.handleMessage = function(message) {
 
             this.setCellColor(color);
             break;
+        case 103:
+            var battleMode = "";
+            for (var i = 1; i < view.byteLength; i += 2) {
+                var charCode = view.getUint16(i, true);
+                if (charCode == 0) {
+                    break;
+                }
+
+                battleMode += String.fromCharCode(charCode);
+            }
+
+            this.setBattleMode(battleMode);
+            break;
+        case 104:
+            var mode = "";
+            for (var i = 1; i < view.byteLength; i += 2) {
+                var charCode = view.getUint16(i, true);
+                if (charCode == 0) {
+                    break;
+                }
+
+                mode += String.fromCharCode(charCode);
+            }
+
+            this.joinMode(mode);
+            break;
+        case 105:
+            var queueMode = "";
+            for (var i = 1; i < view.byteLength; i += 2) {
+                var charCode = view.getUint16(i, true);
+                if (charCode == 0) {
+                    break;
+                }
+
+                queueMode += String.fromCharCode(charCode);
+            }
+
+            this.joinBattleQueue(queueMode);
+            break;
         case 0:
             // Set Nickname
             var nick = "";
@@ -277,6 +316,7 @@ PacketHandler.prototype.setAuthToken = function(token) {
         client.authUserId = null;
         client.authUsername = null;
         client.accountType = 'Guest';
+        client.guildTag = '';
         client.skinUrl = null;
         return;
     }
@@ -290,6 +330,7 @@ PacketHandler.prototype.setAuthToken = function(token) {
             client.authUserId = user.id;
             client.authUsername = user.username;
             client.accountType = user.accountType || 'Free';
+            client.guildTag = user.guild || '';
             client.skinUrl = user.skinUrl || user.guildSkinUrl || null;
             client.lastPassiveXpTime = Date.now();
             this.applyCellColor(Auth.normalizeCellColor(user.cellColor));
@@ -314,17 +355,61 @@ PacketHandler.prototype.setCellColor = function(color) {
     this.applyCellColor(color);
 }
 
+PacketHandler.prototype.setBattleMode = function(mode) {
+    var client = this.socket.playerTracker;
+    mode = String(mode || '').trim().toLowerCase();
+
+    if (!client) {
+        return;
+    }
+
+    client.battleMode = mode == '2v2' ? '2v2' : '1v1';
+}
+
+PacketHandler.prototype.joinMode = function(mode) {
+    if (!this.gameServer || !this.gameServer.joinClientToMode) {
+        return;
+    }
+
+    this.gameServer.joinClientToMode(mode, this.socket);
+}
+
+PacketHandler.prototype.joinBattleQueue = function(mode) {
+    if (!this.gameServer || !this.gameServer.joinBattleQueue) {
+        return;
+    }
+
+    this.gameServer.joinBattleQueue(this.socket, mode);
+}
+
 PacketHandler.prototype.setNickname = function(newNick) {
     var client = this.socket.playerTracker;
+    var activeServer = client && client.gameServer ? client.gameServer : this.gameServer;
     client.setName(newNick);
 
+    if (client.battleState == 'finding' || client.battleState == 'preparing') {
+        client.spectate = false;
+        return;
+    }
+
+    var roomName = activeServer.roomName || '';
     if (client.cells.length < 1) {
         var spawn = function() {
             if (client.cells.length < 1) {
-                this.gameServer.spawnPlayer(client);
+                if (activeServer.gameMode && activeServer.gameMode.name == 'Tournament' && roomName.indexOf('Battle') === 0) {
+                    if (roomName.indexOf('BattleMatch-') !== 0 || client.battleState != 'in_match') {
+                        return;
+                    }
+
+                    activeServer.gameMode.onPlayerSpawn(activeServer, client);
+                    client.spectate = false;
+                    return;
+                }
+
+                activeServer.spawnPlayer(client);
                 client.spectate = false;
             }
-        }.bind(this);
+        };
 
         if (client.authPending) {
             client.authPending.then(spawn);

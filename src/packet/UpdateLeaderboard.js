@@ -19,7 +19,7 @@ UpdateLeaderboard.prototype.build = function() {
                     continue;
                 }
 
-                var item = lb[i];
+                var item = String(lb[i]);
                 bufferSize += 4; // Empty ID
                 bufferSize += item.length * 2 ; // String length
                 bufferSize += 2; // Name terminator
@@ -29,6 +29,29 @@ UpdateLeaderboard.prototype.build = function() {
 
             var buf = new ArrayBuffer(bufferSize);
             var view = new DataView(buf);
+            view.setUint8(0, this.packetLB, true); // Packet ID
+            view.setUint32(1, validElements, true); // Number of elements
+
+            var offset = 5;
+            for (var i = 0; i < lb.length; i++) {
+                if (typeof lb[i] == "undefined") {
+                    continue;
+                }
+
+                var item = String(lb[i]);
+                view.setUint32(offset, 0, true);
+                offset += 4;
+
+                for (var j = 0; j < item.length; j++) {
+                    view.setUint16(offset, item.charCodeAt(j), true);
+                    offset += 2;
+                }
+
+                view.setUint16(offset, 0, true);
+                offset += 2;
+            }
+
+            return buf;
             
         case 49: // FFA-type Packet (List)
         	// Get size of packet            
@@ -39,8 +62,12 @@ UpdateLeaderboard.prototype.build = function() {
                 }
 
                 var item = lb[i];
+                if (!item || typeof item.getName != "function") {
+                    continue;
+                }
                 bufferSize += 4; // Element ID
-                bufferSize += item.getName() ? item.getName().length * 2 : 0; // Name
+                var displayName = item.getDisplayName ? item.getDisplayName() : item.getName();
+                bufferSize += displayName ? displayName.length * 2 : 0; // Name
                 bufferSize += 2; // Name terminator
 
                 validElements++;
@@ -61,6 +88,9 @@ UpdateLeaderboard.prototype.build = function() {
                 }
 
                 var item = lb[i];
+                if (!item || typeof item.getName != "function") {
+                    continue;
+                }
                 
                 var nodeID = 0; // Get node id of player's 1st cell
                 if (item.cells[0]) {
@@ -71,7 +101,7 @@ UpdateLeaderboard.prototype.build = function() {
                 offset += 4;
 
                 // Set name
-                var name = item.getName();
+                var name = item.getDisplayName ? item.getDisplayName() : item.getName();
                 if (name) {
                     for (var j = 0; j < name.length; j++) {
                         view.setUint16(offset, name.charCodeAt(j), true);

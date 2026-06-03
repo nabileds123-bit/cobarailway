@@ -32,7 +32,7 @@ process.argv.forEach(arg => {
 });
 
 // Start servers
-let game, gameTeams, gameHardcore, gameTournament;
+let game;
 const isRailwayDeploy = !!process.env.RAILWAY_ENVIRONMENT || !!process.env.PORT;
 if (runMaster) {
     const MasterServer = require('./MasterServer');
@@ -43,18 +43,12 @@ if (runMaster) {
 if (runGame) {
     const GameServer = require('./GameServer');
     if (isRailwayDeploy) {
-        const railwayGamemode = process.env.GAMEMODE_ID ? Number(process.env.GAMEMODE_ID) : undefined;
+        const railwayGamemode = process.env.GAMEMODE_ID ? Number(process.env.GAMEMODE_ID) : 0;
         game = new GameServer(false, null, railwayGamemode);
         game.start();
     } else {
         game = new GameServer(false, null, 0);
-        gameTeams = new GameServer(true, 8081, 1);
-        gameHardcore = new GameServer(true, 8082, 2);
-        gameTournament = new GameServer(true, 8083, 10);
         game.start();
-        gameTeams.start();
-        gameHardcore.start();
-        gameTournament.start();
     }
 }
 

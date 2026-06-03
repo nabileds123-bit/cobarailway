@@ -13,6 +13,7 @@ function Cell(nodeId, owner, position, mass, gameServer) {
     
     this.moveEngineTicks = 0; // Amount of times to loop the movement function
     this.moveEngineSpeed = 0;
+    this.moveEngineDecay = null;
     this.angle = 0; // Angle of movement
     
     if (this.owner) {
@@ -27,7 +28,7 @@ module.exports = Cell;
 
 Cell.prototype.getName = function() {
 	if (this.owner) {
-		return this.owner.name;
+		return this.owner.getDisplayName ? this.owner.getDisplayName() : this.owner.name;
 	} else {
 		return "";
 	}
@@ -60,7 +61,9 @@ Cell.prototype.getSpeed = function() {
 	// Old formula: 5 + (20 * (1 - (this.mass/(70+this.mass))));
 	// Based on 50ms ticks. If updateMoveEngine interval changes, change 50 to new value
 	// (should possibly have a config value for this?)
-	return 745.28 * Math.pow(this.mass, -0.222) * 50 / 1000;
+    var speedMultiplier = this.owner && this.owner.gameServer ? Number(this.owner.gameServer.config.playerSpeed) : 100;
+    if (isNaN(speedMultiplier)) speedMultiplier = 100;
+	return 745.28 * Math.pow(this.mass, -0.222) * 50 / 1000 * (speedMultiplier / 100);
 }
 
 Cell.prototype.setAngle = function(radians) {
@@ -71,9 +74,10 @@ Cell.prototype.getAngle = function() {
 	return this.angle;
 }
 
-Cell.prototype.setMoveEngineData = function(speed, ticks) {
+Cell.prototype.setMoveEngineData = function(speed, ticks, decay) {
     this.moveEngineSpeed = speed;
     this.moveEngineTicks = ticks;
+    this.moveEngineDecay = decay;
 }
 
 Cell.prototype.getMoveTicks = function() {
@@ -152,7 +156,7 @@ Cell.prototype.calcMove = function(x2, y2, gameServer) {
     for (var i = 0; i < this.owner.cells.length;i++) {
         var cell = this.owner.cells[i];
 		
-        if ((this.nodeId == cell.nodeId) || (this.ignoreCollision)) {
+        if ((this.nodeId == cell.nodeId) || (this.ignoreCollision) || (cell.getCollision())) {
             continue;
         }
 		
@@ -237,7 +241,8 @@ Cell.prototype.calcMovePhys = function(config) {
     var Y = this.position.y + ( this.moveEngineSpeed * Math.cos(this.angle) );
 	
     // Movement engine
-    this.moveEngineSpeed *= .75; // Decaying speed
+    var decay = null == this.moveEngineDecay ? .75 : this.moveEngineDecay;
+    this.moveEngineSpeed *= decay; // Decaying speed
     this.moveEngineTicks--;
 	 
     // Border check - Bouncy physics

@@ -6,12 +6,6 @@
      *
      */
     var CONNECTION_URL = window.location.hostname + ":" + window.location.port;
-    var GAME_MODE_PORTS = {
-        "": "8080",
-        ":teams": "8081",
-        ":hardcore": "8082",
-        ":tournament": "8083"
-    };
     /**
      * Enter path to the skin image folder
      * To take skins from the official server enter: "http://agar.io/skins/"
@@ -45,6 +39,9 @@
     var gameLoopStarted = false;
     var serverListTimer = null;
     var hasClickedPlay = false;
+    var pendingStartNick = null;
+    var pendingBattleQueue = null;
+    var battleSessionActive = false;
 
     function requestFrame(callback) {
         if (wHandle.requestAnimationFrame) {
@@ -205,7 +202,7 @@
             }
 
             sendFeed();
-            eFeedInterval = setInterval(sendFeed, 140);
+            eFeedInterval = setInterval(sendFeed, 250);
         }
 
         function stopEFeed() {
@@ -243,7 +240,11 @@
                     }
                     break;
                 case 27: // quit
-                    showOverlays(true);
+                    if (wHandle.showEscHelloDialog) {
+                        wHandle.showEscHelloDialog();
+                    } else {
+                        showOverlays(true);
+                    }
                     wHandle.isSpectating = false;
                     break;
 
@@ -537,8 +538,18 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         if (!window.location.port) {
             return host;
         }
-        var port = GAME_MODE_PORTS.hasOwnProperty(gameMode) ? GAME_MODE_PORTS[gameMode] : "8080";
-        return host + ":" + port;
+        return host + ":" + window.location.port;
+    }
+
+    function resetWorldState() {
+        nodesOnScreen = [];
+        playerCells = [];
+        nodes = {};
+        nodelist = [];
+        Cells = [];
+        leaderBoard = [];
+        mainCanvas = teamScores = null;
+        userScore = 0;
     }
 
     function wsConnect(wsUrl) {
@@ -555,14 +566,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         var c = getGameModeConnectionUrl();
         var wsProtocol = "https:" == window.location.protocol ? "wss://" : "ws://";
         wsUrl = wsProtocol + c;
-        nodesOnScreen = [];
-        playerCells = [];
-        nodes = {};
-        nodelist = [];
-        Cells = [];
-        leaderBoard = [];
-        mainCanvas = teamScores = null;
-        userScore = 0;
+        resetWorldState();
         console.log("Connecting to " + wsUrl);
         ws = new WebSocket(wsUrl);
         ws.binaryType = "arraybuffer";
@@ -596,9 +600,26 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         msg.setUint32(1, 1332175218, true);
         wsSend(msg);
         sendAuthToken();
+        if (!pendingBattleQueue) {
+            sendJoinMode(gameMode);
+        }
+        sendBattleMode();
         setTimeout(sendSavedAccountColor, 150);
         setTimeout(sendSavedAccountColor, 700);
-        sendNickName();
+        if (pendingBattleQueue && null != pendingStartNick) {
+            var battleMode = pendingBattleQueue;
+            pendingBattleQueue = null;
+            userNickName = pendingStartNick;
+            pendingStartNick = null;
+            sendBattleQueueJoin(battleMode);
+            sendNickName();
+        } else if (null != pendingStartNick) {
+            var nick = pendingStartNick;
+            pendingStartNick = null;
+            wHandle.setNick(nick);
+        } else {
+            sendNickName();
+        }
     }
 
     function onWsClose() {
@@ -639,11 +660,14 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
                 offset += 4;
                 break;
             case 20: // clear nodes
-                if (playerStat && playerStat.active && playerStat.hasSpawned && 0 < playerCells.length) {
+                if (!battleSessionActive && playerStat && playerStat.active && playerStat.hasSpawned && 0 < playerCells.length) {
                     finalizeMatchStats("death", true);
                 }
                 playerCells = [];
                 nodesOnScreen = [];
+                nodes = {};
+                nodelist = [];
+                Cells = [];
                 break;
             case 21: // draw line
                 lineX = msg.getInt16(offset, true);
@@ -663,6 +687,19 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
             case 48: // update leaderboard (custom text)
                 setCustomLB = true;
                 noRanking = true;
+                teamScores = null;
+                var customLBplayerNum = msg.getUint32(offset, true);
+                offset += 4;
+                leaderBoard = [];
+                for (i = 0; i < customLBplayerNum; ++i) {
+                    var customNodeId = msg.getUint32(offset, true);
+                    offset += 4;
+                    leaderBoard.push({
+                        id: customNodeId,
+                        name: getString()
+                    });
+                }
+                drawLeaderBoard();
                 break;
             case 49: // update leaderboard (ffa)
                 if (!setCustomLB) {
@@ -717,6 +754,17 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
 
                 addChat(msg, offset);
 
+                break;
+            case 106:
+                var battleStatus = getString();
+                var battleType = getString();
+                var countdownText = getString();
+                var countdown = parseInt(countdownText, 10);
+                updateBattleLobbyStatus(battleStatus, battleType, isNaN(countdown) ? null : countdown);
+                if (battleStatus == 'in_match') {
+                    resetWorldState();
+                    hideOverlays();
+                }
                 break;
 
         }
@@ -916,6 +964,10 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         }
         updateMatchMassStats();
         if (ua && 0 == playerCells.length) {
+            if (battleSessionActive) {
+                wHandle.isSpectating = true;
+                return;
+            }
             if (!finalizeMatchStats("death", hadPlayerCells)) {
                 showOverlays(false)
             }
@@ -975,6 +1027,88 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         }
 
         sendAuthTokenValue(token);
+    }
+
+    function sendStringPacket(packetId, value) {
+        if (!wsIsOpen()) {
+            return;
+        }
+
+        value = String(value || '');
+        var msg = prepareData(1 + 2 * value.length);
+        msg.setUint8(0, packetId);
+        for (var i = 0; i < value.length; ++i) {
+            msg.setUint16(1 + 2 * i, value.charCodeAt(i), true);
+        }
+        wsSend(msg);
+    }
+
+    function sendJoinMode(mode) {
+        if (battleSessionActive && (mode == ':tournament' || mode == 'Battle')) {
+            return;
+        }
+        sendStringPacket(104, mode || '');
+    }
+
+    function sendBattleMode() {
+        if (!wsIsOpen() || !wHandle.localStorage) {
+            return;
+        }
+
+        var battleMode = String(wHandle.localStorage.getItem('tournamentMode') || '1v1');
+        if (battleMode != '2v2') {
+            battleMode = '1v1';
+        }
+
+        var msg = prepareData(1 + 2 * battleMode.length);
+        msg.setUint8(0, 103);
+        for (var i = 0; i < battleMode.length; ++i) {
+            msg.setUint16(1 + 2 * i, battleMode.charCodeAt(i), true);
+        }
+        wsSend(msg);
+    }
+
+    function sendBattleQueueJoin(battleMode) {
+        sendStringPacket(105, battleMode || '1v1');
+    }
+
+    function updateBattleLobbyStatus(status, battleType, countdown) {
+        if (!wHandle.jQuery) {
+            return;
+        }
+
+        console.log("[BATTLE_CLIENT_STATUS]", status, battleType, countdown);
+        var label = 'Waiting for start';
+        var maxPlayers = battleType == '2v2' ? 4 : 2;
+        if (status == 'finding') {
+            label = 'Waiting for Players...';
+            if (countdown) {
+                wjQuery('#battleLobbyPlayersTitle').text('Players ' + countdown + '/' + maxPlayers);
+            }
+        } else if (status == 'preparing') {
+            label = 'Starting in ' + (countdown || 5);
+            wjQuery('#battleLobbyPlayersTitle').text('Players ' + maxPlayers + '/' + maxPlayers);
+        } else if (status == 'in_match') {
+            label = 'In Match';
+            battleSessionActive = true;
+            wjQuery('#battleLobbyPlayersTitle').text('Players ' + maxPlayers + '/' + maxPlayers);
+        } else if (status == 'finished') {
+            label = 'Waiting for start';
+            battleSessionActive = false;
+            wHandle.isSpectating = false;
+            resetWorldState();
+            showOverlays(true);
+            if (wHandle.showBattleHomeFromGame) {
+                wHandle.showBattleHomeFromGame();
+            }
+        }
+
+        wjQuery('#battleLobbyStatus').text(label);
+        wjQuery('#battleCreateStart').prop('disabled', status == 'finding' || status == 'preparing' || status == 'in_match');
+        console.log("[BATTLE_LOBBY_STATE]", status || 'idle', battleType || '');
+        if (battleType) {
+            wjQuery('#battleLobbyMode').text(battleType == '2v2' ? '2 vs 2' : '1 vs 1');
+        }
     }
 
     wHandle.refreshAccountSkin = sendAuthToken;
@@ -1050,6 +1184,10 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
 
     wHandle.hasPlayedGame = function () {
         return hasClickedPlay;
+    };
+
+    wHandle.getCurrentGameMode = function () {
+        return gameMode;
     };
 
     wHandle.resumeGameSession = function () {
@@ -1308,6 +1446,51 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         return score
     }
 
+    function normalizeFreeSkinName(name) {
+        return String(name || '').trim().toLowerCase().replace(/_/g, ' ');
+    }
+
+    function registerFreeSkinFile(fileName) {
+        var value = String(fileName || '').trim();
+        var baseName = value.replace(/\.[^.]+$/, '');
+        var normalized = normalizeFreeSkinName(baseName);
+
+        if (!normalized) {
+            return;
+        }
+
+        freeSkinFiles[normalized] = value;
+
+        if (-1 == knownNameDict.indexOf(normalized)) {
+            knownNameDict.push(normalized);
+        }
+    }
+
+    function getFreeSkinFileName(name) {
+        var normalized = normalizeFreeSkinName(name);
+
+        return freeSkinFiles[normalized] || null;
+    }
+
+    function isNoNameSkin(name, skinImage) {
+        return null != skinImage && -1 != knownNameDict_noDisp.indexOf(normalizeFreeSkinName(name));
+    }
+
+    function loadFreeSkinManifest() {
+        wjQuery.ajax({
+            dataType: "json",
+            url: "/api/free-skins",
+            cache: false,
+            success: function(data) {
+                var files = data && Array.isArray(data.skins) ? data.skins : [];
+
+                for (var i = 0; i < files.length; i++) {
+                    registerFreeSkinFile(files[i]);
+                }
+            }
+        });
+    }
+
     function getMassOwnerType(cell) {
         if (!cell || 0 == cell.id || cell.isVirus) {
             return "none";
@@ -1488,7 +1671,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         }
 
         if (null != teamScores || 0 != leaderBoard.length)
-            if (null != teamScores || showName) {
+            if (null != teamScores || showName || noRanking) {
                 lbCanvas = document.createElement("canvas");
                 var ctx = lbCanvas.getContext("2d"),
                     boardLength = 60;
@@ -1707,9 +1890,52 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
     };
     wHandle.setGameMode = function (arg) {
         if (arg != gameMode) {
+            if (arg != ':tournament') {
+                battleSessionActive = false;
+            }
             gameMode = arg;
-            showConnecting();
+            resetWorldState();
+            sendJoinMode(gameMode);
         }
+    };
+    wHandle.startGameInMode = function(arg, nick) {
+        if (arg != gameMode) {
+            if (arg != ':tournament') {
+                battleSessionActive = false;
+            }
+            pendingStartNick = nick;
+            gameMode = arg;
+            resetWorldState();
+            if (wsIsOpen()) {
+                sendJoinMode(gameMode);
+                pendingStartNick = null;
+                wHandle.setNick(nick);
+            } else {
+                showConnecting();
+            }
+            return;
+        }
+
+        wHandle.setNick(nick);
+    };
+    wHandle.joinBattleQueue = function(battleMode, nick) {
+        battleMode = battleMode == '2v2' ? '2v2' : '1v1';
+        battleSessionActive = false;
+        gameMode = ':tournament';
+        resetWorldState();
+        if (!wsIsOpen()) {
+            pendingStartNick = nick;
+            pendingBattleQueue = battleMode;
+            showConnecting();
+            return;
+        }
+        if (wHandle.localStorage) {
+            wHandle.localStorage.setItem('tournamentMode', battleMode);
+        }
+        sendBattleMode();
+        userNickName = nick;
+        sendBattleQueueJoin(battleMode);
+        sendNickName();
     };
     wHandle.setAcid = function (arg) {
         xa = arg
@@ -1797,9 +2023,11 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         z = 1,
         scoreText = null,
         skins = {},
+        freeSkinFiles = {},
         knownNameDict = "poland;usa;china;russia;canada;australia;spain;brazil;germany;ukraine;france;sweden;hitler;north korea;south korea;japan;united kingdom;earth;greece;latvia;lithuania;estonia;finland;norway;cia;maldivas;austria;nigeria;reddit;yaranaika;confederate;9gag;indiana;4chan;italy;bulgaria;tumblr;2ch.hk;hong kong;portugal;jamaica;german empire;mexico;sanik;switzerland;croatia;chile;indonesia;bangladesh;thailand;iran;iraq;peru;moon;botswana;bosnia;netherlands;european union;taiwan;pakistan;hungary;satanist;qing dynasty;matriarchy;patriarchy;feminism;ireland;texas;facepunch;prodota;cambodia;steam;piccolo;india;kc;denmark;quebec;ayy lmao;sealand;bait;tsarist russia;origin;vinesauce;stalin;belgium;luxembourg;stussy;prussia;8ch;argentina;scotland;sir;romania;belarus;wojak;doge;nasa;byzantium;imperial japan;french kingdom;somalia;turkey;mars;pokerface;8;irs;receita federal;facebook".split(";"),
-        knownNameDict_noDisp = ["8", "nasa", "Amruflxryns"],
+        knownNameDict_noDisp = ["8", "nasa", "Slowly", "berlusconi", "blatter", "boris", "bush", "cameron", "chavez", "clinton", "dilma", "fidel", "hillary", "hitler", "hollande", "kim jong un", "obama", "palin", "putin", "stalin", "trump", "tsipras"],
         ib = ["_canvas'blob"];
+    loadFreeSkinManifest();
     Cell.prototype = {
         id: 0,
         points: null,
@@ -1946,7 +2174,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         updatePos: function () {
             if (0 == this.id) return 1;
             var a;
-            a = (timestamp - this.updateTime) / (smoothRender ? 180 : 120);
+            a = (timestamp - this.updateTime) / 120;
             a = 0 > a ? 0 : 1 < a ? 1 : a;
             var b = 0 > a ? 0 : 1 < a ? 1 : a;
             this.getNameSize();
@@ -2022,18 +2250,17 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
                         } else {
                             c = null;
                         }
-                    } else if (-1 != knownNameDict.indexOf(skinName)) {
-                        if (!skins.hasOwnProperty(skinName)) {
-                            skins[skinName] = new Image;
-                            skins[skinName].src = SKIN_URL + skinName + '.png';
+                    } else {
+                        var freeSkinFileName = getFreeSkinFileName(skinName);
+                        if (freeSkinFileName && !skins.hasOwnProperty(freeSkinFileName)) {
+                            skins[freeSkinFileName] = new Image;
+                            skins[freeSkinFileName].src = SKIN_URL + freeSkinFileName;
                         }
-                        if (0 != skins[skinName].width && skins[skinName].complete) {
-                            c = skins[skinName];
+                        if (freeSkinFileName && 0 != skins[freeSkinFileName].width && skins[freeSkinFileName].complete) {
+                            c = skins[freeSkinFileName];
                         } else {
                             c = null;
                         }
-                    } else {
-                        c = null;
                     }
                 } else {
                     c = null;
@@ -2062,7 +2289,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
                 //draw name
                 if (0 != this.id) {
                     var b = ~~this.y;
-                    if ((showName || isOwnCell) && this.name && this.nameCache && (null == e || -1 == knownNameDict_noDisp.indexOf(skinName))) {
+                    if ((showName || isOwnCell) && this.name && this.nameCache && !isNoNameSkin(skinName, e)) {
                         ncache = this.nameCache;
                         ncache.setValue(this.name);
                         ncache.setSize(this.getNameSize());

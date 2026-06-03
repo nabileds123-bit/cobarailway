@@ -11,7 +11,8 @@ var mysqlReady = null;
 var BUY_PREMIUM_COST = 2;
 var UPLOAD_SKIN_COST = 150;
 var CREATE_GUILD_COST = 50;
-var MAX_SKIN_UPLOAD_SIZE = 1024 * 1024 * 2;
+var PLAYER_SKIN_UPLOAD_SIZE = 500 * 1024;
+var GUILD_SKIN_UPLOAD_SIZE = 200 * 1024;
 var allowedCellColors = [
     '#6FCA36',
     '#4379EF',
@@ -81,6 +82,10 @@ function ensureMysql() {
                 'xp INT NOT NULL DEFAULT 0,' +
                 'points DECIMAL(12,2) NOT NULL DEFAULT 0,' +
                 'guild VARCHAR(32) NULL,' +
+                'guild_name VARCHAR(32) NULL,' +
+                'guild_description VARCHAR(240) NULL,' +
+                'guild_type VARCHAR(16) NULL,' +
+                'guild_role VARCHAR(16) NULL,' +
                 'skin_url VARCHAR(255) NULL,' +
                 'guild_skin_url VARCHAR(255) NULL,' +
                 'cell_color VARCHAR(7) NOT NULL DEFAULT \'#6FCA36\',' +
@@ -100,6 +105,10 @@ function ensureMysql() {
                 'ALTER TABLE users ADD COLUMN xp INT NOT NULL DEFAULT 0',
                 'ALTER TABLE users ADD COLUMN points DECIMAL(12,2) NOT NULL DEFAULT 0',
                 'ALTER TABLE users ADD COLUMN guild VARCHAR(32) NULL',
+                'ALTER TABLE users ADD COLUMN guild_name VARCHAR(32) NULL',
+                'ALTER TABLE users ADD COLUMN guild_description VARCHAR(240) NULL',
+                'ALTER TABLE users ADD COLUMN guild_type VARCHAR(16) NULL',
+                'ALTER TABLE users ADD COLUMN guild_role VARCHAR(16) NULL',
                 'ALTER TABLE users ADD COLUMN skin_url VARCHAR(255) NULL',
                 'ALTER TABLE users ADD COLUMN guild_skin_url VARCHAR(255) NULL',
                 'ALTER TABLE users ADD COLUMN cell_color VARCHAR(7) NOT NULL DEFAULT \'#6FCA36\'',
@@ -124,6 +133,65 @@ function ensureMysql() {
                 'user_id VARCHAR(32) NOT NULL,' +
                 'created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,' +
                 'FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE' +
+                ')'
+            );
+        })
+        .then(function() {
+            return pool.query(
+                'CREATE TABLE IF NOT EXISTS highscores (' +
+                'id INT AUTO_INCREMENT PRIMARY KEY,' +
+                'player_id VARCHAR(32) NOT NULL,' +
+                'player_name VARCHAR(32) NOT NULL,' +
+                'game_mode VARCHAR(24) NOT NULL,' +
+                'region VARCHAR(32) NOT NULL DEFAULT \'global\',' +
+                'top1_time BIGINT NOT NULL DEFAULT 0,' +
+                'updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,' +
+                'INDEX idx_highscores_mode_region_time (game_mode, region, top1_time)' +
+                ')'
+            );
+        })
+        .then(function() {
+            return pool.query(
+                'CREATE TABLE IF NOT EXISTS top1_history (' +
+                'id INT AUTO_INCREMENT PRIMARY KEY,' +
+                'player_id VARCHAR(32) NOT NULL,' +
+                'player_name VARCHAR(32) NOT NULL,' +
+                'game_mode VARCHAR(24) NOT NULL,' +
+                'server_name VARCHAR(64) NOT NULL,' +
+                'top1_time BIGINT NOT NULL DEFAULT 0,' +
+                'created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,' +
+                'INDEX idx_top1_history_player_time (player_id, created_at)' +
+                ')'
+            );
+        })
+        .then(function() {
+            return pool.query(
+                'CREATE TABLE IF NOT EXISTS battle_match_history (' +
+                'id INT AUTO_INCREMENT PRIMARY KEY,' +
+                'player_id VARCHAR(32) NOT NULL,' +
+                'player_name VARCHAR(32) NOT NULL,' +
+                'battle_type VARCHAR(8) NOT NULL,' +
+                'server_name VARCHAR(64) NOT NULL,' +
+                'result VARCHAR(16) NULL,' +
+                'duration BIGINT NOT NULL DEFAULT 0,' +
+                'created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,' +
+                'INDEX idx_battle_history_player_type_time (player_id, battle_type, created_at)' +
+                ')'
+            );
+        })
+        .then(function() {
+            return pool.query(
+                'CREATE TABLE IF NOT EXISTS guild_invites (' +
+                'id INT AUTO_INCREMENT PRIMARY KEY,' +
+                'guild VARCHAR(32) NOT NULL,' +
+                'guild_name VARCHAR(32) NOT NULL,' +
+                'inviter_id VARCHAR(32) NOT NULL,' +
+                'target_user_id VARCHAR(32) NOT NULL,' +
+                'status VARCHAR(16) NOT NULL DEFAULT \'pending\',' +
+                'created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,' +
+                'updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,' +
+                'INDEX idx_guild_invites_target_status (target_user_id, status),' +
+                'INDEX idx_guild_invites_guild_target (guild, target_user_id)' +
                 ')'
             );
         })
@@ -435,6 +503,10 @@ function publicUser(user) {
         nextLevelXp: getNextLevelXp(level),
         points: Number(user.points || 0),
         guild: user.guild || '',
+        guildName: user.guildName || user.guild || '',
+        guildDescription: user.guildDescription || '',
+        guildType: user.guildType || '',
+        guildRole: user.guildRole || '',
         skinUrl: user.skinUrl || '',
         guildSkinUrl: user.guildSkinUrl || '',
         cellColor: normalizeCellColor(user.cellColor),
@@ -458,6 +530,10 @@ function mysqlUser(row) {
         xp: row.xp,
         points: row.points,
         guild: row.guild,
+        guildName: row.guild_name,
+        guildDescription: row.guild_description,
+        guildType: row.guild_type,
+        guildRole: row.guild_role,
         skinUrl: row.skin_url,
         guildSkinUrl: row.guild_skin_url,
         cellColor: row.cell_color,
@@ -497,15 +573,20 @@ function readBody(req, callback) {
     });
 }
 
-function readRawBody(req, maxSize, callback) {
+function readRawBody(req, maxSize, callback, sizeErrorMessage) {
     var chunks = [];
     var size = 0;
+    var tooLarge = false;
 
     req.on('data', function(chunk) {
+        if (tooLarge) {
+            return;
+        }
+
         size += chunk.length;
         if (size > maxSize) {
-            req.connection.destroy();
-            callback(new Error('File terlalu besar. Maksimal 2MB.'));
+            tooLarge = true;
+            chunks = [];
             return;
         }
 
@@ -513,6 +594,11 @@ function readRawBody(req, maxSize, callback) {
     });
 
     req.on('end', function() {
+        if (tooLarge) {
+            callback(new Error(sizeErrorMessage || 'File terlalu besar.'));
+            return;
+        }
+
         callback(null, Buffer.concat(chunks));
     });
 }
@@ -559,21 +645,16 @@ function getSkinExtension(contentType) {
         return 'png';
     }
 
-    if (contentType == 'image/jpeg' || contentType == 'image/jpg') {
-        return 'jpg';
-    }
-
-    if (contentType == 'image/webp') {
-        return 'webp';
-    }
-
     return null;
 }
 
-function uploadPlayerSkin(user, file) {
+function isPngSkin(file) {
+    return !!(file && String(file.contentType || '').toLowerCase() == 'image/png');
+}
+
+function uploadSkinObject(user, file, bucket, folder) {
     var supabaseUrl = String(process.env.SUPABASE_URL || '').replace(/\/+$/, '');
     var serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-    var bucket = process.env.SUPABASE_BUCKET || 'skins';
     var extension = getSkinExtension(file.contentType);
 
     if (!supabaseUrl || !serviceKey) {
@@ -581,10 +662,10 @@ function uploadPlayerSkin(user, file) {
     }
 
     if (!extension) {
-        return Promise.reject(new Error('Format skin harus PNG, JPG, atau WEBP.'));
+        return Promise.reject(new Error('Skin must be a PNG file.'));
     }
 
-    var objectPath = 'players/' + user.id + '-' + Date.now() + '.' + extension;
+    var objectPath = folder + '/' + user.id + '-' + Date.now() + '.' + extension;
     var uploadUrl = supabaseUrl + '/storage/v1/object/' + encodeURIComponent(bucket) + '/' + objectPath;
 
     return fetch(uploadUrl, {
@@ -605,6 +686,14 @@ function uploadPlayerSkin(user, file) {
 
         return supabaseUrl + '/storage/v1/object/public/' + bucket + '/' + objectPath;
     });
+}
+
+function uploadPlayerSkin(user, file) {
+    return uploadSkinObject(user, file, process.env.SUPABASE_BUCKET || 'skins', 'players');
+}
+
+function uploadGuildSkin(user, file) {
+    return uploadSkinObject(user, file, process.env.SUPABASE_GUILD_BUCKET || 'guilds', 'skins');
 }
 
 function getAuthToken(req) {
@@ -628,6 +717,14 @@ function requireUser(req, res) {
 
         return user;
     });
+}
+
+function optionalUser(req) {
+    var token = getAuthToken(req);
+    if (!token) {
+        return Promise.resolve(null);
+    }
+    return findUserByToken(token);
 }
 
 function handleError(res, err) {
@@ -874,6 +971,26 @@ function awardXp(userId, amount, reason) {
         });
 }
 
+function adjustPoints(userId, amount, reason) {
+    if (!userId || !amount) {
+        return Promise.resolve(null);
+    }
+
+    var delta = Number(amount || 0);
+    return findUserById(userId)
+        .then(function(user) {
+            if (!user) {
+                return null;
+            }
+
+            user.points = Math.max(0, Number(user.points || 0) + delta);
+            return saveAccountFields(user).then(function(savedUser) {
+                console.log('[Auth] Points %s%s for %s (%s)', delta >= 0 ? '+' : '', delta, savedUser.username, reason || 'points');
+                return publicUser(savedUser);
+            });
+        });
+}
+
 function handleRegister(req, res) {
     readBody(req, function(err, body) {
         if (err) {
@@ -1093,8 +1210,8 @@ function saveAccountFields(user) {
         if (usingMysql) {
             return getMysqlPool()
                 .query(
-                    'UPDATE users SET account_type = ?, points = ?, guild = ?, skin_url = ? WHERE id = ?',
-                    [user.accountType || 'Free', Number(user.points || 0), user.guild || null, user.skinUrl || null, user.id]
+                    'UPDATE users SET account_type = ?, points = ?, guild = ?, guild_name = ?, guild_description = ?, guild_type = ?, guild_role = ?, skin_url = ?, guild_skin_url = ? WHERE id = ?',
+                    [user.accountType || 'Free', Number(user.points || 0), user.guild || null, user.guildName || null, user.guildDescription || null, user.guildType || null, user.guildRole || null, user.skinUrl || null, user.guildSkinUrl || null, user.id]
                 )
                 .then(function() {
                     return user;
@@ -1107,13 +1224,429 @@ function saveAccountFields(user) {
                 db.users[i].accountType = user.accountType || 'Free';
                 db.users[i].points = Number(user.points || 0);
                 db.users[i].guild = user.guild || '';
+                db.users[i].guildName = user.guildName || user.guild || '';
+                db.users[i].guildDescription = user.guildDescription || '';
+                db.users[i].guildType = user.guildType || '';
+                db.users[i].guildRole = user.guildRole || '';
                 db.users[i].skinUrl = user.skinUrl || '';
+                db.users[i].guildSkinUrl = user.guildSkinUrl || '';
                 writeJsonDb(db);
                 return user;
             }
         }
 
         return user;
+    });
+}
+
+function normalizeGuildTag(tag) {
+    return String(tag || '').trim().toUpperCase();
+}
+
+function normalizeGuildName(name, fallback) {
+    name = String(name || '').trim();
+    return name || fallback;
+}
+
+function normalizeGuildType(type) {
+    type = String(type || '').trim().toLowerCase();
+    return type == 'public' ? 'public' : 'private';
+}
+
+function normalizeGuildRole(role) {
+    role = String(role || '').trim().toLowerCase();
+    if (role == 'leader') {
+        return 'Leader';
+    }
+    if (role == 'staff') {
+        return 'Staff';
+    }
+    return 'Member';
+}
+
+function guildKey(user) {
+    return normalizeGuildTag(user.guild || user.guildTag || '');
+}
+
+function summarizeGuildUsers(users) {
+    var map = {};
+
+    users.forEach(function(user) {
+        var tag = guildKey(user);
+        if (!tag) {
+            return;
+        }
+
+        if (!map[tag]) {
+            map[tag] = {
+                id: tag,
+                name: normalizeGuildName(user.guildName, tag),
+                tag: tag,
+                description: user.guildDescription || '',
+                logo: user.guildSkinUrl || '',
+                members: 0,
+                status: user.guildType ? String(user.guildType).charAt(0).toUpperCase() + String(user.guildType).slice(1) : '-'
+            };
+        }
+
+        map[tag].members++;
+        if (!map[tag].logo && user.guildSkinUrl) {
+            map[tag].logo = user.guildSkinUrl;
+        }
+        if (!map[tag].description && user.guildDescription) {
+            map[tag].description = user.guildDescription;
+        }
+        if (user.guildName && user.guildName.length > map[tag].name.length) {
+            map[tag].name = user.guildName;
+        }
+        if (user.guildType && map[tag].status == '-') {
+            map[tag].status = String(user.guildType).charAt(0).toUpperCase() + String(user.guildType).slice(1);
+        }
+    });
+
+    return Object.keys(map).sort(function(a, b) {
+        return map[a].name.localeCompare(map[b].name);
+    }).map(function(key) {
+        return map[key];
+    });
+}
+
+function listGuilds() {
+    return ensureMysql().then(function(usingMysql) {
+        if (usingMysql) {
+            return getMysqlPool()
+                .query('SELECT guild, guild_name, guild_description, guild_type, guild_skin_url FROM users WHERE guild IS NOT NULL AND guild <> \'\'')
+                .then(function(result) {
+                    return summarizeGuildUsers(result[0].map(function(row) {
+                        return {
+                            guild: row.guild,
+                            guildName: row.guild_name,
+                            guildDescription: row.guild_description,
+                            guildType: row.guild_type,
+                            guildSkinUrl: row.guild_skin_url
+                        };
+                    }));
+                });
+        }
+
+        return summarizeGuildUsers(readJsonDb().users || []);
+    });
+}
+
+function guildRoleRank(role) {
+    role = normalizeGuildRole(role);
+    return role == 'Leader' ? 0 : (role == 'Staff' ? 1 : 2);
+}
+
+function publicGuildMember(user) {
+    return {
+        id: user.id,
+        nick: user.username,
+        level: Number(user.level || 1),
+        role: normalizeGuildRole(user.guildRole || 'Member')
+    };
+}
+
+function listGuildMembers(tag) {
+    tag = normalizeGuildTag(tag);
+    return ensureMysql().then(function(usingMysql) {
+        if (usingMysql) {
+            return getMysqlPool()
+                .query('SELECT id, username, level, guild_role FROM users WHERE guild = ?', [tag])
+                .then(function(result) {
+                    return result[0].map(function(row) {
+                        return publicGuildMember({
+                            id: row.id,
+                            username: row.username,
+                            level: row.level,
+                            guildRole: row.guild_role
+                        });
+                    });
+                });
+        }
+
+        return (readJsonDb().users || []).filter(function(user) {
+            return normalizeGuildTag(user.guild) == tag;
+        }).map(publicGuildMember);
+    }).then(function(members) {
+        members = members.sort(function(a, b) {
+            var roleDiff = guildRoleRank(a.role) - guildRoleRank(b.role);
+            if (roleDiff) {
+                return roleDiff;
+            }
+            return String(a.nick || '').localeCompare(String(b.nick || ''));
+        });
+        var hasLeader = members.some(function(member) {
+            return member.role == 'Leader';
+        });
+        if (!hasLeader && members.length) {
+            members[0].role = 'Leader';
+        }
+        return members;
+    });
+}
+
+function userHasPendingGuildInvite(userId, tag) {
+    tag = normalizeGuildTag(tag);
+    return ensureMysql().then(function(usingMysql) {
+        if (usingMysql) {
+            return getMysqlPool()
+                .query('SELECT id FROM guild_invites WHERE target_user_id = ? AND guild = ? AND status = ? LIMIT 1', [userId, tag, 'pending'])
+                .then(function(result) {
+                    return result[0].length > 0;
+                });
+        }
+
+        var invites = readJsonDb().guildInvites || [];
+        return invites.some(function(invite) {
+            return String(invite.targetUserId || invite.target_user_id) == String(userId) &&
+                normalizeGuildTag(invite.guild) == tag &&
+                String(invite.status || 'pending') == 'pending';
+        });
+    });
+}
+
+function listGuildInviteNotifications(userId) {
+    return ensureMysql().then(function(usingMysql) {
+        if (usingMysql) {
+            return getMysqlPool()
+                .query('SELECT id, guild, guild_name, created_at FROM guild_invites WHERE target_user_id = ? AND status = ? ORDER BY created_at DESC LIMIT 50', [userId, 'pending'])
+                .then(function(result) {
+                    return result[0].map(function(row) {
+                        return {
+                            id: row.id,
+                            type: 'guild_invite',
+                            guild: row.guild,
+                            guildName: row.guild_name,
+                            createdAt: row.created_at
+                        };
+                    });
+                });
+        }
+
+        return (readJsonDb().guildInvites || []).filter(function(invite) {
+            return String(invite.targetUserId || invite.target_user_id) == String(userId) &&
+                String(invite.status || 'pending') == 'pending';
+        }).sort(function(a, b) {
+            return new Date(b.createdAt || b.created_at || 0) - new Date(a.createdAt || a.created_at || 0);
+        }).slice(0, 50).map(function(invite) {
+            return {
+                id: invite.id,
+                type: 'guild_invite',
+                guild: normalizeGuildTag(invite.guild),
+                guildName: invite.guildName || invite.guild_name || invite.guild,
+                createdAt: invite.createdAt || invite.created_at || null
+            };
+        });
+    });
+}
+
+function createGuildInvite(actor, target, guild) {
+    var tag = normalizeGuildTag(guild.tag || actor.guild);
+    var guildName = normalizeGuildName(guild.name || actor.guildName, tag);
+    return ensureMysql().then(function(usingMysql) {
+        if (usingMysql) {
+            return getMysqlPool()
+                .query('UPDATE guild_invites SET status = ? WHERE target_user_id = ? AND guild = ? AND status = ?', ['cancelled', target.id, tag, 'pending'])
+                .then(function() {
+                    return getMysqlPool().query(
+                        'INSERT INTO guild_invites (guild, guild_name, inviter_id, target_user_id, status) VALUES (?, ?, ?, ?, ?)',
+                        [tag, guildName, actor.id, target.id, 'pending']
+                    );
+                });
+        }
+
+        var db = readJsonDb();
+        db.guildInvites = db.guildInvites || [];
+        db.guildInvites.forEach(function(invite) {
+            if (String(invite.targetUserId) == String(target.id) && normalizeGuildTag(invite.guild) == tag && String(invite.status || 'pending') == 'pending') {
+                invite.status = 'cancelled';
+            }
+        });
+        db.guildInvites.push({
+            id: 'invite_' + Date.now() + '_' + Math.floor(Math.random() * 10000),
+            guild: tag,
+            guildName: guildName,
+            inviterId: actor.id,
+            targetUserId: target.id,
+            status: 'pending',
+            createdAt: new Date().toISOString()
+        });
+        writeJsonDb(db);
+    });
+}
+
+function acceptGuildInvite(userId, tag) {
+    tag = normalizeGuildTag(tag);
+    return ensureMysql().then(function(usingMysql) {
+        if (usingMysql) {
+            return getMysqlPool()
+                .query('UPDATE guild_invites SET status = ? WHERE target_user_id = ? AND guild = ? AND status = ?', ['accepted', userId, tag, 'pending']);
+        }
+
+        var db = readJsonDb();
+        db.guildInvites = db.guildInvites || [];
+        db.guildInvites.forEach(function(invite) {
+            if (String(invite.targetUserId || invite.target_user_id) == String(userId) && normalizeGuildTag(invite.guild) == tag && String(invite.status || 'pending') == 'pending') {
+                invite.status = 'accepted';
+            }
+        });
+        writeJsonDb(db);
+    });
+}
+
+function normalizeHighscoreMode(mode) {
+    mode = String(mode || '').trim().toLowerCase();
+    var aliases = {
+        ffa: 'ffa',
+        hardcore: 'hardcore',
+        hc: 'hardcore',
+        x5: 'x5',
+        exp: 'x5',
+        'battle-1v1': 'battle_1v1',
+        'battle_1v1': 'battle_1v1',
+        '1v1': 'battle_1v1',
+        'battle-2v2': 'battle_2v2',
+        'battle_2v2': 'battle_2v2',
+        '2v2': 'battle_2v2'
+    };
+    return aliases[mode] || 'ffa';
+}
+
+function normalizeHighscoreRegion(region) {
+    region = String(region || '').trim().toLowerCase();
+    var aliases = {
+        global: 'global',
+        indonesia: 'indonesia',
+        asia: 'asia',
+        europe: 'europe',
+        america: 'america'
+    };
+    return aliases[region] || 'global';
+}
+
+function listHighscores(mode, region) {
+    mode = normalizeHighscoreMode(mode);
+    region = normalizeHighscoreRegion(region);
+
+    return ensureMysql().then(function(usingMysql) {
+        if (usingMysql) {
+            var sql = 'SELECT player_id, player_name, game_mode, region, top1_time FROM highscores WHERE game_mode = ?';
+            var params = [mode];
+            if (region != 'global') {
+                sql += ' AND region = ?';
+                params.push(region);
+            }
+            sql += ' ORDER BY top1_time DESC LIMIT 100';
+
+            return getMysqlPool().query(sql, params).then(function(result) {
+                return result[0].map(function(row) {
+                    return {
+                        playerId: row.player_id,
+                        playerName: row.player_name,
+                        gameMode: row.game_mode,
+                        region: row.region,
+                        top1Time: Number(row.top1_time || 0)
+                    };
+                });
+            });
+        }
+
+        var rows = readJsonDb().highscores || [];
+        return rows.filter(function(row) {
+            var rowMode = normalizeHighscoreMode(row.game_mode || row.gameMode);
+            var rowRegion = normalizeHighscoreRegion(row.region);
+            return rowMode == mode && (region == 'global' || rowRegion == region);
+        }).sort(function(a, b) {
+            return Number(b.top1_time || b.top1Time || 0) - Number(a.top1_time || a.top1Time || 0);
+        }).slice(0, 100).map(function(row) {
+            return {
+                playerId: row.player_id || row.playerId || '',
+                playerName: row.player_name || row.playerName || '',
+                gameMode: normalizeHighscoreMode(row.game_mode || row.gameMode),
+                region: normalizeHighscoreRegion(row.region),
+                top1Time: Number(row.top1_time || row.top1Time || 0)
+            };
+        });
+    });
+}
+
+function publicPlayerProfile(user) {
+    return {
+        id: user.id,
+        name: user.username,
+        level: Number(user.level || 1),
+        points: Number(user.points || 0),
+        guild: user.guild || '',
+        game: user.lastLogin || null,
+        status: user.accountType || 'Free',
+        guildSkinUrl: user.guildSkinUrl || '',
+        playerSkinUrl: user.skinUrl || ''
+    };
+}
+
+function mapTop1HistoryRow(row) {
+    return {
+        createdAt: row.created_at || row.createdAt || null,
+        server: row.server_name || row.server || row.game_mode || row.gameMode || '',
+        top1Time: Number(row.top1_time || row.top1Time || 0)
+    };
+}
+
+function mapBattleHistoryRow(row) {
+    return {
+        createdAt: row.created_at || row.createdAt || null,
+        server: row.server_name || row.server || '',
+        result: row.result || '',
+        duration: Number(row.duration || 0)
+    };
+}
+
+function getPlayerProfile(search) {
+    return findUserByLogin(search).then(function(user) {
+        if (!user) {
+            return null;
+        }
+
+        return ensureMysql().then(function(usingMysql) {
+            if (usingMysql) {
+                return Promise.all([
+                    getMysqlPool().query('SELECT created_at, server_name, top1_time FROM top1_history WHERE player_id = ? ORDER BY created_at DESC LIMIT 100', [user.id]),
+                    getMysqlPool().query('SELECT created_at, server_name, result, duration FROM battle_match_history WHERE player_id = ? AND battle_type = ? ORDER BY created_at DESC LIMIT 100', [user.id, '2v2']),
+                    getMysqlPool().query('SELECT created_at, server_name, result, duration FROM battle_match_history WHERE player_id = ? AND battle_type = ? ORDER BY created_at DESC LIMIT 100', [user.id, '1v1'])
+                ]).then(function(result) {
+                    return {
+                        player: publicPlayerProfile(user),
+                        top1: result[0][0].map(mapTop1HistoryRow),
+                        battle2v2: result[1][0].map(mapBattleHistoryRow),
+                        battle1v1: result[2][0].map(mapBattleHistoryRow)
+                    };
+                });
+            }
+
+            var db = readJsonDb();
+            var top1 = (db.top1History || []).filter(function(row) {
+                return String(row.player_id || row.playerId || '') == String(user.id);
+            }).sort(function(a, b) {
+                return new Date(b.created_at || b.createdAt || 0) - new Date(a.created_at || a.createdAt || 0);
+            }).slice(0, 100).map(mapTop1HistoryRow);
+
+            function battleRows(type) {
+                return (db.battleMatchHistory || []).filter(function(row) {
+                    return String(row.player_id || row.playerId || '') == String(user.id) &&
+                        String(row.battle_type || row.battleType || '').toLowerCase() == type;
+                }).sort(function(a, b) {
+                    return new Date(b.created_at || b.createdAt || 0) - new Date(a.created_at || a.createdAt || 0);
+                }).slice(0, 100).map(mapBattleHistoryRow);
+            }
+
+            return {
+                player: publicPlayerProfile(user),
+                top1: top1,
+                battle2v2: battleRows('2v2'),
+                battle1v1: battleRows('1v1')
+            };
+        });
     });
 }
 
@@ -1188,7 +1721,7 @@ function handleUploadSkin(req, res) {
     var contentType = req.headers['content-type'] || '';
 
     if (contentType.indexOf('multipart/form-data') === 0) {
-        readRawBody(req, MAX_SKIN_UPLOAD_SIZE, function(err, body) {
+        readRawBody(req, PLAYER_SKIN_UPLOAD_SIZE, function(err, body) {
             if (err) {
                 sendJson(res, 400, { ok: false, error: err.message || 'Upload gagal.' });
                 return;
@@ -1197,6 +1730,11 @@ function handleUploadSkin(req, res) {
             var file = parseMultipartFile(req, body);
             if (!file || !file.buffer || !file.buffer.length) {
                 sendJson(res, 400, { ok: false, error: 'File skin wajib dipilih.' });
+                return;
+            }
+
+            if (!isPngSkin(file)) {
+                sendJson(res, 400, { ok: false, error: 'Player skin must be a PNG file.' });
                 return;
             }
 
@@ -1222,43 +1760,476 @@ function handleUploadSkin(req, res) {
                 .catch(function(error) {
                     handleError(res, error);
                 });
-        });
+        }, 'Player skin size must not exceed 500 KB.');
         return;
     }
 
+    sendJson(res, 400, { ok: false, error: 'Player skin must be a PNG file.' });
+}
+
+function handleGuildList(req, res) {
+    listGuilds()
+        .then(function(guilds) {
+            sendJson(res, 200, { ok: true, guilds: guilds });
+        })
+        .catch(function(error) {
+            handleError(res, error);
+        });
+}
+
+function handleGuildDetail(req, res) {
+    var query = parseQuery(req);
+    var tag = normalizeGuildTag(query.tag || query.guild || '');
+    if (!tag) {
+        sendJson(res, 400, { ok: false, error: 'Guild tidak valid.' });
+        return;
+    }
+
+    Promise.all([listGuilds(), listGuildMembers(tag), optionalUser(req)])
+        .then(function(result) {
+            var guild = null;
+            for (var i = 0; i < result[0].length; i++) {
+                if (normalizeGuildTag(result[0][i].tag) == tag) {
+                    guild = result[0][i];
+                    break;
+                }
+            }
+            if (!guild) {
+                sendJson(res, 404, { ok: false, error: 'Guild tidak ditemukan.' });
+                return;
+            }
+
+            var currentUser = result[2];
+            var viewer = null;
+            if (currentUser && normalizeGuildTag(currentUser.guild) == tag) {
+                for (var m = 0; m < result[1].length; m++) {
+                    if (result[1][m].id == currentUser.id) {
+                        viewer = { id: currentUser.id, role: result[1][m].role };
+                        break;
+                    }
+                }
+            }
+            return (currentUser && !currentUser.guild ? userHasPendingGuildInvite(currentUser.id, tag) : Promise.resolve(false)).then(function(canJoin) {
+                sendJson(res, 200, {
+                    ok: true,
+                    guild: guild,
+                    members: result[1],
+                    viewer: viewer,
+                    canJoin: !!canJoin
+                });
+            });
+        })
+        .catch(function(error) {
+            handleError(res, error);
+        });
+}
+
+function clearGuildMembership(user) {
+    user.guild = '';
+    user.guildName = '';
+    user.guildDescription = '';
+    user.guildType = '';
+    user.guildRole = '';
+    user.guildSkinUrl = '';
+}
+
+function canKickMember(actorRole, targetRole) {
+    actorRole = normalizeGuildRole(actorRole);
+    targetRole = normalizeGuildRole(targetRole);
+    if (actorRole == 'Leader') {
+        return targetRole != 'Leader';
+    }
+    return actorRole == 'Staff' && targetRole == 'Member';
+}
+
+function getEffectiveGuildRole(user) {
+    if (!user || !user.guild) {
+        return Promise.resolve('');
+    }
+    return listGuildMembers(user.guild).then(function(members) {
+        for (var i = 0; i < members.length; i++) {
+            if (members[i].id == user.id) {
+                return members[i].role;
+            }
+        }
+        return normalizeGuildRole(user.guildRole || 'Member');
+    });
+}
+
+function handleGuildKick(req, res) {
     readBody(req, function(err, body) {
         if (err) {
             sendJson(res, 400, { ok: false, error: 'JSON tidak valid.' });
             return;
         }
 
-        var skinUrl = String(body.skinUrl || '').trim();
+        var targetId = String(body.userId || '').trim();
+        requireUser(req, res).then(function(actor) {
+            if (!actor || !actor.guild) {
+                return null;
+            }
 
-        requireUser(req, res)
-            .then(function(user) {
-                if (!user) {
-                    return;
+            return Promise.all([findUserById(targetId), getEffectiveGuildRole(actor)]).then(function(result) {
+                var target = result[0];
+                var actorRole = result[1];
+                if (!target || target.id == actor.id || normalizeGuildTag(target.guild) != normalizeGuildTag(actor.guild)) {
+                    sendJson(res, 404, { ok: false, error: 'Member tidak ditemukan.' });
+                    return null;
                 }
 
-                if (!skinUrl) {
-                    sendJson(res, 400, { ok: false, error: 'Upload skin membutuhkan storage file. Minimal point yang dibutuhkan: 150.' });
-                    return;
+                if (!canKickMember(actorRole, target.guildRole)) {
+                    sendJson(res, 403, { ok: false, error: 'Tidak punya izin kick member ini.' });
+                    return null;
                 }
 
-                if (!spendPoints(user, UPLOAD_SKIN_COST)) {
-                    sendJson(res, 400, { ok: false, error: 'Point tidak cukup. Upload skin membutuhkan 150 point.' });
-                    return;
-                }
-
-                user.skinUrl = skinUrl;
-                return saveAccountFields(user).then(function(savedUser) {
-                    sendJson(res, 200, { ok: true, message: 'Skin berhasil disimpan.', user: publicUser(savedUser) });
+                clearGuildMembership(target);
+                return saveAccountFields(target).then(function() {
+                    return listGuildMembers(actor.guild).then(function(members) {
+                        sendJson(res, 200, { ok: true, members: members });
+                    });
                 });
-            })
-            .catch(function(error) {
-                handleError(res, error);
             });
+        }).catch(function(error) {
+            handleError(res, error);
+        });
     });
+}
+
+function handleGuildRoleUpdate(req, res) {
+    readBody(req, function(err, body) {
+        if (err) {
+            sendJson(res, 400, { ok: false, error: 'JSON tidak valid.' });
+            return;
+        }
+
+        var targetId = String(body.userId || '').trim();
+        var role = normalizeGuildRole(body.role);
+        requireUser(req, res).then(function(actor) {
+            return Promise.all([findUserById(targetId), getEffectiveGuildRole(actor)]).then(function(result) {
+                var target = result[0];
+                var actorRole = result[1];
+                if (!actor || actorRole != 'Leader') {
+                    sendJson(res, 403, { ok: false, error: 'Hanya Leader yang dapat mengubah role.' });
+                    return null;
+                }
+                if (!target || target.id == actor.id || normalizeGuildTag(target.guild) != normalizeGuildTag(actor.guild) || normalizeGuildRole(target.guildRole) == 'Leader') {
+                    sendJson(res, 404, { ok: false, error: 'Member tidak ditemukan.' });
+                    return null;
+                }
+
+                target.guildRole = role == 'Staff' ? 'Staff' : 'Member';
+                return saveAccountFields(target).then(function() {
+                    return listGuildMembers(actor.guild).then(function(members) {
+                        sendJson(res, 200, { ok: true, members: members });
+                    });
+                });
+            });
+        }).catch(function(error) {
+            handleError(res, error);
+        });
+    });
+}
+
+function handleGuildLeave(req, res) {
+    requireUser(req, res).then(function(user) {
+        if (!user) {
+            return null;
+        }
+        if (!user.guild) {
+            sendJson(res, 400, { ok: false, error: 'Account belum memiliki guild.' });
+            return null;
+        }
+        return getEffectiveGuildRole(user).then(function(role) {
+            if (role == 'Leader') {
+                sendJson(res, 400, { ok: false, error: 'Leader tidak bisa leave. Gunakan Delete Guild.' });
+                return null;
+            }
+            clearGuildMembership(user);
+            return saveAccountFields(user).then(function(savedUser) {
+                sendJson(res, 200, { ok: true, user: publicUser(savedUser) });
+            });
+        });
+    }).catch(function(error) {
+        handleError(res, error);
+    });
+}
+
+function handleGuildEdit(req, res) {
+    readBody(req, function(err, body) {
+        if (err) {
+            sendJson(res, 400, { ok: false, error: 'JSON tidak valid.' });
+            return;
+        }
+
+        var description = String(body.description || '').trim();
+        if (description.length > 240) {
+            description = description.slice(0, 240);
+        }
+
+        requireUser(req, res).then(function(actor) {
+            if (!actor) {
+                return null;
+            }
+            if (!actor.guild) {
+                sendJson(res, 400, { ok: false, error: 'Account belum memiliki guild.' });
+                return null;
+            }
+
+            return getEffectiveGuildRole(actor).then(function(role) {
+                if (role != 'Leader') {
+                    sendJson(res, 403, { ok: false, error: 'Hanya Leader yang dapat edit guild.' });
+                    return null;
+                }
+
+                var tag = normalizeGuildTag(actor.guild);
+                return ensureMysql().then(function(usingMysql) {
+                    if (usingMysql) {
+                        return getMysqlPool()
+                            .query('UPDATE users SET guild_description = ? WHERE guild = ?', [description || null, tag]);
+                    }
+
+                    var db = readJsonDb();
+                    (db.users || []).forEach(function(user) {
+                        if (normalizeGuildTag(user.guild) == tag) {
+                            user.guildDescription = description;
+                        }
+                    });
+                    writeJsonDb(db);
+                }).then(function() {
+                    actor.guildDescription = description;
+                    sendJson(res, 200, { ok: true, description: description, user: publicUser(actor) });
+                });
+            });
+        }).catch(function(error) {
+            handleError(res, error);
+        });
+    });
+}
+
+function handleGuildDelete(req, res) {
+    requireUser(req, res).then(function(actor) {
+        if (!actor) {
+            return null;
+        }
+        if (!actor.guild) {
+            sendJson(res, 400, { ok: false, error: 'Account belum memiliki guild.' });
+            return null;
+        }
+
+        return getEffectiveGuildRole(actor).then(function(role) {
+            if (role != 'Leader') {
+                sendJson(res, 403, { ok: false, error: 'Hanya Leader yang dapat delete guild.' });
+                return null;
+            }
+
+            var tag = normalizeGuildTag(actor.guild);
+            return ensureMysql().then(function(usingMysql) {
+                if (usingMysql) {
+                    return getMysqlPool()
+                        .query('UPDATE users SET guild = NULL, guild_name = NULL, guild_description = NULL, guild_type = NULL, guild_role = NULL, guild_skin_url = NULL WHERE guild = ?', [tag])
+                        .then(function() {
+                            return getMysqlPool()
+                                .query('UPDATE guild_invites SET status = ? WHERE guild = ? AND status = ?', ['cancelled', tag, 'pending']);
+                        });
+                }
+
+                var db = readJsonDb();
+                (db.users || []).forEach(function(user) {
+                    if (normalizeGuildTag(user.guild) == tag) {
+                        clearGuildMembership(user);
+                    }
+                });
+                (db.guildInvites || []).forEach(function(invite) {
+                    if (normalizeGuildTag(invite.guild) == tag && String(invite.status || 'pending') == 'pending') {
+                        invite.status = 'cancelled';
+                    }
+                });
+                writeJsonDb(db);
+            }).then(function() {
+                clearGuildMembership(actor);
+                sendJson(res, 200, { ok: true, user: publicUser(actor) });
+            });
+        });
+    }).catch(function(error) {
+        handleError(res, error);
+    });
+}
+
+function handleGuildInvite(req, res) {
+    readBody(req, function(err, body) {
+        if (err) {
+            sendJson(res, 400, { ok: false, error: 'JSON tidak valid.' });
+            return;
+        }
+
+        var playerName = String(body.playerName || body.username || '').trim();
+        requireUser(req, res).then(function(actor) {
+            if (!actor || !actor.guild) {
+                return null;
+            }
+
+            return getEffectiveGuildRole(actor).then(function(role) {
+                if (role != 'Leader' && role != 'Staff') {
+                    sendJson(res, 403, { ok: false, error: 'Tidak punya izin invite.' });
+                    return null;
+                }
+
+                return findUserByLogin(playerName).then(function(target) {
+                    if (!target) {
+                        sendJson(res, 404, { ok: false, error: 'Player not found.' });
+                        return null;
+                    }
+
+                    if (target.guild) {
+                        sendJson(res, 400, { ok: false, error: 'Player sudah memiliki guild.' });
+                        return null;
+                    }
+
+                    return listGuilds().then(function(guilds) {
+                        var guild = null;
+                        for (var i = 0; i < guilds.length; i++) {
+                            if (normalizeGuildTag(guilds[i].tag) == normalizeGuildTag(actor.guild)) {
+                                guild = guilds[i];
+                                break;
+                            }
+                        }
+                        guild = guild || { tag: actor.guild, name: actor.guildName || actor.guild };
+                        return createGuildInvite(actor, target, guild).then(function() {
+                            sendJson(res, 200, { ok: true, message: 'Invite berhasil dikirim.' });
+                        });
+                    });
+                });
+            });
+        }).catch(function(error) {
+            handleError(res, error);
+        });
+    });
+}
+
+function handleNotificationList(req, res) {
+    requireUser(req, res).then(function(user) {
+        if (!user) {
+            return null;
+        }
+
+        return listGuildInviteNotifications(user.id).then(function(notifications) {
+            sendJson(res, 200, { ok: true, notifications: notifications });
+        });
+    }).catch(function(error) {
+        handleError(res, error);
+    });
+}
+
+function handleGuildJoin(req, res) {
+    readBody(req, function(err, body) {
+        if (err) {
+            sendJson(res, 400, { ok: false, error: 'JSON tidak valid.' });
+            return;
+        }
+
+        var tag = normalizeGuildTag(body.guild || body.tag || '');
+        requireUser(req, res).then(function(user) {
+            if (!user) {
+                return null;
+            }
+
+            if (user.guild) {
+                sendJson(res, 400, { ok: false, error: 'Account sudah memiliki guild.' });
+                return null;
+            }
+
+            return userHasPendingGuildInvite(user.id, tag).then(function(hasInvite) {
+                if (!hasInvite) {
+                    sendJson(res, 403, { ok: false, error: 'Invite guild tidak ditemukan.' });
+                    return null;
+                }
+
+                return listGuilds().then(function(guilds) {
+                    var guild = null;
+                    for (var i = 0; i < guilds.length; i++) {
+                        if (normalizeGuildTag(guilds[i].tag) == tag) {
+                            guild = guilds[i];
+                            break;
+                        }
+                    }
+                    if (!guild) {
+                        sendJson(res, 404, { ok: false, error: 'Guild tidak ditemukan.' });
+                        return null;
+                    }
+
+                    user.guild = tag;
+                    user.guildName = guild.name || tag;
+                    user.guildDescription = guild.description || '';
+                    user.guildType = String(guild.status || '').toLowerCase() == 'public' ? 'public' : '';
+                    user.guildRole = 'Member';
+                    user.guildSkinUrl = guild.logo || '';
+                    return saveAccountFields(user).then(function(savedUser) {
+                        return acceptGuildInvite(user.id, tag).then(function() {
+                            sendJson(res, 200, { ok: true, user: publicUser(savedUser) });
+                        });
+                    });
+                });
+            });
+        }).catch(function(error) {
+            handleError(res, error);
+        });
+    });
+}
+
+function handleHighscoreList(req, res) {
+    var query = {};
+    var parts = String(req.url || '').split('?');
+    if (parts[1]) {
+        parts[1].split('&').forEach(function(part) {
+            var pair = part.split('=');
+            query[decodeURIComponent(pair[0] || '')] = decodeURIComponent((pair[1] || '').replace(/\+/g, ' '));
+        });
+    }
+
+    var mode = normalizeHighscoreMode(query.mode);
+    var region = normalizeHighscoreRegion(query.region);
+    listHighscores(mode, region)
+        .then(function(highscores) {
+            sendJson(res, 200, { ok: true, mode: mode, region: region, highscores: highscores });
+        })
+        .catch(function(error) {
+            handleError(res, error);
+        });
+}
+
+function parseQuery(req) {
+    var query = {};
+    var parts = String(req.url || '').split('?');
+    if (parts[1]) {
+        parts[1].split('&').forEach(function(part) {
+            var pair = part.split('=');
+            query[decodeURIComponent(pair[0] || '')] = decodeURIComponent((pair[1] || '').replace(/\+/g, ' '));
+        });
+    }
+    return query;
+}
+
+function handlePlayerProfile(req, res) {
+    var query = parseQuery(req);
+    var name = String(query.name || '').trim();
+
+    if (!name) {
+        sendJson(res, 400, { ok: false, error: 'Player name wajib diisi.' });
+        return;
+    }
+
+    getPlayerProfile(name)
+        .then(function(profile) {
+            if (!profile) {
+                sendJson(res, 404, { ok: false, error: 'Player not found.' });
+                return;
+            }
+
+            sendJson(res, 200, { ok: true, profile: profile });
+        })
+        .catch(function(error) {
+            handleError(res, error);
+        });
 }
 
 function handleCreateGuild(req, res) {
@@ -1268,9 +2239,17 @@ function handleCreateGuild(req, res) {
             return;
         }
 
-        var guild = String(body.guild || '').trim();
-        if (!/^[A-Za-z0-9]{2,12}$/.test(guild)) {
-            sendJson(res, 400, { ok: false, error: 'Nama guild hanya boleh A-Z 0-9, 2-12 karakter.' });
+        var guild = normalizeGuildTag(body.tag || body.guild || '');
+        var guildName = normalizeGuildName(body.name, guild);
+        var description = String(body.description || '').trim().slice(0, 240);
+        var guildType = normalizeGuildType(body.type);
+        if (!/^[A-Za-z0-9]{1,4}$/.test(guild)) {
+            sendJson(res, 400, { ok: false, error: 'Prefix guild wajib A-Z atau 0-9, maksimal 4 karakter, tanpa spasi atau emoji.' });
+            return;
+        }
+
+        if (!guildName || guildName.length > 32) {
+            sendJson(res, 400, { ok: false, error: 'Nama guild wajib diisi, maksimal 32 karakter.' });
             return;
         }
 
@@ -1285,20 +2264,82 @@ function handleCreateGuild(req, res) {
                     return;
                 }
 
-                if (!spendPoints(user, CREATE_GUILD_COST)) {
-                    sendJson(res, 400, { ok: false, error: 'Point tidak cukup. Membuat guild membutuhkan 50 point.' });
-                    return;
-                }
+                return listGuilds().then(function(guilds) {
+                    for (var i = 0; i < guilds.length; i++) {
+                        if (normalizeGuildTag(guilds[i].tag) == guild) {
+                            sendJson(res, 409, { ok: false, error: 'Tag guild sudah dipakai.' });
+                            return null;
+                        }
+                    }
 
-                user.guild = guild;
-                return saveAccountFields(user).then(function(savedUser) {
-                    sendJson(res, 200, { ok: true, message: 'Guild berhasil dibuat.', user: publicUser(savedUser) });
+                    if (!spendPoints(user, CREATE_GUILD_COST)) {
+                        sendJson(res, 400, { ok: false, error: 'Point tidak cukup. Membuat guild membutuhkan 50 point.' });
+                        return null;
+                    }
+
+                    user.guild = guild;
+                    user.guildName = guildName;
+                    user.guildDescription = description;
+                    user.guildType = guildType;
+                    user.guildRole = 'Leader';
+                    return saveAccountFields(user).then(function(savedUser) {
+                        sendJson(res, 200, { ok: true, message: 'Guild berhasil dibuat.', user: publicUser(savedUser) });
+                    });
                 });
             })
             .catch(function(error) {
                 handleError(res, error);
             });
     });
+}
+
+function handleUploadGuildSkin(req, res) {
+    var contentType = req.headers['content-type'] || '';
+
+    if (contentType.indexOf('multipart/form-data') !== 0) {
+        sendJson(res, 400, { ok: false, error: 'Upload skin guild harus berupa gambar.' });
+        return;
+    }
+
+    readRawBody(req, GUILD_SKIN_UPLOAD_SIZE, function(err, body) {
+        if (err) {
+            sendJson(res, 400, { ok: false, error: err.message || 'Upload skin guild gagal.' });
+            return;
+        }
+
+        var file = parseMultipartFile(req, body);
+        if (!file || !file.buffer || !file.buffer.length) {
+            sendJson(res, 400, { ok: false, error: 'File skin guild wajib dipilih.' });
+            return;
+        }
+
+        if (!isPngSkin(file)) {
+            sendJson(res, 400, { ok: false, error: 'Guild skin must be a PNG file.' });
+            return;
+        }
+
+        requireUser(req, res)
+            .then(function(user) {
+                if (!user) {
+                    return;
+                }
+
+                if (!user.guild) {
+                    sendJson(res, 400, { ok: false, error: 'Buat guild dulu sebelum upload skin guild.' });
+                    return;
+                }
+
+                return uploadGuildSkin(user, file).then(function(skinUrl) {
+                    user.guildSkinUrl = skinUrl;
+                    return saveAccountFields(user).then(function(savedUser) {
+                        sendJson(res, 200, { ok: true, message: 'Skin guild berhasil diupload.', user: publicUser(savedUser) });
+                    });
+                });
+            })
+            .catch(function(error) {
+                handleError(res, error);
+            });
+    }, 'Guild skin size must not exceed 200 KB.');
 }
 
 function handleAuth(req, res) {
@@ -1332,6 +2373,11 @@ function handleAuth(req, res) {
         return true;
     }
 
+    if (req.method == 'GET' && req.url == '/api/notifications') {
+        handleNotificationList(req, res);
+        return true;
+    }
+
     if (req.method == 'POST' && req.url == '/api/account/color') {
         handleAccountColor(req, res);
         return true;
@@ -1347,8 +2393,68 @@ function handleAuth(req, res) {
         return true;
     }
 
+    if (req.method == 'GET' && req.url == '/api/guilds') {
+        handleGuildList(req, res);
+        return true;
+    }
+
+    if (req.method == 'GET' && req.url.indexOf('/api/guild/detail') === 0) {
+        handleGuildDetail(req, res);
+        return true;
+    }
+
+    if (req.method == 'GET' && req.url.indexOf('/api/highscores') === 0) {
+        handleHighscoreList(req, res);
+        return true;
+    }
+
+    if (req.method == 'GET' && req.url.indexOf('/api/player-profile') === 0) {
+        handlePlayerProfile(req, res);
+        return true;
+    }
+
     if (req.method == 'POST' && req.url == '/api/guild/create') {
         handleCreateGuild(req, res);
+        return true;
+    }
+
+    if (req.method == 'POST' && req.url == '/api/guild/member/kick') {
+        handleGuildKick(req, res);
+        return true;
+    }
+
+    if (req.method == 'POST' && req.url == '/api/guild/member/role') {
+        handleGuildRoleUpdate(req, res);
+        return true;
+    }
+
+    if (req.method == 'POST' && req.url == '/api/guild/edit') {
+        handleGuildEdit(req, res);
+        return true;
+    }
+
+    if (req.method == 'POST' && req.url == '/api/guild/delete') {
+        handleGuildDelete(req, res);
+        return true;
+    }
+
+    if (req.method == 'POST' && req.url == '/api/guild/leave') {
+        handleGuildLeave(req, res);
+        return true;
+    }
+
+    if (req.method == 'POST' && req.url == '/api/guild/invite') {
+        handleGuildInvite(req, res);
+        return true;
+    }
+
+    if (req.method == 'POST' && req.url == '/api/guild/join') {
+        handleGuildJoin(req, res);
+        return true;
+    }
+
+    if (req.method == 'POST' && req.url == '/api/guild/upload-skin') {
+        handleUploadGuildSkin(req, res);
         return true;
     }
 
@@ -1357,6 +2463,7 @@ function handleAuth(req, res) {
 
 handleAuth.getUserByToken = findUserByToken;
 handleAuth.awardXp = awardXp;
+handleAuth.adjustPoints = adjustPoints;
 handleAuth.getNextLevelXp = getNextLevelXp;
 handleAuth.isAllowedCellColor = isAllowedCellColor;
 handleAuth.normalizeCellColor = normalizeCellColor;

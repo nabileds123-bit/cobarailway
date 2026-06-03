@@ -59,6 +59,7 @@ function GameServer(mult, prt, gamemodeId) {
         virusMaxAmount: 50, // Maximum amount of viruses on the map. If this amount is reached, then ejected cells will pass through viruses.
         virusStartMass: 100, // Starting virus size (In mass)
         virusBurstMass: 198, // Viruses explode past this size
+        virusMassGain: null, // Mass gained when eating a virus. null = use virus mass
         ejectMass: 16, // Mass of ejected cells
         ejectMassGain: 12, // Amount of mass gained from consuming ejected cells
         ejectSpeed: 120, // Base speed of ejected cells
@@ -69,6 +70,12 @@ function GameServer(mult, prt, gamemodeId) {
         playerMinMassSplit: 36, // Mass required to split
         playerMaxCells: 16, // Max cells the player is allowed to have
         playerRecombineTime: 15, // Base amount of ticks before a cell is allowed to recombine (1 tick = 2000 milliseconds)
+        playerSplitSpeedBase: 95,
+        playerSplitSpeedMultiplier: 4.5,
+        playerSplitMinSpeed: 105,
+        playerSplitMaxSpeed: 130,
+        playerSplitMoveTicks: 10,
+        playerSplitDecay: 0.82,
         playerMassDecayRate: 4, // Amount of mass lost per tick (Multiplier) (1 tick = 2000 milliseconds)
         playerMinMassDecay: 9, // Minimum mass for decay to occur
         gameLBlength: 10, // Amount of players shown on the leaderboard
@@ -83,10 +90,13 @@ function GameServer(mult, prt, gamemodeId) {
     
     // Gamemodes
     var selectedGamemode = typeof this.gamemodeId == "number" ? this.gamemodeId : this.config.serverGamemode;
-    this.gameMode = Gamemode.list[selectedGamemode];
-    if (!this.gameMode) {
-        this.gameMode = Gamemode.list[0]; // Default is FFA
-    }
+    this.gameMode = Gamemode.get(selectedGamemode);
+    this.parentServer = null;
+    this.rooms = null;
+    this.battleQueues = null;
+    this.battleMatches = [];
+    this.roomName = this.gameMode.name;
+    this.worldStarted = false;
     
     // Colors
     this.colors = [{'r':235,'b':0,'g':75},{'r':225,'b':255,'g':125},{'r':180,'b':20,'g':7},{'r':80,'b':240,'g':170},{'r':180,'b':135,'g':90},{'r':195,'b':0,'g':240},{'r':150,'b':255,'g':18},{'r':80,'b':0,'g':245},{'r':165,'b':0,'g':25},{'r':80,'b':0,'g':145},{'r':80,'b':240,'g':170},{'r':55,'b':255,'g':92}]; 
@@ -94,7 +104,11 @@ function GameServer(mult, prt, gamemodeId) {
 
 module.exports = GameServer;
 
-GameServer.prototype.start = function() {
+GameServer.prototype.initGameWorld = function() {
+    if (this.worldStarted) {
+        return;
+    }
+
     if (this.config.serverBots > 0 || this.gameMode.name == "Tournament") {
         var BotLoader = require('./ai/BotLoader.js');
         this.bots = new BotLoader(this,0);
@@ -102,9 +116,60 @@ GameServer.prototype.start = function() {
 
     // Gamemode configurations
     this.gameMode.onServerInit(this);
-    
+    if (this.gameMode.name == "Tournament") {
+        this.config.leaderboardUpdateClient = 20;
+    }
+
+    for (var i = 0; i < this.config.foodStartAmount; i++) {
+        this.spawnFood();
+    }
+
+    // Start Main Loop
+    setInterval(this.mainLoop.bind(this), 1);
+    this.worldStarted = true;
+
+    // Player bots (Experimental)
+    if (this.config.serverBots > 0) {
+        for (var botIndex = 0; botIndex < this.config.serverBots; botIndex++) {
+            this.bots.addBot();
+        }
+        console.log("[Game] Loaded "+this.config.serverBots+" player bots in "+(this.roomName || this.gameMode.name));
+    }
+};
+
+GameServer.prototype.start = function() {
     this.config.serverPort = process.env.PORT || this.config.serverPort ;
-    
+
+    if (!this.multi) {
+        this.rooms = {
+            FFA: this,
+            Teams: this.createInternalRoom('Teams', 1),
+            Hardcore: this.createInternalRoom('Hardcore', 2),
+            Exp: this.createInternalRoom('Exp', 0),
+            Battle: this.createInternalRoom('Battle', 10),
+            Tournament: this.createInternalRoom('Tournament', 10)
+        };
+        this.roomName = 'FFA';
+        this.battleQueues = {
+            '1v1': [],
+            '2v2': []
+        };
+        this.rooms.Teams.config.serverBots = 0;
+        this.rooms.Hardcore.config.serverBots = 0;
+        this.rooms.Exp.config.serverBots = 0;
+        this.rooms.Battle.config.serverBots = 0;
+        this.rooms.Tournament.config.serverBots = 0;
+        this.rooms.Exp.config.playerStartMass *= 5;
+        this.initGameWorld();
+        this.rooms.Teams.initGameWorld();
+        this.rooms.Hardcore.initGameWorld();
+        this.rooms.Exp.initGameWorld();
+        this.rooms.Battle.config.tourneyAutoFill = 0;
+        this.rooms.Battle.initGameWorld();
+        this.rooms.Tournament.initGameWorld();
+    } else {
+        this.initGameWorld();
+    }
     
     var http = require('http');
 
@@ -126,7 +191,7 @@ GameServer.prototype.start = function() {
 
       if (req.url == '/info.php' || req.url == '/api/regions') {
         var region = 'SG-Singapore';
-        var count = self.clients.filter(function(client) {
+        var count = self.getAllClients().filter(function(client) {
           return client && client.playerTracker && client.playerTracker.isOnline;
         }).length;
         var payload = {
@@ -152,6 +217,27 @@ GameServer.prototype.start = function() {
         return;
       }
 
+      if (pathname == '/api/free-skins') {
+        var skinsDir = path.join(__dirname, 'skins');
+        fs.readdir(skinsDir, function(err, files) {
+          var payload = { skins: [] };
+
+          if (!err && files) {
+            payload.skins = files.filter(function(file) {
+              return /\.(png|jpe?g|webp)$/i.test(file);
+            });
+          }
+
+          res.writeHead(200, {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Cache-Control': 'no-store'
+          });
+          res.end(JSON.stringify(payload));
+        });
+        return;
+      }
+
       if (handleAuth(req, res)) {
         return;
       }
@@ -168,32 +254,17 @@ GameServer.prototype.start = function() {
     // Start the server
     this.socketServer = new WebSocket.Server({server: hserver });
     
-    for (var i = 0; i < this.config.foodStartAmount; i++) {
-        this.spawnFood();
-    }
-    
-    // Start Main Loop
-    setInterval(this.mainLoop.bind(this), 1);
-    
     // Done
     var listenPort = this.multi ? this.port : this.config.serverPort;
     console.log("[Game] Listening on port %d", listenPort);
     console.log("[Game] Current game mode is "+this.gameMode.name);
-    
-    // Player bots (Experimental)
-    if (this.config.serverBots > 0) {
-        for (var botIndex = 0; botIndex < this.config.serverBots; botIndex++) {
-            this.bots.addBot();
-        }
-        console.log("[Game] Loaded "+this.config.serverBots+" player bots");
-    }
     // index.html is not modified by the server
     this.socketServer.on('connection', connectionEstablished.bind(this));
 
     function connectionEstablished(ws) {
 
 
-        if (this.clients.length > this.config.serverMaxConnections) {
+        if (this.getAllClients().length > this.config.serverMaxConnections) {
             ws.close();
             console.log("[Game] Client tried to connect, but server player limit has been reached!");
             return;
@@ -201,26 +272,434 @@ GameServer.prototype.start = function() {
         
         function close(error) {
             console.log("[Game] Disconnect: %s:%d", this.socket.remoteAddress, this.socket.remotePort);
-            var index = this.server.clients.indexOf(this.socket);
-            if (index != -1) {
-                this.server.clients.splice(index, 1);
-            }
+            this.server.removeSocketFromAllRooms(this.socket);
             
             // Switch online flag off
-            this.socket.playerTracker.setStatus(false);
+            if (this.socket.playerTracker) {
+                this.socket.playerTracker.setStatus(false);
+            }
         }
 
         console.log("[Game] Connect: %s:%d", ws._socket.remoteAddress, ws._socket.remotePort);
         ws.remoteAddress = ws._socket.remoteAddress;
         ws.remotePort = ws._socket.remotePort;
-        ws.playerTracker = new PlayerTracker(this, ws);
-        ws.packetHandler = new PacketHandler(this, ws);
-        ws.on('message', ws.packetHandler.handleMessage.bind(ws.packetHandler));
+        this.joinSocketToRoom(ws, this.rooms ? this.rooms.FFA : this);
+        ws.on('message', function(message) {
+            if (ws.packetHandler) {
+                ws.packetHandler.handleMessage(message);
+            }
+        });
 
         var bindObject = { server: this, socket: ws };
         ws.on('error', close.bind(bindObject));
         ws.on('close', close.bind(bindObject));
-        this.clients.push(ws);
+    }
+}
+
+GameServer.prototype.createInternalRoom = function(name, gamemodeId) {
+    var room = new GameServer(true, null, gamemodeId);
+    room.parentServer = this;
+    room.roomName = name;
+    return room;
+}
+
+GameServer.prototype.getHub = function() {
+    return this.parentServer || this;
+}
+
+GameServer.prototype.getAllClients = function() {
+    var hub = this.getHub();
+    if (!hub.rooms) {
+        return this.clients.slice();
+    }
+
+    var sockets = [];
+    Object.keys(hub.rooms).forEach(function(key) {
+        var room = hub.rooms[key];
+        for (var i = 0; i < room.clients.length; i++) {
+            if (sockets.indexOf(room.clients[i]) == -1) {
+                sockets.push(room.clients[i]);
+            }
+        }
+    });
+    for (var j = 0; j < hub.battleMatches.length; j++) {
+        var match = hub.battleMatches[j];
+        for (var k = 0; k < match.clients.length; k++) {
+            if (sockets.indexOf(match.clients[k]) == -1) {
+                sockets.push(match.clients[k]);
+            }
+        }
+    }
+    return sockets;
+}
+
+GameServer.prototype.normalizeModeName = function(mode) {
+    mode = String(mode || '').trim().toLowerCase();
+    if (mode == ':teams' || mode == 'teams') return 'Teams';
+    if (mode == ':hardcore' || mode == 'hardcore') return 'Hardcore';
+    if (mode == ':x5' || mode == 'x5' || mode == 'exp' || mode == 'experimental') return 'Exp';
+    if (mode == ':tournament' || mode == 'battle') return 'Battle';
+    if (mode == 'tournament') return 'Tournament';
+    return 'FFA';
+}
+
+GameServer.prototype.copyPlayerSession = function(oldPlayer, newPlayer) {
+    if (!oldPlayer || !newPlayer) {
+        return;
+    }
+
+    newPlayer.name = oldPlayer.name || "";
+    newPlayer.authUserId = oldPlayer.authUserId;
+    newPlayer.authUsername = oldPlayer.authUsername;
+    newPlayer.accountType = oldPlayer.accountType || 'Guest';
+    newPlayer.guildTag = oldPlayer.guildTag || '';
+    newPlayer.skinUrl = oldPlayer.skinUrl || null;
+    newPlayer.cellColor = oldPlayer.cellColor || null;
+    newPlayer.lastPassiveXpTime = oldPlayer.lastPassiveXpTime || Date.now();
+    newPlayer.battleMode = oldPlayer.battleMode || '1v1';
+    newPlayer.battleState = oldPlayer.battleState || 'idle';
+    newPlayer.battleTeam = oldPlayer.battleTeam || null;
+    newPlayer.currentMode = oldPlayer.currentMode || 'FFA';
+    newPlayer.currentRoom = oldPlayer.currentRoom || null;
+    newPlayer.battleType = oldPlayer.battleType || oldPlayer.battleMode || '1v1';
+    newPlayer.matchId = oldPlayer.matchId || null;
+}
+
+GameServer.prototype.removeSocketFromRoom = function(room, socket) {
+    if (!room || !socket) {
+        return;
+    }
+
+    var player = socket.playerTracker;
+    if (player && player.gameServer == room) {
+        var cells = player.cells.slice();
+        for (var i = 0; i < cells.length; i++) {
+            room.removeNode(cells[i]);
+        }
+        player.visibleNodes = [];
+        player.nodeDestroyQueue = [];
+    }
+
+    var index = room.clients.indexOf(socket);
+    if (index != -1) {
+        room.clients.splice(index, 1);
+    }
+}
+
+GameServer.prototype.removeSocketFromAllRooms = function(socket) {
+    var hub = this.getHub();
+    if (hub.battleQueues) {
+        hub.removeFromBattleQueues(socket);
+    }
+
+    if (hub.rooms) {
+        Object.keys(hub.rooms).forEach(function(key) {
+            hub.removeSocketFromRoom(hub.rooms[key], socket);
+        });
+    } else {
+        hub.removeSocketFromRoom(hub, socket);
+    }
+
+    for (var i = 0; i < hub.battleMatches.length; i++) {
+        hub.removeSocketFromRoom(hub.battleMatches[i], socket);
+    }
+}
+
+GameServer.prototype.joinSocketToRoom = function(socket, room) {
+    var hub = this.getHub();
+    var oldPlayer = socket.playerTracker;
+
+    hub.removeSocketFromAllRooms(socket);
+    socket.playerTracker = new PlayerTracker(room, socket);
+    hub.copyPlayerSession(oldPlayer, socket.playerTracker);
+    socket.playerTracker.gameServer = room;
+    socket.playerTracker.currentRoom = room;
+    socket.playerTracker.currentMode = room.roomName && room.roomName.indexOf('BattleMatch-') === 0 ? 'Battle' : (room.roomName || room.gameMode.name);
+    socket.packetHandler = new PacketHandler(room, socket);
+    room.clients.push(socket);
+
+    if (socket.sendPacket) {
+        socket.sendPacket(new Packet.ClearNodes());
+        socket.sendPacket(new Packet.SetBorder(room.config.borderLeft, room.config.borderRight, room.config.borderTop, room.config.borderBottom));
+    }
+
+    console.log("[JOIN_MODE] %s -> %s", socket.playerTracker.getName() || "(no nick)", room.roomName || room.gameMode.name);
+}
+
+GameServer.prototype.joinClientToMode = function(mode, socket) {
+    var hub = this.getHub();
+    var modeName = hub.normalizeModeName(mode);
+    var room = hub.rooms ? hub.rooms[modeName] : hub;
+
+    if (socket.playerTracker && (socket.playerTracker.battleState == 'finding' || socket.playerTracker.battleState == 'preparing' || socket.playerTracker.battleState == 'in_match')) {
+        console.log("[JOIN_MODE_BLOCKED] %s state=%s requested=%s room=%s", socket.playerTracker.getName() || "(no nick)", socket.playerTracker.battleState, modeName, socket.playerTracker.currentMode || "");
+        return socket.playerTracker;
+    }
+
+    if (!room) {
+        room = hub.rooms.FFA;
+    }
+
+    if (socket.playerTracker && socket.playerTracker.gameServer == room) {
+        return socket.playerTracker;
+    }
+
+    hub.joinSocketToRoom(socket, room);
+    return socket.playerTracker;
+}
+
+GameServer.prototype.removeFromBattleQueues = function(socket) {
+    if (!this.battleQueues) {
+        return;
+    }
+
+    Object.keys(this.battleQueues).forEach(function(type) {
+        var queue = this.battleQueues[type];
+        var index = queue.indexOf(socket);
+        if (index != -1) {
+            queue.splice(index, 1);
+            this.broadcastBattleQueueStatus(type);
+        }
+    }, this);
+}
+
+GameServer.prototype.broadcastBattleQueueStatus = function(battleType) {
+    if (!this.battleQueues || !this.battleQueues[battleType]) {
+        return;
+    }
+
+    var queue = this.battleQueues[battleType];
+    var count = queue.length;
+    for (var i = 0; i < queue.length; i++) {
+        this.sendBattleStatus(queue[i], 'finding', battleType, count);
+    }
+}
+
+GameServer.prototype.parkSocketForBattleQueue = function(socket) {
+    var player = socket && socket.playerTracker;
+    if (!player || !player.gameServer) {
+        return;
+    }
+
+    var room = player.gameServer;
+    var cells = player.cells.slice();
+    for (var i = 0; i < cells.length; i++) {
+        room.removeNode(cells[i]);
+    }
+
+    player.cells.length = 0;
+    player.visibleNodes = [];
+    player.nodeDestroyQueue = [];
+    player.spectate = false;
+
+    if (socket.sendPacket) {
+        socket.sendPacket(new Packet.ClearNodes());
+    }
+}
+
+GameServer.prototype.sendBattleStatus = function(socket, status, battleType, countdown) {
+    if (!socket || !socket.send || socket.readyState != WebSocket.OPEN) {
+        return;
+    }
+
+    var parts = [String(status || ''), String(battleType || ''), String(null == countdown ? '' : countdown)];
+    var size = 1;
+    for (var i = 0; i < parts.length; i++) {
+        size += parts[i].length * 2 + 2;
+    }
+    var buf = new ArrayBuffer(size);
+    var view = new DataView(buf);
+    var offset = 0;
+    view.setUint8(offset++, 106);
+    for (var p = 0; p < parts.length; p++) {
+        for (var j = 0; j < parts[p].length; j++) {
+            view.setUint16(offset, parts[p].charCodeAt(j), true);
+            offset += 2;
+        }
+        view.setUint16(offset, 0, true);
+        offset += 2;
+    }
+    socket.send(buf);
+}
+
+GameServer.prototype.joinBattleQueue = function(socket, battleType) {
+    var hub = this.getHub();
+    if (!hub.rooms || !hub.battleQueues) {
+        return;
+    }
+
+    battleType = String(battleType || '').toLowerCase() == '2v2' ? '2v2' : '1v1';
+    hub.removeFromBattleQueues(socket);
+
+    var player = socket.playerTracker;
+    hub.parkSocketForBattleQueue(socket);
+    player.battleMode = battleType;
+    player.battleState = 'finding';
+    player.currentMode = 'BattleLobby';
+    player.battleType = battleType;
+    hub.battleQueues[battleType].push(socket);
+    console.log("[BATTLE_QUEUE_JOIN] %s %s", battleType, player.getName() || "(no nick)");
+    hub.broadcastBattleQueueStatus(battleType);
+    hub.checkBattleQueue(battleType);
+}
+
+GameServer.prototype.checkBattleQueue = function(battleType) {
+    var need = battleType == '2v2' ? 4 : 2;
+    var queue = this.battleQueues[battleType];
+    while (queue.length >= need) {
+        var sockets = queue.splice(0, need);
+        this.createBattleMatch(battleType, sockets);
+    }
+    this.broadcastBattleQueueStatus(battleType);
+}
+
+GameServer.prototype.configureBattleArena = function(match, battleType) {
+    var isTwoVsTwo = battleType == '2v2';
+
+    match.config.borderLeft = 0;
+    match.config.borderTop = 0;
+    match.config.borderRight = isTwoVsTwo ? 7500 : 5000;
+    match.config.borderBottom = isTwoVsTwo ? 7500 : 5000;
+
+    match.config.foodStartAmount = isTwoVsTwo ? 320 : 180;
+    match.config.foodMaxAmount = isTwoVsTwo ? 700 : 420;
+    match.config.foodSpawnAmount = isTwoVsTwo ? 8 : 5;
+    match.config.spawnInterval = isTwoVsTwo ? 18 : 22;
+    match.config.foodMass = 1;
+    match.config.foodMaxMass = 5;
+
+    match.config.virusMinAmount = isTwoVsTwo ? 8 : 4;
+    match.config.virusMaxAmount = isTwoVsTwo ? 18 : 10;
+    match.config.virusStartMass = 100;
+    match.config.virusBurstMass = 198;
+    match.config.virusMassGain = 15;
+    match.config.playerStartMass = 300;
+    match.config.playerMaxCells = 16;
+    match.config.tourneyAutoFill = 0;
+    match.config.serverBots = 0;
+    console.log("[BATTLE_ARENA] %s map=%dx%d food=%d/%d virus=%d-%d startMass=%d",
+        battleType,
+        match.config.borderRight - match.config.borderLeft,
+        match.config.borderBottom - match.config.borderTop,
+        match.config.foodStartAmount,
+        match.config.foodMaxAmount,
+        match.config.virusMinAmount,
+        match.config.virusMaxAmount,
+        match.config.playerStartMass
+    );
+};
+
+GameServer.prototype.createBattleMatch = function(battleType, sockets) {
+    var matchId = 'battle_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
+    var match = this.createInternalRoom('BattleMatch-' + matchId, 10);
+    match.matchId = matchId;
+    match.battleType = battleType;
+    this.configureBattleArena(match, battleType);
+    match.initGameWorld();
+    match.gameMode.battleMode = battleType;
+    match.gameMode.applyBattleSettings();
+    this.battleMatches.push(match);
+
+    console.log("[BATTLE_FOUND] %s players=%d", battleType, sockets.length);
+    for (var i = 0; i < sockets.length; i++) {
+        var socket = sockets[i];
+        var oldMode = socket.playerTracker ? socket.playerTracker.battleMode : battleType;
+        this.joinSocketToRoom(socket, match);
+        socket.playerTracker.battleMode = oldMode == '2v2' ? '2v2' : battleType;
+        socket.playerTracker.battleType = battleType;
+        socket.playerTracker.battleState = 'preparing';
+        socket.playerTracker.battleTeam = battleType == '2v2' ? (i < 2 ? 'A' : 'B') : null;
+        socket.playerTracker.currentMode = 'Battle';
+        socket.playerTracker.currentRoom = match;
+        socket.playerTracker.matchId = matchId;
+        this.sendBattleStatus(socket, 'preparing', battleType, 5);
+    }
+
+    console.log("[BATTLE_PREPARING] %s", battleType);
+    setTimeout(function() {
+        this.startPreparedBattleMatch(match, battleType, sockets);
+    }.bind(this), 5000);
+}
+
+GameServer.prototype.finishBattleMatch = function() {
+    var match = this;
+    if (match.battleFinished) {
+        return;
+    }
+
+    match.battleFinished = true;
+    var hub = this.getHub();
+    var battleType = match.battleType || (match.gameMode && match.gameMode.battleMode) || '1v1';
+    var sockets = match.clients.slice();
+
+    console.log("[BATTLE_MATCH_FINISH] %s %s", match.matchId || "(no match id)", battleType);
+
+    for (var i = 0; i < sockets.length; i++) {
+        var socket = sockets[i];
+        if (!socket || !socket.playerTracker) {
+            continue;
+        }
+
+        socket.playerTracker.battleState = 'idle';
+        socket.playerTracker.currentMode = 'FFA';
+        socket.playerTracker.matchId = null;
+        socket.playerTracker.battleType = null;
+        socket.playerTracker.battleTeam = null;
+        socket.playerTracker.spectate = false;
+        match.sendBattleStatus(socket, 'finished', battleType);
+
+        if (hub.rooms && hub.rooms.FFA) {
+            hub.joinSocketToRoom(socket, hub.rooms.FFA);
+            socket.playerTracker.battleState = 'idle';
+            socket.playerTracker.currentMode = 'FFA';
+            socket.playerTracker.battleType = null;
+            socket.playerTracker.battleTeam = null;
+            socket.playerTracker.matchId = null;
+            socket.playerTracker.spectate = false;
+        }
+    }
+
+    var nodes = match.nodes.slice();
+    for (var n = 0; n < nodes.length; n++) {
+        match.removeNode(nodes[n]);
+    }
+    match.nodes.length = 0;
+    match.nodesPlayer.length = 0;
+    match.nodesVirus.length = 0;
+    match.nodesEjected.length = 0;
+    match.movingNodes.length = 0;
+    match.currentFood = 0;
+    match.leaderboard.length = 0;
+
+    var index = hub.battleMatches.indexOf(match);
+    if (index != -1) {
+        hub.battleMatches.splice(index, 1);
+    }
+}
+
+GameServer.prototype.startPreparedBattleMatch = function(match, battleType, sockets) {
+    console.log("[BATTLE_MATCH_START] %s %s", match.matchId, battleType);
+    console.log("[ROOM_GAMEMODE] %s", match.gameMode.name);
+    for (var j = 0; j < sockets.length; j++) {
+        if (!sockets[j].playerTracker || sockets[j].playerTracker.gameServer != match) {
+            continue;
+        }
+        sockets[j].playerTracker.battleState = 'in_match';
+        sockets[j].playerTracker.currentMode = 'Battle';
+        sockets[j].playerTracker.currentRoom = match;
+        sockets[j].playerTracker.battleType = battleType;
+        sockets[j].playerTracker.matchId = match.matchId;
+        console.log("[PLAYER_ROOM] %s %s %s %s", sockets[j].playerTracker.getName() || "(no nick)", sockets[j].playerTracker.currentMode, sockets[j].playerTracker.battleType, sockets[j].playerTracker.matchId);
+        this.sendBattleStatus(sockets[j], 'in_match', battleType);
+        if (sockets[j].sendPacket) {
+            sockets[j].sendPacket(new Packet.ClearNodes());
+            sockets[j].sendPacket(new Packet.SetBorder(match.config.borderLeft, match.config.borderRight, match.config.borderTop, match.config.borderBottom));
+        }
+        match.gameMode.onPlayerSpawn(match, sockets[j].playerTracker);
+    }
+
+    if (match.gameMode && match.gameMode.gamePhase == 1 && match.gameMode.startGame) {
+        match.gameMode.startGame(match);
     }
 }
 
@@ -343,7 +822,8 @@ GameServer.prototype.mainLoop = function() {
         
         // Update cells/leaderboard loop
         this.tickMain++;
-        if (this.tickMain >= 40) { // 2 seconds
+        var leaderboardTickRate = this.gameMode && this.gameMode.name == "Tournament" ? 20 : 40;
+        if (this.tickMain >= leaderboardTickRate) {
             // Update cells
             this.updateCells();
             
@@ -383,6 +863,17 @@ GameServer.prototype.awardPlayerXp = function(client, amount, reason) {
         });
 }
 
+GameServer.prototype.adjustPlayerPoints = function(client, amount, reason) {
+    if (!client || !client.authUserId || !amount || !handleAuth.adjustPoints) {
+        return;
+    }
+
+    handleAuth.adjustPoints(client.authUserId, amount, reason)
+        .catch(function(error) {
+            console.log("[Auth] Points adjust failed:", error && error.message ? error.message : error);
+        });
+}
+
 GameServer.prototype.updateClients = function() {
     for (var i = 0; i < this.clients.length; i++) {
         if (typeof this.clients[i] == "undefined") {
@@ -409,6 +900,11 @@ var f = new Entity.Food(this.getNextNodeId(), null, this.getRandomPosition(), Ma
 }
 
 GameServer.prototype.spawnPlayer = function(client) {
+   if (!client || client.gameServer !== this) {
+       console.log("[SPAWN_BLOCKED] %s requested=%s actual=%s", client && client.getName ? client.getName() : "(no client)", this.roomName || this.gameMode.name, client && client.gameServer ? (client.gameServer.roomName || client.gameServer.gameMode.name) : "(none)");
+       return;
+   }
+
    if(this.config.serverGameMode == 2) {
    var pos = this.getCertainPosition(0,0);
    } else {
@@ -522,6 +1018,10 @@ GameServer.prototype.updateMoveEngine = function() {
             this.removeNode(cell);
             continue;
         }
+
+        if (this.gameMode && this.gameMode.name == "Tournament" && this.gameMode.gamePhase == 1) {
+            continue;
+        }
         
         cell.calcMove(client.mouse.x, client.mouse.y, this);
 
@@ -560,7 +1060,7 @@ GameServer.prototype.updateMoveEngine = function() {
         if (check.getMoveTicks() > 0) {
             // If the cell has enough move ticks, then move it
             check.calcMovePhys(this.config);
-            if ((check.getType() == 3) && (this.nodesVirus.length < this.config.virusMaxAmount)) {
+            if (check.getType() == 3) {
                 // Check for viruses
                 var v = this.getNearestVirus(check);
                 if (v) { // Feeds the virus if it exists
@@ -604,20 +1104,38 @@ GameServer.prototype.splitCells = function(client) {
         var deltaX = client.mouse.x - cell.position.x;
         var angle = Math.atan2(deltaX,deltaY);
         
-        // Get starting position
-        var size = cell.getSize();
-        var startPos = {
-            x: cell.position.x + ( (size + this.config.ejectMass) * Math.sin(angle) ), 
-            y: cell.position.y + ( (size + this.config.ejectMass) * Math.cos(angle) )
-        };
         // Calculate mass of splitting cell
         var newMass = cell.mass / 2;
         cell.mass = newMass;
         cell.calcMergeTime(this.config.playerRecombineTime);
+        // Get starting position after mass split so large cells do not overlap and stutter
+        var splitSize = Math.sqrt(100 * newMass + .25) >> 0;
+        var startDistance = Math.min(splitSize * 0.35, 35);
+        var startPos = {
+            x: cell.position.x + ( startDistance * Math.sin(angle) ),
+            y: cell.position.y + ( startDistance * Math.cos(angle) )
+        };
         // Create cell
         var split = new Entity.PlayerCell(this.getNextNodeId(), client, startPos, newMass);
         split.setAngle(angle);
-        split.setMoveEngineData(60 + (cell.getSpeed() * 4), 20);
+        var splitSpeedBase = Number(this.config.playerSplitSpeedBase);
+        var splitSpeedMultiplier = Number(this.config.playerSplitSpeedMultiplier);
+        var splitMinSpeed = Number(this.config.playerSplitMinSpeed);
+        var splitMaxSpeed = Number(this.config.playerSplitMaxSpeed);
+        var splitMoveTicks = Number(this.config.playerSplitMoveTicks);
+        var splitDecay = Number(this.config.playerSplitDecay);
+        if (isNaN(splitSpeedBase)) splitSpeedBase = 120;
+        if (isNaN(splitSpeedMultiplier)) splitSpeedMultiplier = 8;
+        if (isNaN(splitMinSpeed)) splitMinSpeed = 170;
+        if (isNaN(splitMaxSpeed)) splitMaxSpeed = 245;
+        if (isNaN(splitMoveTicks)) splitMoveTicks = 24;
+        if (isNaN(splitDecay)) splitDecay = 0.82;
+        var sizeScale = Math.max(0, Math.min(1, (cell.getSize() - 35) / 210));
+        var heavyAssist = Math.sqrt(sizeScale) * 42;
+        var smallBrake = (1 - sizeScale) * 28;
+        var calculatedSplitSpeed = splitSpeedBase + (cell.getSpeed() * splitSpeedMultiplier) + heavyAssist - smallBrake;
+        var splitSpeed = Math.max(splitMinSpeed, Math.min(splitMaxSpeed, calculatedSplitSpeed));
+        split.setMoveEngineData(splitSpeed, splitMoveTicks, splitDecay);
         split.calcMergeTime(this.config.playerRecombineTime);
         split.firstSplit = true;
        setTimeout(function(){split.firstSplit = false;},1000)
@@ -699,7 +1217,7 @@ GameServer.prototype.newCellVirused = function(client, parent, angle, mass, spee
     // Create cell
     newCell = new Entity.PlayerCell(this.getNextNodeId(), client, startPos, mass);
     newCell.setAngle(angle);
-    newCell.setMoveEngineData(speed, 10);
+    newCell.setMoveEngineData(speed, 14, 0.84);
     newCell.calcMergeTime(this.config.playerRecombineTime);
     newCell.setCollisionOff(true); // Turn off collision
     
@@ -815,7 +1333,8 @@ GameServer.prototype.getCellsInRange = function(cell) {
 GameServer.prototype.getNearestVirus = function(cell) { 
     // More like getNearbyVirus
     var virus = null;
-    var r = 100; // Checking radius
+    var closestDist = Infinity;
+    var r = Math.max(160, cell.getSize() + this.config.virusStartMass);
     
     var topY = cell.position.y - r;
     var bottomY = cell.position.y + r;
@@ -835,8 +1354,14 @@ GameServer.prototype.getNearestVirus = function(cell) {
         if (!check.collisionCheck(bottomY,topY,rightX,leftX)) {
             continue;
         }
-                
-        // Add to list of cells nearby
+
+        var dist = Math.sqrt(Math.pow(check.position.x - cell.position.x, 2) + Math.pow(check.position.y - cell.position.y, 2));
+        var feedRange = check.getSize() + cell.getSize() + 40;
+        if (dist > feedRange || dist >= closestDist) {
+            continue;
+        }
+
+        closestDist = dist;
         virus = check;
     }
     return virus;

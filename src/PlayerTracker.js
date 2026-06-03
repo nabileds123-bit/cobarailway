@@ -13,9 +13,18 @@ function PlayerTracker(gameServer, socket) {
     this.authUserId = null;
     this.authUsername = null;
     this.accountType = 'Guest';
+    this.guildTag = '';
     this.skinUrl = null;
     this.cellColor = null;
     this.lastPassiveXpTime = Date.now();
+    this.battleMode = '1v1';
+    this.battlePointSettled = false;
+    this.battleState = 'idle';
+    this.battleTeam = null;
+    this.battleType = '1v1';
+    this.currentMode = gameServer && gameServer.roomName ? gameServer.roomName : '';
+    this.currentRoom = gameServer || null;
+    this.matchId = null;
 
     this.mouse = {x: 0, y: 0};
     this.tickLeaderboard = 0; // 
@@ -61,6 +70,21 @@ PlayerTracker.prototype.setName = function(name) {
 
 PlayerTracker.prototype.getName = function() {
     return this.name;
+}
+
+PlayerTracker.prototype.getGuildTag = function() {
+    return String(this.guildTag || '').trim().toUpperCase();
+}
+
+PlayerTracker.prototype.getDisplayName = function() {
+    var name = this.getName();
+    var guildTag = this.getGuildTag();
+
+    if (!name) {
+        return "";
+    }
+
+    return guildTag ? "[" + guildTag + "] " + name : name;
 }
 
 PlayerTracker.prototype.getScore = function(reCalcScore) {
