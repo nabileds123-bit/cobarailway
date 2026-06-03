@@ -60,6 +60,8 @@ function GameServer(mult, prt, gamemodeId) {
         virusStartMass: 100, // Starting virus size (In mass)
         virusBurstMass: 198, // Viruses explode past this size
         virusMassGain: null, // Mass gained when eating a virus. null = use virus mass
+        virusSplitMoveTicks: 6, // Virus split boost duration. Lower = closer burst
+        virusSplitDecay: 0.45, // Virus split boost decay. Lower = faster stop
         ejectMass: 16, // Mass of ejected cells
         ejectMassGain: 12, // Amount of mass gained from consuming ejected cells
         ejectSpeed: 120, // Base speed of ejected cells
@@ -1215,9 +1217,13 @@ GameServer.prototype.newCellVirused = function(client, parent, angle, mass, spee
     };
     
     // Create cell
-    newCell = new Entity.PlayerCell(this.getNextNodeId(), client, startPos, mass);
+    var newCell = new Entity.PlayerCell(this.getNextNodeId(), client, startPos, mass);
     newCell.setAngle(angle);
-    newCell.setMoveEngineData(speed, 14, 0.84);
+    var moveTicks = Number(this.config.virusSplitMoveTicks);
+    var moveDecay = Number(this.config.virusSplitDecay);
+    if (isNaN(moveTicks)) moveTicks = 6;
+    if (isNaN(moveDecay)) moveDecay = 0.45;
+    newCell.setMoveEngineData(speed, moveTicks, moveDecay);
     newCell.calcMergeTime(this.config.playerRecombineTime);
     newCell.setCollisionOff(true); // Turn off collision
     
