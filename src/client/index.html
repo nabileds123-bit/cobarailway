@@ -738,7 +738,7 @@
         }
         .guild-table-head {
             display: grid;
-            grid-template-columns: 44px 1fr 50px 34px;
+            grid-template-columns: 34px 1fr 46px 30px;
             align-items: center;
             min-height: 28px;
             border-bottom: 1px solid #e5e5e5;
@@ -747,6 +747,9 @@
             font-weight: bold;
             text-align: center;
         }
+        .guild-table-name {
+            text-align: left;
+        }
         .guild-list {
             height: 282px;
             overflow-y: auto;
@@ -754,15 +757,15 @@
         }
         .guild-row {
             display: grid;
-            grid-template-columns: 44px 1fr 50px 34px;
+            grid-template-columns: 34px 1fr 46px 30px;
             align-items: center;
             min-height: 54px;
             border-bottom: 1px solid #eee;
             color: #555;
         }
         .guild-icon {
-            width: 34px;
-            height: 34px;
+            width: 30px;
+            height: 30px;
             border-radius: 50%;
             border: 1px solid #cfcfcf;
             background: #2f2f2f;
@@ -781,6 +784,7 @@
             color: #337ab7;
             font-size: 14px;
             line-height: 1.2;
+            text-align: left;
             word-break: break-word;
         }
         .guild-tag {
@@ -1886,7 +1890,7 @@
                 <input id="guildSearch" type="text" class="form-control guild-search" placeholder="Search">
                 <div class="guild-table-head">
                     <span></span>
-                    <span>Guild name</span>
+                    <span class="guild-table-name">Guild name</span>
                     <span class="glyphicon glyphicon-user"></span>
                     <span>?</span>
                 </div>
