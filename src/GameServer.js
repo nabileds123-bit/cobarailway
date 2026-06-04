@@ -1111,31 +1111,20 @@ GameServer.prototype.splitCells = function(client) {
         cell.mass = newMass;
         cell.calcMergeTime(this.config.playerRecombineTime);
 
-        var splitSize = cell.getSize();
-        var startDistance = Math.min(splitSize * 0.15, 14);
+        var size = cell.getSize();
 
         var startPos = {
-            x: cell.position.x + (startDistance * Math.sin(angle)),
-            y: cell.position.y + (startDistance * Math.cos(angle))
+            x: cell.position.x + ((size + this.config.ejectMass) * Math.sin(angle)),
+            y: cell.position.y + ((size + this.config.ejectMass) * Math.cos(angle))
         };
 
         var split = new Entity.PlayerCell(this.getNextNodeId(), client, startPos, newMass);
         split.setAngle(angle);
 
-        var splitSpeedBase = Number(this.config.playerSplitSpeedBase);
-        if (isNaN(splitSpeedBase)) splitSpeedBase = 50;
-        var splitSpeedMultiplier = Number(this.config.playerSplitSpeedMultiplier);
-        if (isNaN(splitSpeedMultiplier)) splitSpeedMultiplier = 5;
-        var splitMoveTicks = Number(this.config.playerSplitMoveTicks);
-        if (isNaN(splitMoveTicks)) splitMoveTicks = 25;
-        var splitDecay = Number(this.config.playerSplitDecay);
-        if (isNaN(splitDecay)) splitDecay = 0.75;
+        var splitSpeed = 50 + (cell.getSpeed() * 5);
 
-        var calculatedSplitSpeed = splitSpeedBase + (cell.getSpeed() * splitSpeedMultiplier);
-
-        split.setMoveEngineData(calculatedSplitSpeed, splitMoveTicks, splitDecay);
+        split.setMoveEngineData(splitSpeed, 25, 0.75);
         split.calcMergeTime(this.config.playerRecombineTime);
-        split.setCollisionOff(true);
         split.firstSplit = true;
 
         setTimeout(function() {
