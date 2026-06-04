@@ -217,6 +217,7 @@
                 case 32: // split
                     if ((!spacePressed) && (!isTyping)) {
                         sendMouseMove();
+                        predictLocalSplit();
                         sendUint8(17);
                         spacePressed = true;
                     }
@@ -332,6 +333,7 @@
             var size = ~~ (canvasWidth / 7);
             if ((touch.clientX > canvasWidth - size) && (touch.clientY > canvasHeight - size)) {
                 sendMouseMove();
+                predictLocalSplit();
                 sendUint8(17); //split
             }
 
@@ -547,6 +549,8 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         nodes = {};
         nodelist = [];
         Cells = [];
+        splitPredictions = [];
+        lastSplitPredictionAt = 0;
         leaderBoard = [];
         mainCanvas = teamScores = null;
         userScore = 0;
@@ -668,6 +672,8 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
                 nodes = {};
                 nodelist = [];
                 Cells = [];
+                splitPredictions = [];
+                lastSplitPredictionAt = 0;
                 break;
             case 21: // draw line
                 lineX = msg.getInt16(offset, true);
@@ -952,6 +958,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
                 skinUrl += String.fromCharCode(skinChar)
             }
             var node = null;
+            var isOwnScreenNode = -1 != nodesOnScreen.indexOf(nodeid);
             if (nodes.hasOwnProperty(nodeid)) {
                 node = nodes[nodeid];
                 node.updatePos();
@@ -960,7 +967,8 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
                 node.oSize = node.size;
                 node.color = colorstr;
             } else {
-                node = new Cell(nodeid, posX, posY, size, colorstr, name);
+                var predictedVisual = isOwnScreenNode && flagPlayerCell ? claimSplitPrediction(posX, posY, size, timestamp) : null;
+                node = new Cell(nodeid, predictedVisual ? predictedVisual.x : posX, predictedVisual ? predictedVisual.y : posY, predictedVisual ? predictedVisual.size : size, colorstr, name);
                 nodelist.push(node);
                 nodes[nodeid] = node;
                 node.ka = posX;
@@ -977,7 +985,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
             node.updateTime = timestamp;
             node.flag = flags;
             name && node.setName(name);
-            if (-1 != nodesOnScreen.indexOf(nodeid) && -1 == playerCells.indexOf(node)) {
+            if (isOwnScreenNode && -1 == playerCells.indexOf(node)) {
                 document.getElementById("overlays").style.display = "none";
                 playerCells.push(node);
                 noteMatchSpawn();
@@ -1221,6 +1229,269 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         return hasClickedPlay && wsIsOpen() && playerCells.length > 0;
     };
 
+    function isLocalSplitGhost(cell) {
+        return !!(cell && cell.localSplitGhost);
+    }
+
+    function removePredictionGhost(prediction) {
+        var ghost = prediction && prediction.ghost;
+        if (!ghost) {
+            return;
+        }
+
+        var tmp = nodelist.indexOf(ghost);
+        if (-1 != tmp) {
+            nodelist.splice(tmp, 1);
+        }
+        tmp = playerCells.indexOf(ghost);
+        if (-1 != tmp) {
+            playerCells.splice(tmp, 1);
+        }
+        tmp = nodesOnScreen.indexOf(ghost.id);
+        if (-1 != tmp) {
+            nodesOnScreen.splice(tmp, 1);
+        }
+        delete nodes[ghost.id];
+        ghost.destroyed = true;
+        prediction.ghost = null;
+    }
+
+    function fadePredictionGhost(prediction, now) {
+        var ghost = prediction && prediction.ghost;
+        if (!ghost || ghost.destroyed) {
+            return;
+        }
+
+        ghost.updatePos();
+        ghost.ox = ghost.x;
+        ghost.oy = ghost.y;
+        ghost.oSize = ghost.size;
+        ghost.nx = prediction.parent && !prediction.parent.destroyed ? prediction.parent.x : ghost.x;
+        ghost.ny = prediction.parent && !prediction.parent.destroyed ? prediction.parent.y : ghost.y;
+        ghost.nSize = Math.max(0, ghost.size * .35);
+        ghost.updateTime = now;
+        ghost.destroy();
+        prediction.ghost = null;
+    }
+
+    function rejectSplitPrediction(prediction, now) {
+        if (!prediction || prediction.done) {
+            return;
+        }
+
+        prediction.done = true;
+        if (prediction.parent && !prediction.parent.destroyed) {
+            prediction.parent.updatePos();
+            prediction.parent.ox = prediction.parent.x;
+            prediction.parent.oy = prediction.parent.y;
+            prediction.parent.oSize = prediction.parent.size;
+            prediction.parent.nx = prediction.parent.x;
+            prediction.parent.ny = prediction.parent.y;
+            prediction.parent.nSize = Math.max(prediction.originalSize || 0, prediction.parent.nSize || 0);
+            prediction.parent.updateTime = now;
+            prediction.parent.localSplitPending = false;
+        }
+        fadePredictionGhost(prediction, now);
+    }
+
+    function cleanupSplitPredictions(now) {
+        for (var i = splitPredictions.length - 1; i >= 0; i--) {
+            var prediction = splitPredictions[i];
+            if (!prediction || prediction.done) {
+                splitPredictions.splice(i, 1);
+                continue;
+            }
+            if (SPLIT_PREDICTION_TIMEOUT_MS <= now - prediction.createdAt) {
+                rejectSplitPrediction(prediction, now);
+                splitPredictions.splice(i, 1);
+            }
+        }
+    }
+
+    function updateSplitPredictions(now) {
+        cleanupSplitPredictions(now);
+        for (var i = 0; i < splitPredictions.length; i++) {
+            var prediction = splitPredictions[i];
+            var ghost = prediction && prediction.ghost;
+            if (!ghost || ghost.destroyed) {
+                continue;
+            }
+
+            var elapsed = Math.max(0, now - ghost.localSplitLastMoveAt);
+            if (0 >= elapsed) {
+                continue;
+            }
+
+            var steps = Math.min(elapsed / 50, 1.5);
+            var distance = ghost.localSplitSpeed * steps;
+            ghost.localSplitSpeed *= Math.pow(SPLIT_PREDICTION_DECAY, steps);
+            ghost.localSplitLastMoveAt = now;
+            ghost.x += ghost.localSplitDirX * distance;
+            ghost.y += ghost.localSplitDirY * distance;
+            ghost.ox = ghost.nx = ghost.x;
+            ghost.oy = ghost.ny = ghost.y;
+            ghost.oSize = ghost.nSize = ghost.size;
+            ghost.updateTime = now;
+        }
+    }
+
+    function claimSplitPrediction(serverX, serverY, serverSize, now) {
+        var bestIndex = -1;
+        var bestScore = Number.POSITIVE_INFINITY;
+
+        for (var i = 0; i < splitPredictions.length; i++) {
+            var prediction = splitPredictions[i];
+            var ghost = prediction && prediction.ghost;
+            if (!prediction || prediction.done || !ghost || ghost.destroyed || SPLIT_PREDICTION_CLAIM_MS < now - prediction.createdAt) {
+                continue;
+            }
+
+            ghost.updatePos();
+            var dx = ghost.x - serverX;
+            var dy = ghost.y - serverY;
+            var sizeDiff = (ghost.size || serverSize) - serverSize;
+            var score = dx * dx + dy * dy + sizeDiff * sizeDiff * 9;
+            if (score < bestScore) {
+                bestScore = score;
+                bestIndex = i;
+            }
+        }
+
+        if (-1 == bestIndex) {
+            return null;
+        }
+
+        var matched = splitPredictions.splice(bestIndex, 1)[0];
+        matched.done = true;
+        if (matched.parent) {
+            matched.parent.localSplitPending = false;
+        }
+
+        var ghost = matched.ghost;
+        var visual = {
+            x: ghost.x,
+            y: ghost.y,
+            size: ghost.size
+        };
+        removePredictionGhost(matched);
+        return visual;
+    }
+
+    function getSplitPredictionDirection(cell) {
+        mouseCoordinateChange();
+        var dx = X - cell.x;
+        var dy = Y - cell.y;
+        var distance = Math.sqrt(dx * dx + dy * dy);
+        if (!isFinite(distance) || 1 > distance) {
+            dx = rawMouseX - canvasWidth / 2;
+            dy = rawMouseY - canvasHeight / 2;
+            distance = Math.sqrt(dx * dx + dy * dy);
+        }
+        if (!isFinite(distance) || 1 > distance) {
+            return {
+                x: 1,
+                y: 0
+            };
+        }
+        return {
+            x: dx / distance,
+            y: dy / distance
+        };
+    }
+
+    function createSplitPrediction(parent, now) {
+        parent.updatePos();
+
+        var originalSize = Math.max(parent.size || 0, parent.nSize || 0, parent.oSize || 0);
+        if (!(0 < originalSize)) {
+            return false;
+        }
+
+        var splitSize = Math.max(10, originalSize / Math.SQRT2);
+        var direction = getSplitPredictionDirection(parent);
+        var startDistance = Math.min(splitSize * .12, 12);
+        var initialKick = Math.min(Math.max(splitSize * .55, 36), 95);
+
+        parent.ox = parent.nx = parent.x;
+        parent.oy = parent.ny = parent.y;
+        parent.oSize = parent.nSize = parent.size = splitSize;
+        parent.updateTime = now;
+        parent.localSplitPending = true;
+
+        var ghost = new Cell(splitPredictionCounter--, parent.x + direction.x * (startDistance + initialKick), parent.y + direction.y * (startDistance + initialKick), splitSize, parent.color, parent.name || "");
+        ghost.skinUrl = parent.skinUrl || "";
+        ghost.isPlayerCell = true;
+        ghost.flag = 128;
+        ghost.localSplitGhost = true;
+        ghost.localSplitDirX = direction.x;
+        ghost.localSplitDirY = direction.y;
+        ghost.localSplitSpeed = SPLIT_PREDICTION_SPEED;
+        ghost.localSplitLastMoveAt = now;
+        ghost.updateTime = now;
+        ghost.updateCode = now;
+        ghost.ox = ghost.nx = ghost.x;
+        ghost.oy = ghost.ny = ghost.y;
+        ghost.oSize = ghost.nSize = ghost.size;
+
+        nodes[ghost.id] = ghost;
+        nodesOnScreen.push(ghost.id);
+        nodelist.push(ghost);
+        playerCells.push(ghost);
+        splitPredictions.push({
+            parent: parent,
+            parentId: parent.id,
+            ghost: ghost,
+            originalSize: originalSize,
+            createdAt: now,
+            done: false
+        });
+        return true;
+    }
+
+    function predictLocalSplit() {
+        if (!wsIsOpen() || 0 == playerCells.length) {
+            return;
+        }
+
+        var now = Date.now();
+        if (now - lastSplitPredictionAt < SPLIT_PREDICTION_COOLDOWN_MS) {
+            return;
+        }
+
+        timestamp = now;
+        cleanupSplitPredictions(now);
+        var freeSlots = Math.max(0, SPLIT_PREDICTION_MAX_CELLS - playerCells.length);
+        if (0 >= freeSlots) {
+            return;
+        }
+
+        var candidates = [];
+        for (var i = 0; i < playerCells.length; i++) {
+            var cell = playerCells[i];
+            if (!cell || cell.destroyed || isLocalSplitGhost(cell) || cell.localSplitPending) {
+                continue;
+            }
+
+            cell.updatePos();
+            var size = Math.max(cell.nSize || 0, cell.size || 0);
+            if (SPLIT_PREDICTION_MIN_SIZE <= size) {
+                candidates.push(cell);
+            }
+        }
+
+        var predicted = false;
+        for (i = 0; i < candidates.length && 0 < freeSlots; i++) {
+            if (createSplitPrediction(candidates[i], now)) {
+                predicted = true;
+                freeSlots--;
+            }
+        }
+
+        if (predicted) {
+            lastSplitPredictionAt = now;
+        }
+    }
+
     wHandle.hasPlayedGame = function () {
         return hasClickedPlay;
     };
@@ -1301,6 +1572,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
 
         ++cb;
         timestamp = oldtime;
+        updateSplitPredictions(oldtime);
         if (0 < playerCells.length) {
             calcViewZoom();
             var c = a = 0;
@@ -1843,7 +2115,17 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         isTouchStart = "ontouchstart" in wHandle && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent),
         splitIcon = new Image,
         ejectIcon = new Image,
-        noRanking = false;
+        noRanking = false,
+        splitPredictionCounter = -1,
+        splitPredictions = [],
+        lastSplitPredictionAt = 0,
+        SPLIT_PREDICTION_MAX_CELLS = 16,
+        SPLIT_PREDICTION_MIN_SIZE = Math.floor(Math.sqrt(40 * 100 + .25)),
+        SPLIT_PREDICTION_SPEED = 150,
+        SPLIT_PREDICTION_DECAY = .82,
+        SPLIT_PREDICTION_COOLDOWN_MS = 90,
+        SPLIT_PREDICTION_TIMEOUT_MS = 320,
+        SPLIT_PREDICTION_CLAIM_MS = 520;
     splitIcon.src = "/client/split.png";
     ejectIcon.src = "/client/feed.png";
     var wCanvas = document.createElement("canvas");
