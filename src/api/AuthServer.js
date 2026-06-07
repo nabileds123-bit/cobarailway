@@ -5,6 +5,7 @@ var path = require('path');
 var tls = require('tls');
 
 var dbPath = path.join(__dirname, '..', 'data', 'users.json');
+var freeSkinsPath = path.join(__dirname, '..', 'skins');
 var memorySessions = {};
 var mysqlPool = null;
 var mysqlReady = null;
@@ -2110,6 +2111,63 @@ function handleUploadSkin(req, res) {
     sendJson(res, 400, { ok: false, error: 'Player skin must be a PNG file.' });
 }
 
+function getPickableSkinFile(fileName) {
+    var cleanName = path.basename(String(fileName || '').trim());
+
+    if (!cleanName || cleanName != String(fileName || '').trim()) {
+        return null;
+    }
+
+    if (!/\.(png|jpe?g)$/i.test(cleanName)) {
+        return null;
+    }
+
+    var fullPath = path.join(freeSkinsPath, cleanName);
+    if (path.dirname(fullPath) != freeSkinsPath || !fs.existsSync(fullPath)) {
+        return null;
+    }
+
+    if (!fs.statSync(fullPath).isFile()) {
+        return null;
+    }
+
+    return cleanName;
+}
+
+function handlePickSkin(req, res) {
+    readBody(req, function(err, body) {
+        if (err) {
+            sendJson(res, 400, { ok: false, error: 'JSON tidak valid.' });
+            return;
+        }
+
+        var fileName = getPickableSkinFile(body.skin || body.file || body.fileName || '');
+        if (!fileName) {
+            sendJson(res, 400, { ok: false, error: 'Skin tidak valid.' });
+            return;
+        }
+
+        requireUser(req, res)
+            .then(function(user) {
+                if (!user) {
+                    return;
+                }
+
+                user.skinUrl = '/skins/' + encodeURIComponent(fileName);
+                return saveAccountFields(user).then(function(savedUser) {
+                    sendJson(res, 200, {
+                        ok: true,
+                        message: 'Skin berhasil dipilih.',
+                        user: publicUser(savedUser)
+                    });
+                });
+            })
+            .catch(function(error) {
+                handleError(res, error);
+            });
+    });
+}
+
 function handleGuildList(req, res) {
     listGuilds()
         .then(function(guilds) {
@@ -2744,6 +2802,11 @@ function handleAuth(req, res) {
 
     if (req.method == 'POST' && req.url == '/api/account/upload-skin') {
         handleUploadSkin(req, res);
+        return true;
+    }
+
+    if (req.method == 'POST' && req.url == '/api/account/pick-skin') {
+        handlePickSkin(req, res);
         return true;
     }
 

@@ -583,6 +583,57 @@
         .profile-skin.active {
             border: 2px solid #31b0d5;
         }
+        .profile-skin-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .profile-skin-actions .btn {
+            flex: 1;
+        }
+        #pickSkinPanel {
+            display: none;
+            margin-top: 10px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            background: #fff;
+            max-height: 206px;
+            overflow: auto;
+        }
+        #pickSkinPanel.is-open {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
+            gap: 8px;
+        }
+        .pick-skin-option {
+            width: 58px;
+            min-height: 76px;
+            padding: 4px;
+            border: 1px solid #ddd;
+            background: #fafafa;
+            cursor: pointer;
+            text-align: center;
+        }
+        .pick-skin-option:hover,
+        .pick-skin-option.is-selected {
+            border-color: #31b0d5;
+            background: #eef9fd;
+        }
+        .pick-skin-option img {
+            width: 46px;
+            height: 46px;
+            border-radius: 50%;
+            object-fit: cover;
+            background: #fff;
+        }
+        .pick-skin-name {
+            display: block;
+            margin-top: 3px;
+            font-size: 10px;
+            line-height: 12px;
+            color: #555;
+            word-break: break-word;
+        }
         .profile-color-wrap {
             position: relative;
             display: inline-flex;
@@ -660,7 +711,7 @@
             font-size: 12px;
         }
         #uploadSkinButton {
-            margin-top: 40px;
+            margin-top: 10px;
             background-color: #f0ad4e;
             border-color: #eea236;
             color: #fff;
@@ -1797,6 +1848,11 @@
                 <img id="profileGuildSkin" class="profile-skin" alt="Guild skin" style="display:none"/>
             </span>
         </div>
+        <div class="profile-skin-actions">
+            <button id="pickSkinButton" class="btn btn-primary" type="button">Pick skin</button>
+            <button id="closePickSkinButton" class="btn btn-default" type="button" style="display:none">Close</button>
+        </div>
+        <div id="pickSkinPanel"></div>
         <div class="profile-row">
             <span class="profile-label">Level:</span>
             <span id="profileLevel" class="profile-value">1</span>
@@ -2174,6 +2230,8 @@
             '#D61017',
             '#D9A5FC'
         ];
+        var pickSkinLoaded = false;
+        var pickSkinLoading = false;
 
         function authRequest(path, data) {
             return $.ajax({
@@ -2252,6 +2310,92 @@
             });
         }
 
+        function normalizePickedSkinUrl(fileName) {
+            return '/skins/' + encodeURIComponent(String(fileName || ''));
+        }
+
+        function getSkinDisplayName(fileName) {
+            return String(fileName || '').replace(/\.[^.]+$/, '').replace(/_/g, ' ');
+        }
+
+        function markPickedSkin() {
+            var currentSkin = currentUser && currentUser.skinUrl ? String(currentUser.skinUrl) : '';
+            $('#pickSkinPanel .pick-skin-option').removeClass('is-selected');
+            if (!currentSkin) {
+                return;
+            }
+
+            $('#pickSkinPanel .pick-skin-option').each(function() {
+                var fileName = $(this).attr('data-skin-file');
+                if (normalizePickedSkinUrl(fileName) == currentSkin || '/skins/' + fileName == currentSkin) {
+                    $(this).addClass('is-selected');
+                }
+            });
+        }
+
+        function renderPickSkinPanel(files) {
+            var panel = $('#pickSkinPanel');
+            var seen = {};
+            panel.empty();
+
+            files = (files || []).filter(function(fileName) {
+                var key = String(fileName || '').replace(/\.[^.]+$/, '').toLowerCase();
+                if (!/\.(png|jpe?g)$/i.test(fileName) || seen[key]) {
+                    return false;
+                }
+                seen[key] = true;
+                return true;
+            }).sort(function(a, b) {
+                return String(a).localeCompare(String(b));
+            });
+
+            if (!files.length) {
+                panel.text('Tidak ada skin PNG/JPG di folder skins.');
+                return;
+            }
+
+            files.forEach(function(fileName) {
+                var button = $('<button type="button" class="pick-skin-option"></button>')
+                    .attr('data-skin-file', fileName)
+                    .attr('title', getSkinDisplayName(fileName));
+                $('<img alt="">')
+                    .attr('src', normalizePickedSkinUrl(fileName))
+                    .appendTo(button);
+                $('<span class="pick-skin-name"></span>')
+                    .text(getSkinDisplayName(fileName))
+                    .appendTo(button);
+                button.appendTo(panel);
+            });
+
+            markPickedSkin();
+        }
+
+        function loadPickSkins() {
+            var panel = $('#pickSkinPanel');
+            if (pickSkinLoaded || pickSkinLoading) {
+                markPickedSkin();
+                return;
+            }
+
+            pickSkinLoading = true;
+            panel.text('Loading skins...');
+            $.ajax({
+                url: '/api/free-skins',
+                method: 'GET',
+                dataType: 'json'
+            })
+                .done(function(result) {
+                    renderPickSkinPanel(result && result.skins ? result.skins : []);
+                    pickSkinLoaded = true;
+                })
+                .fail(function() {
+                    panel.text('Gagal load daftar skin.');
+                })
+                .always(function() {
+                    pickSkinLoading = false;
+                });
+        }
+
         function applyLoggedInUser(user) {
             var hadPremium = currentUser && String(currentUser.accountType || '').toLowerCase() == 'premium';
             currentUser = user;
@@ -2314,6 +2458,7 @@
                 $('#profileGuildSkin').removeAttr('src').hide();
             }
             $('#profileSkinRow').toggle(hasSkin || hasGuildSkin);
+            markPickedSkin();
         }
 
         window.updateAccountPoints = function(points) {
@@ -3912,6 +4057,51 @@
         });
         $(document).on('click', function() {
             $('#cellColorPalette').removeClass('is-open');
+        });
+        $('#pickSkinButton').on('click', function(e) {
+            e.preventDefault();
+            var status = $('#uploadSkinStatus');
+            if (!currentUser) {
+                status.removeClass('text-success').addClass('text-danger').text('Login dulu untuk pilih skin.').show();
+                return;
+            }
+
+            $('#pickSkinPanel').addClass('is-open');
+            $('#closePickSkinButton').show();
+            loadPickSkins();
+        });
+        $('#closePickSkinButton').on('click', function(e) {
+            e.preventDefault();
+            $('#pickSkinPanel').removeClass('is-open');
+            $('#closePickSkinButton').hide();
+        });
+        $('#pickSkinPanel').on('click', '.pick-skin-option', function(e) {
+            e.preventDefault();
+            var fileName = $(this).attr('data-skin-file');
+            var status = $('#uploadSkinStatus');
+
+            if (!currentUser) {
+                status.removeClass('text-success').addClass('text-danger').text('Login dulu untuk pilih skin.').show();
+                return;
+            }
+
+            status.removeClass('text-danger').addClass('text-success').text('Menyimpan skin...').show();
+            $('#pickSkinPanel .pick-skin-option').prop('disabled', true);
+
+            authPost('/api/account/pick-skin', { skin: fileName })
+                .done(function(result) {
+                    applyLoggedInUser(result.user);
+                    if (window.refreshAccountSkin) {
+                        window.refreshAccountSkin();
+                    }
+                    status.removeClass('text-danger').addClass('text-success').text(result.message || 'Skin berhasil dipilih.').show();
+                })
+                .fail(function(xhr) {
+                    showAuthError(status, xhr, 'Pilih skin gagal.');
+                })
+                .always(function() {
+                    $('#pickSkinPanel .pick-skin-option').prop('disabled', false);
+                });
         });
         $('#logoutLink').on('click', function(e) {
             e.preventDefault();
