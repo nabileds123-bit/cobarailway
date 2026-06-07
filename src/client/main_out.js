@@ -817,8 +817,9 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
             color = '0' + color;
         }
         color = '#' + color;
+        var playerName = getString();
         chatBoard.push({
-            "name": getString(),
+            "name": playerName,
             "color": color,
             "message": getString(),
             "time": Date.now()
@@ -839,6 +840,132 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         drawChatBoard();
     }
 
+    function getChatFont(size) {
+        return '700 ' + size + 'px Helvetica, Arial, sans-serif';
+    }
+
+    function wrapChatText(ctx, text, maxWidth) {
+        text = String(text || '');
+        if (maxWidth <= 0) return [text];
+        var words = text.split(/\s+/);
+        var lines = [];
+        var line = '';
+        for (var i = 0; i < words.length; i++) {
+            var word = words[i];
+            if (!word) continue;
+            var testLine = line ? line + ' ' + word : word;
+            if (ctx.measureText(testLine).width <= maxWidth) {
+                line = testLine;
+                continue;
+            }
+            if (line) {
+                lines.push(line);
+                line = '';
+            }
+            while (ctx.measureText(word).width > maxWidth && word.length > 1) {
+                var cut = 1;
+                while (cut < word.length && ctx.measureText(word.slice(0, cut + 1)).width <= maxWidth) {
+                    cut++;
+                }
+                lines.push(word.slice(0, cut));
+                word = word.slice(cut);
+            }
+            line = word;
+        }
+        if (line || !lines.length) lines.push(line);
+        return lines;
+    }
+
+    function wrapChatMessage(ctx, text, firstMaxWidth, nextMaxWidth) {
+        text = String(text || '');
+        var words = text.split(/\s+/);
+        var lines = [];
+        var line = '';
+        var maxWidth = firstMaxWidth;
+        for (var i = 0; i < words.length; i++) {
+            var word = words[i];
+            if (!word) continue;
+            var testLine = line ? line + ' ' + word : word;
+            if (ctx.measureText(testLine).width <= maxWidth) {
+                line = testLine;
+                continue;
+            }
+            if (line) {
+                lines.push(line);
+                line = '';
+                maxWidth = nextMaxWidth;
+            }
+            while (ctx.measureText(word).width > maxWidth && word.length > 1) {
+                var cut = 1;
+                while (cut < word.length && ctx.measureText(word.slice(0, cut + 1)).width <= maxWidth) {
+                    cut++;
+                }
+                lines.push(word.slice(0, cut));
+                word = word.slice(cut);
+                maxWidth = nextMaxWidth;
+            }
+            line = word;
+        }
+        if (line || !lines.length) lines.push(line);
+        return lines;
+    }
+
+    function buildChatRenderLines(ctx, entries, chatWidth, paddingX) {
+        var fontSize = 14;
+        var lineHeight = 18;
+        var nameGap = 2;
+        var lines = [];
+        ctx.font = getChatFont(fontSize);
+        for (var i = 0; i < entries.length; i++) {
+            var entry = entries[i];
+            if (entry.system) {
+                var systemLines = wrapChatText(ctx, entry.message, chatWidth - paddingX * 2);
+                for (var s = 0; s < systemLines.length; s++) {
+                    lines.push({
+                        text: systemLines[s],
+                        color: '#666666',
+                        x: paddingX,
+                        time: entry.time,
+                        first: true,
+                        lineHeight: lineHeight
+                    });
+                }
+                continue;
+            }
+
+            var displayName = entry.name + ':';
+            var nameWidth = ctx.measureText(displayName).width;
+            var firstTextX = paddingX + nameWidth + nameGap;
+            var continuationX = paddingX;
+            var wrapped = wrapChatMessage(ctx, entry.message, chatWidth - firstTextX - paddingX, chatWidth - continuationX - paddingX);
+            for (var j = 0; j < wrapped.length; j++) {
+                if (j === 0) {
+                    lines.push({
+                        name: displayName,
+                        nameColor: entry.color,
+                        text: wrapped[j],
+                        color: '#DDDDDD',
+                        nameX: paddingX,
+                        textX: firstTextX,
+                        time: entry.time,
+                        first: true,
+                        lineHeight: lineHeight
+                    });
+                } else {
+                    lines.push({
+                        text: wrapped[j],
+                        color: '#DDDDDD',
+                        x: continuationX,
+                        time: entry.time,
+                        first: false,
+                        lineHeight: lineHeight
+                    });
+                }
+            }
+        }
+        return lines;
+    }
+
     function drawChatBoard() {
         //chatCanvas = null;
         if (!showChat) {
@@ -849,47 +976,70 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
             return;
         }
 
+        var nowtime = Date.now();
+        var chatMessageLifetime = 15000;
+        var chatRemovalDelay = 3000;
+        if (!drawChatBoard.lastRemovalTime || nowtime - drawChatBoard.lastRemovalTime >= chatRemovalDelay) {
+            for (var oldEntryIndex = 0; oldEntryIndex < chatBoard.length; oldEntryIndex++) {
+                if (nowtime - chatBoard[oldEntryIndex].time >= chatMessageLifetime) {
+                    chatBoard.splice(oldEntryIndex, 1);
+                    drawChatBoard.lastRemovalTime = nowtime;
+                    break;
+                }
+            }
+        }
         if (chatBoard.length < 1) {
+            chatCanvas = null;
             return;
         }
 
         chatCanvas = document.createElement("canvas");
         var ctx = chatCanvas.getContext("2d");
         var scaleFactor = Math.min(Math.max(canvasWidth / 1200, 0.75),1); //scale factor = 0.75 to 1
-        chatCanvas.width = 1000 * scaleFactor;
-        chatCanvas.height = 550 * scaleFactor;
+        var chatWidth = 315;
+        var maxChatHeight = 450;
+        var paddingX = 6;
+        var paddingY = 12;
+        var measureCanvas = document.createElement("canvas");
+        var measureCtx = measureCanvas.getContext("2d");
+        var lineHeight = 18;
+        var maxLines = Math.floor((maxChatHeight - paddingY * 2) / lineHeight);
+        var chatLines = [];
+        for (var entryIndex = chatBoard.length - 1; entryIndex >= 0; entryIndex--) {
+            var entryLines = buildChatRenderLines(measureCtx, [chatBoard[entryIndex]], chatWidth, paddingX);
+            if (entryLines.length > maxLines) {
+                chatLines = entryLines.slice(entryLines.length - maxLines);
+                break;
+            }
+            if (entryLines.length + chatLines.length > maxLines) {
+                break;
+            }
+            chatLines = entryLines.concat(chatLines);
+        }
+        var chatHeight = maxChatHeight;
+        chatCanvas.width = chatWidth * scaleFactor;
+        chatCanvas.height = chatHeight * scaleFactor;
         ctx.scale(scaleFactor, scaleFactor);
-        var nowtime = Date.now();
-        var lasttime = 0;
-        lasttime = chatBoard[chatBoard.length - 1].time;
-        var deltat = nowtime - lasttime;
-
-        ctx.globalAlpha = 0.8 * Math.exp(-deltat / 25000);
         //console.log(deltat);
 
+        for (var i = 0; i < chatLines.length; i++) {
+            var line = chatLines[i];
+            ctx.globalAlpha = 0.8;
+            var y = paddingY + lineHeight * i;
+            if (line.name) {
+                var chatName = new UText(14, line.nameColor, false, null, 'Helvetica, Arial, sans-serif', '700');
+                chatName.setValue(line.name);
+                safeDrawImage(ctx, chatName.render(), line.nameX, y);
 
-        var len = chatBoard.length;
-        var from = len - 15;
-        if (from < 0) from = 0;
-        for (var i = 0; i < (len - from); i++) {
-            if (chatBoard[i + from].system) {
-                var systemText = new UText(18, '#666666');
-                systemText.setValue(chatBoard[i + from].message);
-                var renderedSystemText = systemText.render();
-                safeDrawImage(ctx, renderedSystemText, 15, chatCanvas.height / scaleFactor - 24 * (len - i - from));
+                var firstChatText = new UText(14, line.color, false, null, 'Helvetica, Arial, sans-serif', '700');
+                firstChatText.setValue(line.text);
+                safeDrawImage(ctx, firstChatText.render(), line.textX, y);
                 continue;
             }
 
-            var chatName = new UText(18, chatBoard[i + from].color);
-            chatName.setValue(chatBoard[i + from].name);
-            var width = chatName.getWidth();
-            var a = chatName.render();
-            safeDrawImage(ctx, a, 15, chatCanvas.height / scaleFactor - 24 * (len - i - from));
-
-            var chatText = new UText(18, '#666666');
-            chatText.setValue(':' + chatBoard[i + from].message);
-            a = chatText.render();
-            safeDrawImage(ctx, a, 15 + width * 1.8, chatCanvas.height / scaleFactor - 24 * (len - from - i));
+            var chatText = new UText(14, line.color, false, null, 'Helvetica, Arial, sans-serif', '700');
+            chatText.setValue(line.text);
+            safeDrawImage(ctx, chatText.render(), line.x, y);
         }
         //ctx.restore();
     }
@@ -1350,6 +1500,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         ctx.translate(canvasWidth / 2, canvasHeight / 2);
         ctx.scale(viewZoom, viewZoom);
         ctx.translate(-nodeX, -nodeY);
+        drawMapBorder(ctx);
         for (d = 0; d < Cells.length; d++) Cells[d].drawOneCell(ctx);
 
         for (d = 0; d < nodelist.length; d++) nodelist[d].drawOneCell(ctx);
@@ -1374,7 +1525,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         }
         ctx.restore();
         lbCanvas && showLeaderboard && lbCanvas.width && safeDrawImage(ctx, lbCanvas, canvasWidth - lbCanvas.width - 10, 10); // draw Leader Board
-        if (showChat && chatCanvas != null) safeDrawImage(ctx, chatCanvas, 0, canvasHeight - chatCanvas.height - 50); // draw Chat
+        if (showChat && chatCanvas != null) safeDrawImage(ctx, chatCanvas, 4, canvasHeight - chatCanvas.height - 44); // draw Chat
 
         userScore = Math.max(userScore, calcUserScore());
         updateMatchMassStats();
@@ -1448,6 +1599,23 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         //c.fillText("hello", 0,0);
         ctx.restore();
     }
+
+    function drawMapBorder(ctx) {
+        var width = rightPos - leftPos,
+            height = bottomPos - topPos;
+        if (!(0 < width) || !(0 < height) || !isFinite(width) || !isFinite(height)) {
+            return;
+        }
+
+        ctx.save();
+        ctx.strokeStyle = showDarkTheme ? "#FFFFFF" : "#154865";
+        ctx.globalAlpha = .6;
+        ctx.lineWidth = 1 / viewZoom;
+        ctx.lineJoin = "miter";
+        ctx.strokeRect(leftPos, topPos, width, height);
+        ctx.restore();
+    }
+
     function drawGrid() {
         ctx.fillStyle = showDarkTheme ? "#111111" : "#F2FBFF";
         ctx.fillRect(0, 0, canvasWidth, canvasHeight);
@@ -1784,11 +1952,13 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         this.setName(uname)
     }
 
-    function UText(usize, ucolor, ustroke, ustrokecolor) {
+    function UText(usize, ucolor, ustroke, ustrokecolor, ufontfamily, ufontweight) {
         usize && (this._size = usize);
         ucolor && (this._color = ucolor);
         this._stroke = !!ustroke;
-        ustrokecolor && (this._strokeColor = ustrokecolor)
+        ustrokecolor && (this._strokeColor = ustrokecolor);
+        ufontfamily && (this._fontFamily = ufontfamily);
+        ufontweight && (this._fontWeight = ufontweight)
     }
 
 
@@ -2378,6 +2548,8 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         _ctx: null,
         _dirty: false,
         _scale: 1,
+        _fontFamily: "Ubuntu",
+        _fontWeight: "",
         setSize: function (a) {
             if (this._size != a) {
                 this._size = a;
@@ -2414,7 +2586,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
                     value = this._value,
                     scale = this._scale,
                     fontsize = this._size,
-                    font = fontsize + 'px Ubuntu';
+                    font = (this._fontWeight ? this._fontWeight + ' ' : '') + fontsize + 'px ' + this._fontFamily;
                 ctx.font = font;
                 var h = ~~(.2 * fontsize);
                 canvas.width = (ctx.measureText(value).width +

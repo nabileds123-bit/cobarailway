@@ -80,7 +80,7 @@ PlayerTracker.prototype.getGuildTag = function() {
 }
 
 PlayerTracker.prototype.getDisplayName = function() {
-    var name = this.getName();
+    var name = this.getName() || this.authUsername || "";
     var guildTag = this.getGuildTag();
 
     if (!name) {

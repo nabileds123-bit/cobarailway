@@ -11,7 +11,7 @@
     <meta name="viewport" content="minimal-ui, width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta property="fb:app_id" content="677505792353827"/>
-    <meta property="og:title" content="Agar.io"/>
+    <meta property="og:title" content="Bubble.am"/>
     <meta property="og:description" content="Eat cells smaller than you and don't get eaten by the bigger ones, as an MMO"/>
     <meta property="og:url" content="http://agar.io"/>
     <meta property="og:image" content="http://agar.io/img/1200x630.png"/>
@@ -4158,12 +4158,16 @@
                 status.removeClass('text-success').addClass('text-danger').text('Username wajib diisi.').show();
                 return;
             }
-            if (!/^[A-Za-z0-9]+$/.test(name)) {
-                status.removeClass('text-success').addClass('text-danger').text('Username hanya boleh huruf A-Z dan angka 0-9.').show();
+            if (!/^[A-Za-z0-9]+(?: [A-Za-z0-9]+)*$/.test(name)) {
+                status.removeClass('text-success').addClass('text-danger').text('Username hanya boleh huruf A-Z, angka 0-9, dan spasi.').show();
                 return;
             }
             if (!email) {
                 status.removeClass('text-success').addClass('text-danger').text('Email wajib diisi.').show();
+                return;
+            }
+            if (!/^[A-Za-z0-9.]+@gmail\.com$/i.test(email)) {
+                status.removeClass('text-success').addClass('text-danger').text('Email wajib menggunakan @gmail.com.').show();
                 return;
             }
             if (!password) {

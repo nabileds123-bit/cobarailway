@@ -248,6 +248,28 @@ function normalizeEmail(email) {
     return String(email || '').trim().toLowerCase();
 }
 
+function normalizeGmailEmail(email) {
+    var value = normalizeEmail(email);
+    var parts = value.split('@');
+    if (parts.length != 2 || parts[1] != 'gmail.com') {
+        return null;
+    }
+
+    var local = parts[0];
+    if (!local || !/^[a-z0-9.]+$/.test(local)) {
+        return null;
+    }
+
+    local = local.replace(/\./g, '');
+    return local ? local + '@gmail.com' : null;
+}
+
+function isSameLoginEmail(storedEmail, loginEmail) {
+    var stored = normalizeEmail(storedEmail);
+    var login = normalizeEmail(loginEmail);
+    return stored == login || (!!normalizeGmailEmail(stored) && normalizeGmailEmail(stored) == normalizeGmailEmail(login));
+}
+
 function hashPassword(password, salt) {
     return crypto.pbkdf2Sync(String(password), salt, 100000, 64, 'sha512').toString('hex');
 }
@@ -817,7 +839,7 @@ function findJsonUserByLogin(db, login) {
 
     for (var i = 0; i < db.users.length; i++) {
         var user = db.users[i];
-        if (user.username.toLowerCase() == value || user.email.toLowerCase() == value) {
+        if (user.username.toLowerCase() == value || isSameLoginEmail(user.email, value)) {
             return user;
         }
     }
@@ -839,12 +861,26 @@ function findJsonUserByUsername(db, username) {
 }
 
 function findUserByLogin(login) {
+    var value = String(login || '').trim().toLowerCase();
+    var gmail = normalizeGmailEmail(value);
+
     return ensureMysql().then(function(usingMysql) {
         if (usingMysql) {
+            if (gmail) {
+                return getMysqlPool()
+                    .query(
+                        'SELECT * FROM users WHERE LOWER(username) = ? OR LOWER(email) = ? OR (LOWER(SUBSTRING_INDEX(email, \'@\', -1)) = \'gmail.com\' AND REPLACE(LOWER(SUBSTRING_INDEX(email, \'@\', 1)), \'.\', \'\') = ?) LIMIT 1',
+                        [value, value, gmail.split('@')[0]]
+                    )
+                    .then(function(result) {
+                        return mysqlUser(result[0][0]);
+                    });
+            }
+
             return getMysqlPool()
                 .query('SELECT * FROM users WHERE LOWER(username) = ? OR LOWER(email) = ? LIMIT 1', [
-                    String(login || '').trim().toLowerCase(),
-                    String(login || '').trim().toLowerCase()
+                    value,
+                    value
                 ])
                 .then(function(result) {
                     return mysqlUser(result[0][0]);
@@ -1178,7 +1214,7 @@ function handleRegister(req, res) {
         }
 
         var username = normalizeName(body.username);
-        var email = normalizeEmail(body.email);
+        var email = normalizeGmailEmail(body.email);
         var password = String(body.password || '');
 
         if (!username || username.length > 15) {
@@ -1186,13 +1222,13 @@ function handleRegister(req, res) {
             return;
         }
 
-        if (!/^[A-Za-z0-9]+$/.test(username)) {
-            sendJson(res, 400, { ok: false, error: 'Username hanya boleh huruf A-Z dan angka 0-9.' });
+        if (!/^[A-Za-z0-9]+(?: [A-Za-z0-9]+)*$/.test(username)) {
+            sendJson(res, 400, { ok: false, error: 'Username hanya boleh huruf A-Z, angka 0-9, dan spasi.' });
             return;
         }
 
-        if (!email || email.indexOf('@') == -1) {
-            sendJson(res, 400, { ok: false, error: 'Email tidak valid.' });
+        if (!email) {
+            sendJson(res, 400, { ok: false, error: 'Email wajib menggunakan @gmail.com dan tidak boleh memakai variasi dot trick.' });
             return;
         }
 
