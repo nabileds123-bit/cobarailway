@@ -584,49 +584,6 @@
         .profile-skin.active {
             border: 2px solid #31b0d5;
         }
-        #freeSkinPanel {
-            display: none;
-            margin-top: 10px;
-            padding: 8px;
-            border: 1px solid #ddd;
-            background: #fff;
-            max-height: 206px;
-            overflow: auto;
-        }
-        #freeSkinPanel.is-open {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
-            gap: 8px;
-        }
-        .free-skin-option {
-            width: 58px;
-            min-height: 76px;
-            padding: 4px;
-            border: 1px solid #ddd;
-            background: #fafafa;
-            cursor: pointer;
-            text-align: center;
-        }
-        .free-skin-option:hover,
-        .free-skin-option.is-selected {
-            border-color: #31b0d5;
-            background: #eef9fd;
-        }
-        .free-skin-option img {
-            width: 46px;
-            height: 46px;
-            border-radius: 50%;
-            object-fit: cover;
-            background: #fff;
-        }
-        .free-skin-name {
-            display: block;
-            margin-top: 3px;
-            font-size: 10px;
-            line-height: 12px;
-            color: #555;
-            word-break: break-word;
-        }
         .profile-color-wrap {
             position: relative;
             display: inline-flex;
@@ -1676,7 +1633,7 @@
                     <option value="TK-Turkey">Turkey</option>
                     <option value="JP-Tokyo">East Asia</option>
                     <option value="CN-China">China</option>-->
-                    <option selected value="SG-Singapore">Oceania</option>
+                    <option selected value="Ocenia">Ocenia</option>
                 </select>
             </div>
             <div><div class="text-muted region-message CN-China"></div></div>
@@ -1861,7 +1818,7 @@
             <span class="profile-label">Email:</span>
             <span id="profileEmail" class="profile-value">-</span>
         </div>
-        <button id="uploadSkinButton" class="btn btn-block">Change your skin</button>
+        <button id="uploadSkinButton" class="btn btn-block">Upload your skin (required 150 points)</button>
         <input id="uploadSkinInput" type="file" accept="image/png" style="display:none"/>
         <p id="uploadSkinStatus" class="text-muted"></p>
         <div class="dialog-footer">
@@ -1902,9 +1859,7 @@
             <a href="#account" id="uploadAccountLink" class="dialog-brand" style="font-size:14px;">Bubble.am</a>
             <span style="font-size:14px; color:#888;"> &raquo; Upload skin</span>
         </div>
-        <div class="upload-label">Choose free skin</div>
-        <div id="freeSkinPanel"></div>
-        <div class="upload-label">Upload custom skin</div>
+        <div class="upload-label">Upload your skin (required 150 points)</div>
         <input id="uploadSkinFile" type="file" accept="image/png"/>
         <button id="uploadSkinSubmit" class="btn btn-primary btn-block">Upload</button>
         <p id="uploadSkinDialogStatus" class="upload-status text-muted"></p>
@@ -2143,7 +2098,7 @@
                         <button class="btn btn-xs btn-default battle-type-btn" type="button" data-battle-type="2v2">2v2</button>
                     </strong>
                 </div>
-                <div class="battle-settings-row"><span>Region</span><strong id="battleLobbyRegion">Oceania</strong></div>
+                <div class="battle-settings-row"><span>Region</span><strong id="battleLobbyRegion">Ocenia</strong></div>
                 <div class="battle-settings-row"><span>Queue</span><strong>~1 minute</strong></div>
                 <div class="battle-settings-row"><span>Status</span><strong id="battleLobbyStatus">Waiting for start</strong></div>
                 <div class="battle-settings-row"><span>Reward</span><strong id="battleLobbyReward">1.5 pt.</strong></div>
@@ -2220,9 +2175,6 @@
             '#D61017',
             '#D9A5FC'
         ];
-        var freeSkinLoaded = false;
-        var freeSkinLoading = false;
-
         function authRequest(path, data) {
             return $.ajax({
                 url: path,
@@ -2300,92 +2252,6 @@
             });
         }
 
-        function normalizeFreeAccountSkinUrl(fileName) {
-            return '/skins/' + encodeURIComponent(String(fileName || ''));
-        }
-
-        function getSkinDisplayName(fileName) {
-            return String(fileName || '').replace(/\.[^.]+$/, '').replace(/_/g, ' ');
-        }
-
-        function markSelectedFreeSkin() {
-            var currentSkin = currentUser && currentUser.skinUrl ? String(currentUser.skinUrl) : '';
-            $('#freeSkinPanel .free-skin-option').removeClass('is-selected');
-            if (!currentSkin) {
-                return;
-            }
-
-            $('#freeSkinPanel .free-skin-option').each(function() {
-                var fileName = $(this).attr('data-skin-file');
-                if (normalizeFreeAccountSkinUrl(fileName) == currentSkin || '/skins/' + fileName == currentSkin) {
-                    $(this).addClass('is-selected');
-                }
-            });
-        }
-
-        function renderFreeSkinPanel(files) {
-            var panel = $('#freeSkinPanel');
-            var seen = {};
-            panel.empty();
-
-            files = (files || []).filter(function(fileName) {
-                var key = String(fileName || '').replace(/\.[^.]+$/, '').toLowerCase();
-                if (!/\.(png|jpe?g)$/i.test(fileName) || seen[key]) {
-                    return false;
-                }
-                seen[key] = true;
-                return true;
-            }).sort(function(a, b) {
-                return String(a).localeCompare(String(b));
-            });
-
-            if (!files.length) {
-                panel.text('Tidak ada skin PNG/JPG di folder skins.');
-                return;
-            }
-
-            files.forEach(function(fileName) {
-                var button = $('<button type="button" class="free-skin-option"></button>')
-                    .attr('data-skin-file', fileName)
-                    .attr('title', getSkinDisplayName(fileName));
-                $('<img alt="">')
-                    .attr('src', normalizeFreeAccountSkinUrl(fileName))
-                    .appendTo(button);
-                $('<span class="free-skin-name"></span>')
-                    .text(getSkinDisplayName(fileName))
-                    .appendTo(button);
-                button.appendTo(panel);
-            });
-
-            markSelectedFreeSkin();
-        }
-
-        function loadFreeAccountSkins() {
-            var panel = $('#freeSkinPanel');
-            if (freeSkinLoaded || freeSkinLoading) {
-                markSelectedFreeSkin();
-                return;
-            }
-
-            freeSkinLoading = true;
-            panel.text('Loading skins...');
-            $.ajax({
-                url: '/api/free-skins',
-                method: 'GET',
-                dataType: 'json'
-            })
-                .done(function(result) {
-                    renderFreeSkinPanel(result && result.skins ? result.skins : []);
-                    freeSkinLoaded = true;
-                })
-                .fail(function() {
-                    panel.text('Gagal load daftar skin.');
-                })
-                .always(function() {
-                    freeSkinLoading = false;
-                });
-        }
-
         function applyLoggedInUser(user) {
             var hadPremium = currentUser && String(currentUser.accountType || '').toLowerCase() == 'premium';
             currentUser = user;
@@ -2451,7 +2317,6 @@
             $('#profilePlayerSkin').toggleClass('active', activeSkinMode == 'player');
             $('#profileGuildSkin').toggleClass('active', activeSkinMode == 'guild');
             $('#profileSkinRow').toggle(hasSkin || hasGuildSkin);
-            markSelectedFreeSkin();
         }
 
         window.updateAccountPoints = function(points) {
@@ -3269,8 +3134,6 @@
         function resetUploadSkinDialog() {
             $('#uploadSkinFile').val('');
             $('#uploadSkinDialogStatus').hide().removeClass('text-danger text-success').addClass('text-muted').text('');
-            $('#freeSkinPanel').addClass('is-open');
-            markSelectedFreeSkin();
             $('#uploadSkinPreview')
                 .removeAttr('src')
                 .replaceWith('<div id="uploadSkinPreview" class="upload-preview-empty">skin</div>');
@@ -3300,7 +3163,6 @@
             resetUploadSkinDialog();
             showNavigationOverlay();
             $('#uploadSkinDialog').addClass('upload-open');
-            loadFreeAccountSkins();
             setFooterActive('account');
         }
 
@@ -3473,7 +3335,7 @@
 
         function getSelectedRegionLabel() {
             var selected = $('#region option:selected');
-            return $.trim(selected.text() || selected.val() || 'Oceania').replace(/\s*\(\d+\s+players\)\s*$/i, '');
+            return $.trim(selected.text() || selected.val() || 'Ocenia').replace(/\s*\(\d+\s+players\)\s*$/i, '');
         }
 
         function isBattleModeBlocked() {
@@ -4081,35 +3943,6 @@
         });
         $(document).on('click', function() {
             $('#cellColorPalette').removeClass('is-open');
-        });
-        $('#freeSkinPanel').on('click', '.free-skin-option', function(e) {
-            e.preventDefault();
-            var fileName = $(this).attr('data-skin-file');
-            var status = $('#uploadSkinDialogStatus');
-
-            if (!currentUser) {
-                status.removeClass('text-success').addClass('text-danger').text('Login dulu untuk pilih skin.').show();
-                return;
-            }
-
-            status.removeClass('text-danger').addClass('text-success').text('Menyimpan skin...').show();
-            $('#freeSkinPanel .free-skin-option').prop('disabled', true);
-
-            authPost('/api/account/upload-skin', { skin: fileName })
-                .done(function(result) {
-                    applyLoggedInUser(result.user);
-                    if (window.refreshAccountSkin) {
-                        window.refreshAccountSkin();
-                    }
-                    $('#uploadSkinStatus').removeClass('text-danger').addClass('text-success').text(result.message || 'Skin berhasil dipilih.').show();
-                    openAccountDialog();
-                })
-                .fail(function(xhr) {
-                    showAuthError(status, xhr, 'Pilih skin gagal.');
-                })
-                .always(function() {
-                    $('#freeSkinPanel .free-skin-option').prop('disabled', false);
-                });
         });
         $('#logoutLink').on('click', function(e) {
             e.preventDefault();

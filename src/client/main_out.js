@@ -495,6 +495,9 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
     }
 
     function setRegion(a) {
+        if ("SG-Singapore" == a) {
+            a = "Ocenia";
+        }
         if (a && a != w) {
             if (wjQuery("#region").val() != a) {
                 wjQuery("#region").val(a);
@@ -517,6 +520,9 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
     }
 
     function Ha() {
+        if ("SG-Singapore" == wHandle.localStorage.location) {
+            wHandle.localStorage.location = "Ocenia";
+        }
         wjQuery("#region").val() ? wHandle.localStorage.location = wjQuery("#region").val() : wHandle.localStorage.location && wjQuery("#region").val(wHandle.localStorage.location);
         wjQuery("#region").val() ? wjQuery("#locationKnown").append(wjQuery("#region")) : wjQuery("#locationUnknown").append(wjQuery("#region"))
     }

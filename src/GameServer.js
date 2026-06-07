@@ -191,7 +191,7 @@ GameServer.prototype.start = function() {
       }
 
       if (req.url == '/info.php' || req.url == '/api/regions') {
-        var region = 'SG-Singapore';
+        var region = 'Ocenia';
         var count = self.getAllClients().filter(function(client) {
           return client && client.playerTracker && client.playerTracker.isOnline;
         }).length;
