@@ -26,6 +26,7 @@
     </style>
     <link href='https://fonts.googleapis.com/css?family=Ubuntu:700' rel='stylesheet' type='text/css'>
     <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
     <script src="https://code.jquery.com/jquery-1.11.3.min.js"></script>
     <script src="/client/Vector2.js"></script>
     <script src="/client/main_out.js?578"></script>
@@ -929,9 +930,8 @@
         .guild-member-role-btn {
             border: 0;
             background: transparent;
-            color: #337ab7;
             padding: 0 2px;
-            font-size: 11px;
+            font-size: 14px;
         }
         .guild-detail-actions {
             display: flex;
@@ -2656,14 +2656,21 @@
                         .appendTo(nickCell);
                     nickCell.appendTo(row);
                     $('<div class="guild-member-level"></div>').text(member.level || 1).appendTo(row);
+                    row.children('.guild-member-rank').text(member.role == 'Leader' ? 'Leader' : (index + 1) + '.');
                     var role = $('<div class="guild-member-role"></div>');
                     $('<span></span>').text(member.role == 'Leader' ? '👑 Leader' : member.role).appendTo(role);
+                    role.children('span').first().text(member.role == 'Leader' ? 'Leader' : member.role);
                     if (viewerGuildRole() == 'Leader' && member.role != 'Leader' && guildDetailState.viewer && guildDetailState.viewer.id != member.id) {
                         $('<button type="button" class="guild-member-role-btn"></button>')
                             .attr('data-user-id', member.id)
                             .attr('data-role', member.role == 'Staff' ? 'Member' : 'Staff')
                             .text(member.role == 'Staff' ? 'Demote' : 'Promote')
                             .appendTo(role);
+                        role.find('.guild-member-role-btn').last()
+                            .attr('title', member.role == 'Staff' ? 'Staff' : 'Promote to staff')
+                            .html(member.role == 'Staff'
+                                ? '<i class="fa-solid fa-crown" style="color:#000;" title="Staff"></i>'
+                                : '<i class="fa-solid fa-crown" style="color:#999;" title="Promote to staff"></i>');
                     }
                     if (canViewerKick(member)) {
                         $('<button type="button" class="guild-member-action" title="Kick member">🗑️</button>')

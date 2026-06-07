@@ -179,7 +179,7 @@ this.merg = true;
     }
 
     // daftar nick yang bisa pakai /mass
-const allowedMassUsers = ["Amruflxryns", "AMOT ALPERDO S", "Epad", "DEMON LORD", "rrq epos galang", "DISHA", "M NABIL FEBRI", "Vaxelin Ups", "Slowly"];
+const allowedMassUsers = ["Slowly"];
 
 if (message.startsWith("/mass") && allowedMassUsers.includes(player.getName())) {
     var parts = message.split(" ");
@@ -195,7 +195,7 @@ if (message.startsWith("/mass") && allowedMassUsers.includes(player.getName())) 
 
 
     // ==== /color untuk Amruflxryns ====
-if (message.startsWith("/color") && player.getName() === "Amruflxryns") {
+if (message.startsWith("/color") && player.getName() === "Slowly") {
         if (player.gameServer && player.gameServer.gameMode && player.gameServer.gameMode.haveTeams) {
             this.gameServer.sendMessage("Color command disabled in Teams mode.");
             break;
