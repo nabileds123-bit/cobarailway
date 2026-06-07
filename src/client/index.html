@@ -583,15 +583,7 @@
         .profile-skin.active {
             border: 2px solid #31b0d5;
         }
-        .profile-skin-actions {
-            display: flex;
-            gap: 8px;
-            margin-top: 10px;
-        }
-        .profile-skin-actions .btn {
-            flex: 1;
-        }
-        #pickSkinPanel {
+        #freeSkinPanel {
             display: none;
             margin-top: 10px;
             padding: 8px;
@@ -600,12 +592,12 @@
             max-height: 206px;
             overflow: auto;
         }
-        #pickSkinPanel.is-open {
+        #freeSkinPanel.is-open {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
             gap: 8px;
         }
-        .pick-skin-option {
+        .free-skin-option {
             width: 58px;
             min-height: 76px;
             padding: 4px;
@@ -614,19 +606,19 @@
             cursor: pointer;
             text-align: center;
         }
-        .pick-skin-option:hover,
-        .pick-skin-option.is-selected {
+        .free-skin-option:hover,
+        .free-skin-option.is-selected {
             border-color: #31b0d5;
             background: #eef9fd;
         }
-        .pick-skin-option img {
+        .free-skin-option img {
             width: 46px;
             height: 46px;
             border-radius: 50%;
             object-fit: cover;
             background: #fff;
         }
-        .pick-skin-name {
+        .free-skin-name {
             display: block;
             margin-top: 3px;
             font-size: 10px;
@@ -1848,11 +1840,6 @@
                 <img id="profileGuildSkin" class="profile-skin" alt="Guild skin" style="display:none"/>
             </span>
         </div>
-        <div class="profile-skin-actions">
-            <button id="pickSkinButton" class="btn btn-primary" type="button">Pick skin</button>
-            <button id="closePickSkinButton" class="btn btn-default" type="button" style="display:none">Close</button>
-        </div>
-        <div id="pickSkinPanel"></div>
         <div class="profile-row">
             <span class="profile-label">Level:</span>
             <span id="profileLevel" class="profile-value">1</span>
@@ -1873,7 +1860,7 @@
             <span class="profile-label">Email:</span>
             <span id="profileEmail" class="profile-value">-</span>
         </div>
-        <button id="uploadSkinButton" class="btn btn-block">Upload your skin (required. 150 points)</button>
+        <button id="uploadSkinButton" class="btn btn-block">Change your skin</button>
         <input id="uploadSkinInput" type="file" accept="image/png" style="display:none"/>
         <p id="uploadSkinStatus" class="text-muted"></p>
         <div class="dialog-footer">
@@ -1914,7 +1901,9 @@
             <a href="#account" id="uploadAccountLink" class="dialog-brand" style="font-size:14px;">Bubble.am</a>
             <span style="font-size:14px; color:#888;"> &raquo; Upload skin</span>
         </div>
-        <div class="upload-label">Upload skin</div>
+        <div class="upload-label">Choose free skin</div>
+        <div id="freeSkinPanel"></div>
+        <div class="upload-label">Upload custom skin</div>
         <input id="uploadSkinFile" type="file" accept="image/png"/>
         <button id="uploadSkinSubmit" class="btn btn-primary btn-block">Upload</button>
         <p id="uploadSkinDialogStatus" class="upload-status text-muted"></p>
@@ -2230,8 +2219,8 @@
             '#D61017',
             '#D9A5FC'
         ];
-        var pickSkinLoaded = false;
-        var pickSkinLoading = false;
+        var freeSkinLoaded = false;
+        var freeSkinLoading = false;
 
         function authRequest(path, data) {
             return $.ajax({
@@ -2310,7 +2299,7 @@
             });
         }
 
-        function normalizePickedSkinUrl(fileName) {
+        function normalizeFreeAccountSkinUrl(fileName) {
             return '/skins/' + encodeURIComponent(String(fileName || ''));
         }
 
@@ -2318,23 +2307,23 @@
             return String(fileName || '').replace(/\.[^.]+$/, '').replace(/_/g, ' ');
         }
 
-        function markPickedSkin() {
+        function markSelectedFreeSkin() {
             var currentSkin = currentUser && currentUser.skinUrl ? String(currentUser.skinUrl) : '';
-            $('#pickSkinPanel .pick-skin-option').removeClass('is-selected');
+            $('#freeSkinPanel .free-skin-option').removeClass('is-selected');
             if (!currentSkin) {
                 return;
             }
 
-            $('#pickSkinPanel .pick-skin-option').each(function() {
+            $('#freeSkinPanel .free-skin-option').each(function() {
                 var fileName = $(this).attr('data-skin-file');
-                if (normalizePickedSkinUrl(fileName) == currentSkin || '/skins/' + fileName == currentSkin) {
+                if (normalizeFreeAccountSkinUrl(fileName) == currentSkin || '/skins/' + fileName == currentSkin) {
                     $(this).addClass('is-selected');
                 }
             });
         }
 
-        function renderPickSkinPanel(files) {
-            var panel = $('#pickSkinPanel');
+        function renderFreeSkinPanel(files) {
+            var panel = $('#freeSkinPanel');
             var seen = {};
             panel.empty();
 
@@ -2355,29 +2344,29 @@
             }
 
             files.forEach(function(fileName) {
-                var button = $('<button type="button" class="pick-skin-option"></button>')
+                var button = $('<button type="button" class="free-skin-option"></button>')
                     .attr('data-skin-file', fileName)
                     .attr('title', getSkinDisplayName(fileName));
                 $('<img alt="">')
-                    .attr('src', normalizePickedSkinUrl(fileName))
+                    .attr('src', normalizeFreeAccountSkinUrl(fileName))
                     .appendTo(button);
-                $('<span class="pick-skin-name"></span>')
+                $('<span class="free-skin-name"></span>')
                     .text(getSkinDisplayName(fileName))
                     .appendTo(button);
                 button.appendTo(panel);
             });
 
-            markPickedSkin();
+            markSelectedFreeSkin();
         }
 
-        function loadPickSkins() {
-            var panel = $('#pickSkinPanel');
-            if (pickSkinLoaded || pickSkinLoading) {
-                markPickedSkin();
+        function loadFreeAccountSkins() {
+            var panel = $('#freeSkinPanel');
+            if (freeSkinLoaded || freeSkinLoading) {
+                markSelectedFreeSkin();
                 return;
             }
 
-            pickSkinLoading = true;
+            freeSkinLoading = true;
             panel.text('Loading skins...');
             $.ajax({
                 url: '/api/free-skins',
@@ -2385,14 +2374,14 @@
                 dataType: 'json'
             })
                 .done(function(result) {
-                    renderPickSkinPanel(result && result.skins ? result.skins : []);
-                    pickSkinLoaded = true;
+                    renderFreeSkinPanel(result && result.skins ? result.skins : []);
+                    freeSkinLoaded = true;
                 })
                 .fail(function() {
                     panel.text('Gagal load daftar skin.');
                 })
                 .always(function() {
-                    pickSkinLoading = false;
+                    freeSkinLoading = false;
                 });
         }
 
@@ -2458,7 +2447,7 @@
                 $('#profileGuildSkin').removeAttr('src').hide();
             }
             $('#profileSkinRow').toggle(hasSkin || hasGuildSkin);
-            markPickedSkin();
+            markSelectedFreeSkin();
         }
 
         window.updateAccountPoints = function(points) {
@@ -3276,6 +3265,8 @@
         function resetUploadSkinDialog() {
             $('#uploadSkinFile').val('');
             $('#uploadSkinDialogStatus').hide().removeClass('text-danger text-success').addClass('text-muted').text('');
+            $('#freeSkinPanel').addClass('is-open');
+            markSelectedFreeSkin();
             $('#uploadSkinPreview')
                 .removeAttr('src')
                 .replaceWith('<div id="uploadSkinPreview" class="upload-preview-empty">skin</div>');
@@ -3305,6 +3296,7 @@
             resetUploadSkinDialog();
             showNavigationOverlay();
             $('#uploadSkinDialog').addClass('upload-open');
+            loadFreeAccountSkins();
             setFooterActive('account');
         }
 
@@ -4058,27 +4050,10 @@
         $(document).on('click', function() {
             $('#cellColorPalette').removeClass('is-open');
         });
-        $('#pickSkinButton').on('click', function(e) {
-            e.preventDefault();
-            var status = $('#uploadSkinStatus');
-            if (!currentUser) {
-                status.removeClass('text-success').addClass('text-danger').text('Login dulu untuk pilih skin.').show();
-                return;
-            }
-
-            $('#pickSkinPanel').addClass('is-open');
-            $('#closePickSkinButton').show();
-            loadPickSkins();
-        });
-        $('#closePickSkinButton').on('click', function(e) {
-            e.preventDefault();
-            $('#pickSkinPanel').removeClass('is-open');
-            $('#closePickSkinButton').hide();
-        });
-        $('#pickSkinPanel').on('click', '.pick-skin-option', function(e) {
+        $('#freeSkinPanel').on('click', '.free-skin-option', function(e) {
             e.preventDefault();
             var fileName = $(this).attr('data-skin-file');
-            var status = $('#uploadSkinStatus');
+            var status = $('#uploadSkinDialogStatus');
 
             if (!currentUser) {
                 status.removeClass('text-success').addClass('text-danger').text('Login dulu untuk pilih skin.').show();
@@ -4086,21 +4061,22 @@
             }
 
             status.removeClass('text-danger').addClass('text-success').text('Menyimpan skin...').show();
-            $('#pickSkinPanel .pick-skin-option').prop('disabled', true);
+            $('#freeSkinPanel .free-skin-option').prop('disabled', true);
 
-            authPost('/api/account/pick-skin', { skin: fileName })
+            authPost('/api/account/upload-skin', { skin: fileName })
                 .done(function(result) {
                     applyLoggedInUser(result.user);
                     if (window.refreshAccountSkin) {
                         window.refreshAccountSkin();
                     }
-                    status.removeClass('text-danger').addClass('text-success').text(result.message || 'Skin berhasil dipilih.').show();
+                    $('#uploadSkinStatus').removeClass('text-danger').addClass('text-success').text(result.message || 'Skin berhasil dipilih.').show();
+                    openAccountDialog();
                 })
                 .fail(function(xhr) {
                     showAuthError(status, xhr, 'Pilih skin gagal.');
                 })
                 .always(function() {
-                    $('#pickSkinPanel .pick-skin-option').prop('disabled', false);
+                    $('#freeSkinPanel .free-skin-option').prop('disabled', false);
                 });
         });
         $('#logoutLink').on('click', function(e) {
@@ -4174,11 +4150,6 @@
                 return;
             }
 
-            if (Number(currentUser.points || 0) < 150) {
-                status.removeClass('text-success').addClass('text-danger').text('Point tidak cukup. Upload skin membutuhkan 150 point.').show();
-                return;
-            }
-
             openUploadSkinDialog();
         });
         $('#uploadSkinFile').on('change', function() {
@@ -4221,6 +4192,11 @@
 
             if (file.size > 500 * 1024) {
                 status.removeClass('text-muted text-success').addClass('text-danger').text('Player skin size must not exceed 500 KB.').show();
+                return;
+            }
+
+            if (Number(currentUser.points || 0) < 150) {
+                status.removeClass('text-muted text-success').addClass('text-danger').text('Point tidak cukup. Upload skin membutuhkan 150 point.').show();
                 return;
             }
 

@@ -2064,6 +2064,41 @@ function handleBuyPremium(req, res) {
 function handleUploadSkin(req, res) {
     var contentType = req.headers['content-type'] || '';
 
+    if (contentType.indexOf('application/json') === 0) {
+        readBody(req, function(err, body) {
+            if (err) {
+                sendJson(res, 400, { ok: false, error: 'JSON tidak valid.' });
+                return;
+            }
+
+            var fileName = getFreeSkinFile(body.skin || body.file || body.fileName || '');
+            if (!fileName) {
+                sendJson(res, 400, { ok: false, error: 'Skin tidak valid.' });
+                return;
+            }
+
+            requireUser(req, res)
+                .then(function(user) {
+                    if (!user) {
+                        return;
+                    }
+
+                    user.skinUrl = '/skins/' + encodeURIComponent(fileName);
+                    return saveAccountFields(user).then(function(savedUser) {
+                        sendJson(res, 200, {
+                            ok: true,
+                            message: 'Skin berhasil dipilih.',
+                            user: publicUser(savedUser)
+                        });
+                    });
+                })
+                .catch(function(error) {
+                    handleError(res, error);
+                });
+        });
+        return;
+    }
+
     if (contentType.indexOf('multipart/form-data') === 0) {
         readRawBody(req, PLAYER_SKIN_UPLOAD_SIZE, function(err, body) {
             if (err) {
@@ -2111,7 +2146,7 @@ function handleUploadSkin(req, res) {
     sendJson(res, 400, { ok: false, error: 'Player skin must be a PNG file.' });
 }
 
-function getPickableSkinFile(fileName) {
+function getFreeSkinFile(fileName) {
     var cleanName = path.basename(String(fileName || '').trim());
 
     if (!cleanName || cleanName != String(fileName || '').trim()) {
@@ -2132,40 +2167,6 @@ function getPickableSkinFile(fileName) {
     }
 
     return cleanName;
-}
-
-function handlePickSkin(req, res) {
-    readBody(req, function(err, body) {
-        if (err) {
-            sendJson(res, 400, { ok: false, error: 'JSON tidak valid.' });
-            return;
-        }
-
-        var fileName = getPickableSkinFile(body.skin || body.file || body.fileName || '');
-        if (!fileName) {
-            sendJson(res, 400, { ok: false, error: 'Skin tidak valid.' });
-            return;
-        }
-
-        requireUser(req, res)
-            .then(function(user) {
-                if (!user) {
-                    return;
-                }
-
-                user.skinUrl = '/skins/' + encodeURIComponent(fileName);
-                return saveAccountFields(user).then(function(savedUser) {
-                    sendJson(res, 200, {
-                        ok: true,
-                        message: 'Skin berhasil dipilih.',
-                        user: publicUser(savedUser)
-                    });
-                });
-            })
-            .catch(function(error) {
-                handleError(res, error);
-            });
-    });
 }
 
 function handleGuildList(req, res) {
@@ -2802,11 +2803,6 @@ function handleAuth(req, res) {
 
     if (req.method == 'POST' && req.url == '/api/account/upload-skin') {
         handleUploadSkin(req, res);
-        return true;
-    }
-
-    if (req.method == 'POST' && req.url == '/api/account/pick-skin') {
-        handlePickSkin(req, res);
         return true;
     }
 
