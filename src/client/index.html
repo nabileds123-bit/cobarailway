@@ -29,7 +29,7 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
     <script src="https://code.jquery.com/jquery-1.11.3.min.js"></script>
     <script src="/client/Vector2.js"></script>
-    <script src="/client/main_out.js?579"></script>
+    <script src="/client/main_out.js?581"></script>
     <script>
     'use strict';
     // Hide overlays background (but not helloDialog) when ESC is pressed
@@ -871,23 +871,27 @@
         }
         .guild-members-head,
         .guild-member-row {
-            display: grid;
-            grid-template-columns: 42px minmax(0, 1fr) 52px 78px;
+            display: flex;
             align-items: center;
-            gap: 4px;
+            gap: 10px;
         }
         .guild-members-head {
-            min-height: 34px;
-            font-weight: bold;
-            text-align: center;
+            padding: 4px 4px 6px;
+            min-height: 0;
+            border-bottom: 1px solid #eee;
+            color: #aaa;
+            font-size: 12px;
+            font-weight: normal;
         }
         .guild-members-list {
             flex: 1;
+            max-height: 180px;
             overflow-y: auto;
             border-bottom: 1px solid #eee;
         }
         .guild-member-row {
-            min-height: 42px;
+            min-height: 32px;
+            padding: 4px;
             border-bottom: 1px solid #eee;
             font-size: 13px;
         }
@@ -896,22 +900,30 @@
         }
         .guild-member-nick {
             min-width: 0;
+            flex: 1;
             font-weight: bold;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
         }
         .guild-member-profile {
-            color: #337ab7;
+            color: #333;
             text-decoration: none;
         }
         .guild-member-profile:hover,
         .guild-member-profile:focus {
-            color: #23527c;
-            text-decoration: underline;
+            color: #333;
+            text-decoration: none;
         }
-        .guild-member-level,
         .guild-member-rank {
+            width: 70px;
+            min-width: 70px;
+            color: #000;
+            font-size: 13px;
+        }
+        .guild-member-level {
+            width: 40px;
+            color: #888;
             text-align: center;
         }
         .guild-member-role {
@@ -920,6 +932,22 @@
             justify-content: flex-end;
             gap: 4px;
             padding-right: 4px;
+        }
+        .guild-member-role > span {
+            display: none;
+        }
+        .guild-member-status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            background: #ccc;
+        }
+        .guild-member-status-dot.is-online {
+            background: #4caf50;
+        }
+        .guild-member-status-dot.is-online {
+            cursor: pointer;
         }
         .guild-member-action {
             border: 0;
@@ -2652,7 +2680,7 @@
             if (guildDetailTab != 'members') {
                 $('<div class="guild-empty"></div>').text(guildDetailTab == 'info' ? (guild.description || 'No guild info.') : 'No statistics available.').appendTo(content);
             } else {
-                $('<div class="guild-members-head"><span>#</span><span>Nick</span><span>Level</span><span></span></div>').appendTo(content);
+                $('<div class="guild-members-head"><div class="guild-member-rank">#</div><div class="guild-member-nick">Name</div><div class="guild-member-level">Level</div><div class="guild-member-status-dot" style="visibility:hidden"></div></div>').appendTo(content);
                 members.forEach(function(member, index) {
                     var row = $('<div class="guild-member-row"></div>').toggleClass('is-leader', member.role == 'Leader');
                     $('<div class="guild-member-rank"></div>').text(member.role == 'Leader' ? '👑' : (index + 1) + '.').appendTo(row);
@@ -2663,7 +2691,16 @@
                         .appendTo(nickCell);
                     nickCell.appendTo(row);
                     $('<div class="guild-member-level"></div>').text(member.level || 1).appendTo(row);
+                    $('<div class="guild-member-status-dot"></div>')
+                        .toggleClass('is-online', !!member.online)
+                        .attr('title', member.online ? ('Online - ' + (member.modeLabel || 'FFA')) : 'Offline')
+                        .attr('data-mode', member.mode || '')
+                        .attr('data-battle-type', member.battleType || '')
+                        .appendTo(row);
                     row.children('.guild-member-rank').text(member.role == 'Leader' ? 'Leader' : (index + 1) + '.');
+                    if (member.role == 'Staff') {
+                        row.children('.guild-member-rank').html('<i class="fa-solid fa-crown" style="color:#000;" title="Staff"></i>');
+                    }
                     var role = $('<div class="guild-member-role"></div>');
                     $('<span></span>').text(member.role == 'Leader' ? '👑 Leader' : member.role).appendTo(role);
                     role.children('span').first().text(member.role == 'Leader' ? 'Leader' : member.role);
@@ -3436,6 +3473,38 @@
             }
         }
 
+        function joinGuildMemberMode(mode, battleType) {
+            mode = String(mode || '');
+            battleType = battleType == '2v2' ? '2v2' : '1v1';
+            var nick = $('#nick').val();
+            localStorage.setItem('nick', nick);
+            closeSpaDialogs();
+            $('#helloDialog').hide();
+
+            if (mode == ':tournament') {
+                $('#gamemode').val(':tournament');
+                syncModeButtons(battleType);
+                showBattleCreateDialog(battleType);
+                return;
+            }
+
+            $('#gamemode').val('');
+            if (mode == ':hardcore') {
+                syncModeButtons('hc');
+            } else if (mode == ':x5') {
+                syncModeButtons('ms');
+            } else {
+                syncModeButtons('', true);
+            }
+
+            if (window.startGameInMode) {
+                window.startGameInMode(mode, nick);
+            } else {
+                setGameMode(mode);
+                setNick(nick);
+            }
+        }
+
         $('#playBtn').on('click', function(e) {
             e.preventDefault();
             playOrResumeGame();
@@ -3598,6 +3667,11 @@
             window.location.hash = 'player-search';
             openSpaPage('player-search');
             searchPlayerProfile(playerName);
+        });
+        $('#guildDetailContent').on('click', '.guild-member-status-dot.is-online', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            joinGuildMemberMode($(this).attr('data-mode') || '', $(this).attr('data-battle-type') || '');
         });
         $('#guildDetailContent').on('click', '.guild-member-action', function(e) {
             e.preventDefault();
@@ -4289,10 +4363,22 @@
     }
     window.openGuildChatInput = openGuildChatInput;
 
+    var guildChatCtrlDown = false;
     function handleGuildChatShortcut(e) {
         e = e || window.event || {};
         var code = e.which || e.keyCode;
-        if (code == 17 || e.key == 'Control' || e.code == 'ControlLeft' || e.code == 'ControlRight') {
+        var isCtrlKey = code == 17 || e.key == 'Control' || e.code == 'ControlLeft' || e.code == 'ControlRight';
+        if (!isCtrlKey) {
+            return;
+        }
+
+        if (e.type == 'keyup') {
+            guildChatCtrlDown = false;
+            return;
+        }
+
+        if (!guildChatCtrlDown) {
+            guildChatCtrlDown = true;
             openGuildChatInput(e);
         }
     }

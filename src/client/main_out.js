@@ -202,7 +202,7 @@
             }
 
             sendFeed();
-            eFeedInterval = setInterval(sendFeed, 250);
+            eFeedInterval = setInterval(sendFeed, 350);
         }
 
         function stopEFeed() {
@@ -214,11 +214,6 @@
 
         wHandle.onkeydown = function (event) {
             switch (event.keyCode) {
-                case 17:
-                    if (wHandle.openGuildChatInput && wHandle.openGuildChatInput(event)) {
-                        isTyping = true;
-                    }
-                    break;
                 case 32: // split
                     if ((!spacePressed) && (!isTyping)) {
                         sendMouseMove();

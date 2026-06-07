@@ -139,6 +139,12 @@ GameServer.prototype.initGameWorld = function() {
 };
 
 GameServer.prototype.start = function() {
+    if (handleAuth.setOnlinePlayersProvider) {
+        handleAuth.setOnlinePlayersProvider(function() {
+            return this.getHub().getOnlineGuildPlayers();
+        }.bind(this));
+    }
+
     this.config.serverPort = process.env.PORT || this.config.serverPort ;
 
     if (!this.multi) {
@@ -398,6 +404,47 @@ GameServer.prototype.getAllClients = function() {
         }
     }
     return sockets;
+}
+
+GameServer.prototype.getOnlineGuildPlayers = function() {
+    return this.getAllClients().map(function(socket) {
+        var player = socket && socket.playerTracker;
+        if (!player || !player.authUserId || !player.isOnline) {
+            return null;
+        }
+
+        var mode = player.currentMode || (player.gameServer && (player.gameServer.roomName || player.gameServer.gameMode.name)) || 'FFA';
+        var battleType = player.battleType || player.battleMode || '';
+        var joinMode = '';
+        var modeLabel = mode;
+
+        if (mode == 'Hardcore') {
+            joinMode = ':hardcore';
+            modeLabel = 'Hardcore';
+        } else if (mode == 'Exp') {
+            joinMode = ':x5';
+            modeLabel = 'x5';
+        } else if (mode == 'Battle' || mode == 'BattleLobby') {
+            joinMode = ':tournament';
+            modeLabel = battleType == '2v2' ? 'Battle 2v2' : 'Battle 1v1';
+        } else if (mode == 'Teams') {
+            joinMode = ':teams';
+            modeLabel = 'Teams';
+        } else {
+            joinMode = '';
+            modeLabel = 'FFA';
+        }
+
+        return {
+            userId: player.authUserId,
+            guild: player.getGuildTag ? player.getGuildTag() : String(player.guildTag || '').trim().toUpperCase(),
+            mode: joinMode,
+            modeLabel: modeLabel,
+            battleType: battleType
+        };
+    }).filter(function(player) {
+        return !!player;
+    });
 }
 
 GameServer.prototype.normalizeModeName = function(mode) {

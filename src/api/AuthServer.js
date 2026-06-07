@@ -10,6 +10,7 @@ var memorySessions = {};
 var mysqlPool = null;
 var mysqlReady = null;
 var premiumExpiryTimer = null;
+var onlinePlayersProvider = null;
 var BUY_PREMIUM_COST = 2;
 var PREMIUM_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 var EMAIL_VERIFICATION_REWARD = 152;
@@ -1663,6 +1664,27 @@ function publicGuildMember(user) {
     };
 }
 
+function getOnlinePlayersByUserId() {
+    var map = {};
+    if (!onlinePlayersProvider) {
+        return map;
+    }
+
+    try {
+        var players = onlinePlayersProvider() || [];
+        players.forEach(function(player) {
+            if (!player || !player.userId) {
+                return;
+            }
+            map[String(player.userId)] = player;
+        });
+    } catch (error) {
+        console.log('[Guild] Online provider failed:', error && error.message ? error.message : error);
+    }
+
+    return map;
+}
+
 function listGuildMembers(tag) {
     tag = normalizeGuildTag(tag);
     return ensureMysql().then(function(usingMysql) {
@@ -1685,6 +1707,15 @@ function listGuildMembers(tag) {
             return normalizeGuildTag(user.guild) == tag;
         }).map(publicGuildMember);
     }).then(function(members) {
+        var onlineByUserId = getOnlinePlayersByUserId();
+        members.forEach(function(member) {
+            var online = onlineByUserId[String(member.id || '')];
+            member.online = !!online;
+            member.mode = online && online.mode ? online.mode : '';
+            member.modeLabel = online && online.modeLabel ? online.modeLabel : '';
+            member.battleType = online && online.battleType ? online.battleType : '';
+        });
+
         members = members.sort(function(a, b) {
             var roleDiff = guildRoleRank(a.role) - guildRoleRank(b.role);
             if (roleDiff) {
@@ -2950,6 +2981,9 @@ handleAuth.getNextLevelXp = getNextLevelXp;
 handleAuth.isAllowedCellColor = isAllowedCellColor;
 handleAuth.normalizeCellColor = normalizeCellColor;
 handleAuth.getActiveSkinUrl = getActiveSkinUrl;
+handleAuth.setOnlinePlayersProvider = function(provider) {
+    onlinePlayersProvider = typeof provider == 'function' ? provider : null;
+};
 
 startPremiumExpiryRuntime();
 
