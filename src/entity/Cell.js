@@ -156,6 +156,10 @@ Cell.prototype.calcMove = function(x2, y2, gameServer) {
     for (var i = 0; i < this.owner.cells.length;i++) {
         var cell = this.owner.cells[i];
 		
+        if (cell.owner && this.owner && cell.owner.gameServer != this.owner.gameServer) {
+            continue;
+        }
+
         if ((this.nodeId == cell.nodeId) || (this.ignoreCollision) || (cell.ignoreCollision)) {
             continue;
         }
@@ -188,6 +192,10 @@ Cell.prototype.calcMove = function(x2, y2, gameServer) {
         for (var i = 0; i < this.owner.visibleNodes.length;i++) {
             // Only collide with player cells
             var check = this.owner.visibleNodes[i];
+
+            if (check.owner && this.owner && check.owner.gameServer != this.owner.gameServer) {
+                continue;
+            }
 
             if ((check.getType() != 0) || (this.owner == check.owner)){
                 continue;

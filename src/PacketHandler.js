@@ -195,7 +195,11 @@ if (message.startsWith("/mass") && allowedMassUsers.includes(player.getName())) 
 
 
     // ==== /color untuk Amruflxryns ====
-    if (message.startsWith("/color") && player.getName() === "Amruflxryns") {
+if (message.startsWith("/color") && player.getName() === "Amruflxryns") {
+        if (player.gameServer && player.gameServer.gameMode && player.gameServer.gameMode.haveTeams) {
+            this.gameServer.sendMessage("Color command disabled in Teams mode.");
+            break;
+        }
         var parts = message.split(" ");
         if (parts.length === 4) {
             var r = parseInt(parts[1]);
@@ -219,6 +223,10 @@ if (message.startsWith("/mass") && allowedMassUsers.includes(player.getName())) 
 
     // ==== /rainbow untuk Amruflxryns ====
     if (message === "/rainbow" && player.getName() === "Amruflxryns") {
+        if (player.gameServer && player.gameServer.gameMode && player.gameServer.gameMode.haveTeams) {
+            this.gameServer.sendMessage("Rainbow command disabled in Teams mode.");
+            break;
+        }
         if (!player.rainbowInterval) {
             var hue = 0;
             player.rainbowInterval = setInterval(() => {
@@ -242,7 +250,11 @@ if (message.startsWith("/mass") && allowedMassUsers.includes(player.getName())) 
     // Kirim chat normal dari Premium ke semua pemain.
     var packet = new Packet.Chat(player, message);
     for (var i = 0; i < this.gameServer.clients.length; i++) {
-        this.gameServer.clients[i].sendPacket(packet);
+        var receiver = this.gameServer.clients[i];
+        if (!receiver || !receiver.playerTracker || receiver.playerTracker.gameServer != player.gameServer) {
+            continue;
+        }
+        receiver.sendPacket(packet);
     }
     break;
 
@@ -486,6 +498,18 @@ PacketHandler.prototype.applyCellColor = function(color) {
     }
 
     client.cellColor = color;
+    if (client.gameServer && client.gameServer.gameMode && client.gameServer.gameMode.haveTeams) {
+        if (client.gameServer.gameMode.applyTeamColor) {
+            var teamColor = client.gameServer.gameMode.applyTeamColor(client);
+            for (var t = 0; t < client.cells.length; t++) {
+                if (client.cells[t] && client.cells[t].setColor && teamColor) {
+                    client.cells[t].setColor(teamColor);
+                }
+            }
+        }
+        return;
+    }
+
     client.setColor(rgb);
 
     for (var i = 0; i < client.cells.length; i++) {

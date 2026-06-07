@@ -39,11 +39,35 @@ Teams.prototype.getTeamColor = function(team) {
     };
 };
 
+Teams.prototype.applyTeamColor = function(player) {
+    if (!player) {
+        return null;
+    }
+
+    player.team = (player.team >> 0);
+    if (player.team < 0 || player.team >= this.teamAmount) {
+        player.team = Math.floor(Math.random() * this.teamAmount);
+    }
+
+    if (!player.teamColor || player.teamColorTeam != player.team) {
+        player.teamColor = this.getTeamColor(player.team);
+        player.teamColorTeam = player.team;
+    }
+
+    player.color = {
+        r: player.teamColor.r,
+        g: player.teamColor.g,
+        b: player.teamColor.b
+    };
+
+    return player.color;
+};
+
 // Override
 
 Teams.prototype.onPlayerSpawn = function(gameServer,player) {
     // Random color based on team
-    player.color = this.getTeamColor(player.team);
+    this.applyTeamColor(player);
     // Spawn player
     gameServer.spawnPlayer(player);
 };
@@ -58,7 +82,7 @@ Teams.prototype.onServerInit = function(gameServer) {
     for (var i = 0; i < gameServer.clients.length; i++) {
         var client = gameServer.clients[i].playerTracker;
         this.onPlayerInit(client);
-        client.color = this.getTeamColor(client.team);
+        this.applyTeamColor(client);
         for (var j = 0; j < client.cells.length; j++) {
             var cell = client.cells[j];
             cell.setColor(client.color);
@@ -70,9 +94,16 @@ Teams.prototype.onServerInit = function(gameServer) {
 Teams.prototype.onPlayerInit = function(player) {
     // Get random team
     player.team = Math.floor(Math.random() * this.teamAmount);
+    player.teamColor = null;
+    player.teamColorTeam = null;
 };
 
 Teams.prototype.onCellAdd = function(cell) {
+    var color = this.applyTeamColor(cell.owner);
+    if (color && cell.setColor) {
+        cell.setColor(color);
+    }
+
     // Add to team list
     this.nodes[cell.owner.getTeam()].push(cell);
 };
