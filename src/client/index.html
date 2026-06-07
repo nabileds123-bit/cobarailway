@@ -79,9 +79,24 @@
         #canvas { position:absolute; left:0; right:0; top:0; bottom:0; width:100%; height:100%; }
         .checkbox label { margin-right:10px; }
         form { margin-bottom:0px; }
-        .btn-play,.btn-settings,.btn-spectate { display:block; height:35px; }
+        .btn-play,.btn-settings,.btn-spectate,.btn-friend { display:block; height:35px; }
         .btn-play { width:85%; float:left; }
         .btn-settings { width:13%; float:right; }
+        .btn-row {
+            display: flex;
+            gap: 6px;
+        }
+        .btn-row .btn-play {
+            flex: 1 1 auto;
+            width: auto;
+            float: none;
+        }
+        .btn-row .btn-friend,
+        .btn-row .btn-settings {
+            flex: 0 0 42px;
+            width: 42px;
+            float: none;
+        }
         .btn-spectate { display:block; float:right; }
         #adsBottom { position:absolute; left:0; right:0; bottom:0; }
         #adsBottomInner { margin:0px auto; width:728px; height:50px; border:5px solid white; border-radius:5px px px px; background-color:#FFFFFF; box-sizing:content-box; }
@@ -326,7 +341,7 @@
         #overlays.only-dialog > #helloDialog {
     display: flex;
 }
-        #overlays.only-dialog > *:not(#helloDialog):not(#loginDialog):not(#registerInfoDialog):not(#registerDialog):not(#forgotDialog):not(#accountDialog):not(#changePasswordDialog):not(#uploadSkinDialog):not(#notificationDialog):not(#guildDialog):not(#guildCreateDialog):not(#highScoreDialog):not(#playerSearchDialog):not(#matchResultDialog):not(#battleCreateDialog) {
+        #overlays.only-dialog > *:not(#helloDialog):not(#loginDialog):not(#registerInfoDialog):not(#registerDialog):not(#forgotDialog):not(#accountDialog):not(#changePasswordDialog):not(#uploadSkinDialog):not(#notificationDialog):not(#friendsDialog):not(#friendRequestDialog):not(#guildDialog):not(#guildCreateDialog):not(#highScoreDialog):not(#playerSearchDialog):not(#matchResultDialog):not(#battleCreateDialog) {
     display: none !important;
 }
         #loginDialog,
@@ -336,6 +351,8 @@
         #accountDialog,
         #changePasswordDialog,
         #notificationDialog,
+        #friendsDialog,
+        #friendRequestDialog,
         #guildDialog,
         #guildCreateDialog,
         #highScoreDialog,
@@ -371,6 +388,73 @@
             display: flex;
             flex-direction: column;
         }
+        #friendsDialog {
+            width: 300px;
+            left: calc(50% + 202px);
+            margin-right: 0;
+            transform: translateY(-50%);
+            min-height: 500px;
+            max-height: calc(100vh - 24px);
+        }
+        #friendsDialog.friend-side-open {
+            display: flex;
+            flex-direction: column;
+        }
+        #friendRequestDialog.spa-open {
+            display: flex;
+            flex-direction: column;
+        }
+        .friend-panel-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .friend-panel-close {
+            border: 0;
+            background: transparent;
+            color: #999;
+            font-size: 22px;
+            font-weight: bold;
+            line-height: 1;
+            padding: 0;
+        }
+        .friend-panel-close:hover {
+            color: #555;
+        }
+        .friend-request-link-wrap {
+            margin: 0 0 10px 0;
+            text-align: center;
+        }
+        #openFriendRequestLink {
+            display: inline-block;
+            font-weight: bold;
+        }
+        .friend-request-label {
+            display: block;
+            margin: 0 0 5px 0;
+            font-weight: bold;
+        }
+        #friendRequestName {
+            margin-bottom: 10px;
+        }
+        #friendRequestStatus {
+            display: none;
+            margin-top: 8px;
+            font-size: 12px;
+        }
+        @media (max-width: 760px) {
+            #friendsDialog {
+                left: 10px;
+                right: 10px;
+                top: auto;
+                bottom: 10px;
+                width: auto;
+                min-height: 300px;
+                max-height: 48vh;
+                transform: none;
+            }
+        }
         #accountDialog,
         #uploadSkinDialog {
             min-height: 520px;
@@ -383,6 +467,8 @@
         #changePasswordDialog h3,
         #uploadSkinDialog h3,
         #notificationDialog h3,
+        #friendsDialog h3,
+        #friendRequestDialog h3,
         #guildDialog h3,
         #guildCreateDialog h3,
         #highScoreDialog h3,
@@ -401,6 +487,8 @@
         #changePasswordDialog .dialog-brand,
         #uploadSkinDialog .dialog-brand,
         #notificationDialog .dialog-brand,
+        #friendsDialog .dialog-brand,
+        #friendRequestDialog .dialog-brand,
         #guildDialog .dialog-brand,
         #guildCreateDialog .dialog-brand,
         #highScoreDialog .dialog-brand,
@@ -470,6 +558,8 @@
         #changePasswordDialog .dialog-footer,
         #uploadSkinDialog .dialog-footer,
         #notificationDialog .dialog-footer,
+        #friendsDialog .dialog-footer,
+        #friendRequestDialog .dialog-footer,
         #guildDialog .dialog-footer,
         #guildCreateDialog .dialog-footer,
         #highScoreDialog .dialog-footer,
@@ -982,6 +1072,81 @@
         .notification-action {
             margin-top: 6px;
         }
+        .friends-body {
+            display: flex;
+            flex: 1;
+            flex-direction: column;
+            min-height: 0;
+        }
+        .friend-section-title {
+            margin: 10px 0 6px 0;
+            font-size: 12px;
+            font-weight: bold;
+            color: #333;
+        }
+        .friend-list {
+            max-height: 116px;
+            overflow-y: auto;
+            border-top: 1px solid #eee;
+        }
+        .friend-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-height: 34px;
+            padding: 5px 0;
+            border-bottom: 1px solid #eee;
+            font-size: 13px;
+        }
+        .friend-name {
+            flex: 1;
+            min-width: 0;
+            color: #111;
+            font-weight: bold;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .friend-row.is-pending .friend-name {
+            color: #999;
+        }
+        .friend-status {
+            color: #777;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+        .friend-presence {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #111;
+            flex: 0 0 10px;
+        }
+        .friend-presence.is-online {
+            background: #33b64b;
+        }
+        .friend-request-actions {
+            display: flex;
+            gap: 4px;
+        }
+        .friend-request-actions .btn {
+            width: 30px;
+            height: 26px;
+            padding: 0;
+            line-height: 24px;
+            font-weight: bold;
+        }
+        .friend-empty {
+            padding: 10px 0;
+            color: #999;
+            font-size: 12px;
+            text-align: center;
+        }
+        #friendStatus {
+            display: none;
+            margin: 4px 0 8px 0;
+            font-size: 12px;
+        }
         .guild-form-label {
             margin: 7px 0 4px 0;
             font-size: 12px;
@@ -1221,6 +1386,15 @@
             display: flex;
             gap: 24px;
             padding: 20px 4px 12px 4px;
+        }
+        .player-profile-actions {
+            margin-top: 12px;
+        }
+        .player-profile-status {
+            display: none;
+            margin-top: 8px;
+            color: #777;
+            font-size: 12px;
         }
         .player-avatar {
             width: 98px;
@@ -1665,9 +1839,13 @@
                 </select>
             </div>
             <div><div class="text-muted region-message CN-China"></div></div>
-            <div class="form-group">
+            <div class="form-group btn-row">
                 <button type="submit" id="playBtn"
                         class="btn btn-play btn-primary btn-needs-server play-ffa">Play</button>
+                <button type="button" id="friendPlayBtn"
+                        class="btn btn-success btn-friend" title="Play with Friends">
+                    <i class="fa fa-user-plus"></i>
+                </button>
                 <button onclick="$('#settings, #instructions').toggle();return false;"
                         class="btn btn-info btn-settings"><i class="glyphicon glyphicon-cog"></i></button>
                 <br clear="both"/>
@@ -1920,6 +2098,50 @@
             <a href="https://discord.gg/SjKG6JHNg3" class="text-primary">About</a>
         </div>
     </div>
+    <div id="friendsDialog">
+        <div class="friend-panel-head">
+            <div>
+                <a href="#home" class="dialog-brand" style="font-size:14px;">Bubble.am</a>
+                <span style="font-size:14px; color:#888;"> &raquo; Friends</span>
+            </div>
+            <button id="friendPanelClose" type="button" class="friend-panel-close" aria-label="Close">&times;</button>
+        </div>
+        <div class="friends-body">
+            <div class="friend-request-link-wrap">
+                <a href="#friend-request" id="openFriendRequestLink" class="text-primary">Send Friend Request</a>
+            </div>
+            <div id="friendStatus" class="text-muted"></div>
+            <div class="friend-section-title">Friend Requests</div>
+            <div id="friendRequestsList" class="friend-list">
+                <div class="friend-empty">No friend requests.</div>
+            </div>
+            <div class="friend-section-title">Pending</div>
+            <div id="friendPendingList" class="friend-list">
+                <div class="friend-empty">No pending requests.</div>
+            </div>
+            <div class="friend-section-title">Friends</div>
+            <div id="friendsList" class="friend-list">
+                <div class="friend-empty">No friends yet.</div>
+            </div>
+        </div>
+    </div>
+    <div id="friendRequestDialog">
+        <div class="form-group">
+            <a href="#home" class="dialog-brand" style="font-size:14px;">Bubble.am</a>
+            <span style="font-size:14px; color:#888;"> &raquo; Send Friend Request</span>
+        </div>
+        <div class="spa-page-body">
+            <label class="friend-request-label" for="friendRequestName">Nickname player</label>
+            <input id="friendRequestName" type="text" class="form-control" maxlength="15" autocomplete="off" placeholder="Player nickname">
+            <button id="friendRequestSubmit" type="button" class="btn btn-success btn-block">Send Friend Request</button>
+            <p id="friendRequestStatus" class="text-muted"></p>
+        </div>
+        <div class="dialog-footer">
+            <a href="#friends" id="friendRequestBack" class="text-primary">Friends</a> |
+            <a href="#home" class="text-primary spa-home-link">Home</a> |
+            <a href="#community" class="text-primary community-menu-link">Community</a>
+        </div>
+    </div>
     <div id="guildDialog">
         <div class="form-group">
             <a href="#home" class="dialog-brand" style="font-size:14px;">Bubble.am</a>
@@ -2040,7 +2262,7 @@
         <div class="player-search-body">
             <div class="player-breadcrumb">
                 <a href="#home" class="dialog-brand">Bubble.am</a>
-                <span> &raquo; Search &raquo; </span>
+                <span> &raquo; <span id="playerSearchTitle">Search</span> &raquo; </span>
                 <span id="playerProfileCrumb">Player</span>
             </div>
             <div class="player-tabs">
@@ -2164,6 +2386,7 @@
 </div>
 <div id="communityDropup">
     <a href="#notification" data-route="notification"><span class="dropup-icon glyphicon glyphicon-bell"></span><span>Notifications</span></a>
+    <a href="#friends" data-route="friends"><span class="dropup-icon fa fa-user-plus"></span><span>Friends</span></a>
     <a href="#high-score" data-route="high-score"><span class="dropup-icon glyphicon glyphicon-stats"></span><span>Highscore</span></a>
     <a href="#guild" data-route="guild"><span class="dropup-icon glyphicon glyphicon-tower"></span><span>Guilds</span></a>
     <a href="#guild" id="communityGuildShortcut" style="display:none;"><span class="dropup-icon"></span><span id="communityGuildShortcutText"></span></a>
@@ -2188,6 +2411,7 @@
         var guildRefreshTimer = null;
         var guildDetailState = null;
         var guildDetailTab = 'members';
+        var friendsRefreshTimer = null;
         var playerProfileState = null;
         var playerProfileTab = 'profile';
         var cellColors = [
@@ -2458,6 +2682,7 @@
 
         function closeSpaDialogs() {
             stopGuildRefresh();
+            stopFriendsRefresh();
             $('#overlays').removeClass('only-dialog');
             $('#loginDialog').removeClass('login-open');
             $('#registerInfoDialog').removeClass('register-info-open');
@@ -2465,7 +2690,8 @@
             $('#forgotDialog').removeClass('forgot-open');
             $('#accountDialog').removeClass('account-open');
             $('#uploadSkinDialog').removeClass('upload-open');
-            $('#notificationDialog, #guildDialog, #guildCreateDialog, #highScoreDialog, #playerSearchDialog, #changePasswordDialog, #matchResultDialog, #battleCreateDialog').removeClass('spa-open');
+            $('#friendsDialog').removeClass('friend-side-open');
+            $('#notificationDialog, #friendRequestDialog, #guildDialog, #guildCreateDialog, #highScoreDialog, #playerSearchDialog, #changePasswordDialog, #matchResultDialog, #battleCreateDialog').removeClass('spa-open');
             closeCommunityDropup(true);
         }
 
@@ -2489,7 +2715,7 @@
         }
 
         function updateFooterActiveFromVisible() {
-            if ($('#communityDropup').hasClass('is-open') || $('#notificationDialog, #guildDialog, #guildCreateDialog, #highScoreDialog, #playerSearchDialog').hasClass('spa-open')) {
+            if ($('#communityDropup').hasClass('is-open') || $('#friendsDialog').hasClass('friend-side-open') || $('#notificationDialog, #friendRequestDialog, #guildDialog, #guildCreateDialog, #highScoreDialog, #playerSearchDialog').hasClass('spa-open')) {
                 setFooterActive('community');
             } else if ($('#matchResultDialog, #battleCreateDialog').hasClass('spa-open')) {
                 setFooterActive('home');
@@ -2566,10 +2792,204 @@
                 startGuildRefresh();
             } else if (page == 'high-score') {
                 loadHighscores();
+            } else if (page == 'player-search') {
+                $('#playerSearchTitle').text('Search');
             } else if (page == 'change-password') {
                 resetChangePasswordDialog();
             }
             return true;
+        }
+
+        function openFriendsDialog() {
+            if (!currentUser) {
+                closeSpaDialogs();
+                $('#helloDialog').hide();
+                showNavigationOverlay();
+                $('#loginDialog').addClass('login-open');
+                $('#loginStatus')
+                    .removeClass('text-success')
+                    .addClass('text-danger')
+                    .text('Login dulu untuk membuka Friends.')
+                    .show();
+                setFooterActive('account');
+                $('#loginName').focus();
+                return;
+            }
+
+            closeSpaDialogs();
+            showNavigationOverlay();
+            $('#helloDialog').css('display', 'flex');
+            $('#friendsDialog').addClass('friend-side-open');
+            setFooterActive('community');
+            startFriendsRefresh();
+            $('#openFriendRequestLink').focus();
+        }
+
+        function closeFriendsDialog() {
+            stopFriendsRefresh();
+            $('#friendsDialog').removeClass('friend-side-open');
+            updateFooterActiveFromVisible();
+        }
+
+        function openFriendRequestDialog(prefill) {
+            closeSpaDialogs();
+            $('#helloDialog').hide();
+            showNavigationOverlay();
+            $('#friendRequestName').val(prefill || '');
+            $('#friendRequestStatus')
+                .hide()
+                .removeClass('text-danger text-success')
+                .addClass('text-muted')
+                .text('');
+            $('#friendRequestSubmit').prop('disabled', false);
+            $('#friendRequestDialog').addClass('spa-open');
+            setFooterActive('community');
+            $('#friendRequestName').focus();
+        }
+
+        function stopFriendsRefresh() {
+            if (friendsRefreshTimer) {
+                clearInterval(friendsRefreshTimer);
+                friendsRefreshTimer = null;
+            }
+        }
+
+        function setFriendStatus(message, isError) {
+            $('#friendStatus')
+                .toggleClass('text-danger', !!isError)
+                .toggleClass('text-success', !isError)
+                .text(message || '')
+                .toggle(!!message);
+        }
+
+        function renderFriendEmpty(target, message) {
+            $(target).empty().append($('<div class="friend-empty"></div>').text(message));
+        }
+
+        function renderIncomingFriendRequest(item) {
+            var row = $('<div class="friend-row is-pending"></div>');
+            $('<span class="friend-name"></span>').text(item.user.username || '-').appendTo(row);
+            $('<span class="friend-status"></span>').text('Pending Friend Request').appendTo(row);
+            var actions = $('<span class="friend-request-actions"></span>');
+            $('<button type="button" class="btn btn-success btn-xs friend-accept" title="Accept">&#10003;</button>')
+                .attr('data-request-id', item.id)
+                .appendTo(actions);
+            $('<button type="button" class="btn btn-danger btn-xs friend-decline" title="Decline">&#10005;</button>')
+                .attr('data-request-id', item.id)
+                .appendTo(actions);
+            actions.appendTo(row);
+            return row;
+        }
+
+        function renderOutgoingFriendRequest(item) {
+            var row = $('<div class="friend-row is-pending"></div>');
+            $('<span class="friend-name"></span>').text(item.user.username || '-').appendTo(row);
+            $('<span class="friend-status"></span>').text('Pending Friend Request').appendTo(row);
+            return row;
+        }
+
+        function renderAcceptedFriend(item) {
+            var row = $('<div class="friend-row"></div>');
+            $('<span class="friend-presence"></span>')
+                .toggleClass('is-online', !!item.online)
+                .attr('title', item.online ? 'Online' : 'Offline')
+                .appendTo(row);
+            $('<span class="friend-name"></span>').text(item.user.username || '-').appendTo(row);
+            $('<span class="friend-status"></span>').text(item.online ? 'Online' : 'Offline').appendTo(row);
+            return row;
+        }
+
+        function renderFriendsData(data) {
+            var incoming = data.incoming || [];
+            var outgoing = data.outgoing || [];
+            var friends = data.friends || [];
+            var requestsList = $('#friendRequestsList').empty();
+            var pendingList = $('#friendPendingList').empty();
+            var friendsList = $('#friendsList').empty();
+
+            if (!incoming.length) {
+                renderFriendEmpty(requestsList, 'No friend requests.');
+            } else {
+                incoming.forEach(function(item) {
+                    requestsList.append(renderIncomingFriendRequest(item));
+                });
+            }
+
+            if (!outgoing.length) {
+                renderFriendEmpty(pendingList, 'No pending requests.');
+            } else {
+                outgoing.forEach(function(item) {
+                    pendingList.append(renderOutgoingFriendRequest(item));
+                });
+            }
+
+            if (!friends.length) {
+                renderFriendEmpty(friendsList, 'No friends yet.');
+            } else {
+                friends.forEach(function(item) {
+                    friendsList.append(renderAcceptedFriend(item));
+                });
+            }
+        }
+
+        function loadFriends(silent) {
+            if (!silent) {
+                renderFriendEmpty('#friendRequestsList', 'Loading friend requests...');
+                renderFriendEmpty('#friendPendingList', 'Loading pending requests...');
+                renderFriendEmpty('#friendsList', 'Loading friends...');
+            }
+
+            return authGet('/api/friends')
+                .done(function(result) {
+                    renderFriendsData(result || {});
+                })
+                .fail(function(xhr) {
+                    if (xhr && xhr.status == 401) {
+                        stopFriendsRefresh();
+                        return;
+                    }
+                    if (!silent) {
+                        setFriendStatus('Gagal memuat friends.', true);
+                    }
+                });
+        }
+
+        function startFriendsRefresh() {
+            stopFriendsRefresh();
+            loadFriends();
+            friendsRefreshTimer = setInterval(function() {
+                if ($('#friendsDialog').hasClass('friend-side-open')) {
+                    loadFriends(true);
+                } else {
+                    stopFriendsRefresh();
+                }
+            }, 3000);
+        }
+
+        function sendFriendRequest(playerName, statusTarget, button) {
+            playerName = String(playerName || '').trim();
+            if (!playerName) {
+                return;
+            }
+
+            if (button) {
+                $(button).prop('disabled', true);
+            }
+            $(statusTarget).removeClass('text-danger').addClass('text-success').text('Sending friend request...').show();
+            authPost('/api/friend/request', { playerName: playerName })
+                .done(function(result) {
+                    $(statusTarget).removeClass('text-danger').addClass('text-success').text(result.message || 'Friend request terkirim.').show();
+                    loadFriends(true);
+                })
+                .fail(function(xhr) {
+                    var error = xhr && xhr.responseJSON && xhr.responseJSON.error ? xhr.responseJSON.error : 'Friend request gagal.';
+                    $(statusTarget).removeClass('text-success').addClass('text-danger').text(error).show();
+                })
+                .always(function() {
+                    if (button) {
+                        $(button).prop('disabled', false);
+                    }
+                });
         }
 
         function stopGuildRefresh() {
@@ -2955,6 +3375,14 @@
                 if (skins.children().length) {
                     skins.appendTo(content);
                 }
+
+                var actions = $('<div class="player-profile-actions"></div>');
+                $('<button id="playerAddFriendButton" type="button" class="btn btn-success btn-block"></button>')
+                    .attr('data-player-name', player.name || '')
+                    .text('Send Friend Request')
+                    .appendTo(actions);
+                $('<div id="playerAddFriendStatus" class="player-profile-status"></div>').appendTo(actions);
+                actions.appendTo(content);
                 return;
             }
 
@@ -3473,6 +3901,28 @@
             }
         }
 
+        function showFriendPlayPanel() {
+            var token = localStorage.getItem('authToken') || localStorage.getItem('token');
+            var loggedUser = currentUser || localStorage.getItem('loggedUser') || localStorage.getItem('loginName');
+
+            if (!token || !loggedUser) {
+                closeSpaDialogs();
+                $('#helloDialog').hide();
+                showNavigationOverlay();
+                $('#loginDialog').addClass('login-open');
+                $('#loginStatus')
+                    .removeClass('text-success')
+                    .addClass('text-danger')
+                    .text('Login dulu untuk bermain bersama teman.')
+                    .show();
+                setFooterActive('account');
+                $('#loginName').focus();
+                return;
+            }
+
+            openFriendsDialog();
+        }
+
         function joinGuildMemberMode(mode, battleType) {
             mode = String(mode || '');
             battleType = battleType == '2v2' ? '2v2' : '1v1';
@@ -3508,6 +3958,44 @@
         $('#playBtn').on('click', function(e) {
             e.preventDefault();
             playOrResumeGame();
+        });
+        $('#friendPlayBtn').on('click', function(e) {
+            e.preventDefault();
+            showFriendPlayPanel();
+        });
+        $('#friendPanelClose').on('click', function(e) {
+            e.preventDefault();
+            closeFriendsDialog();
+        });
+        $('#openFriendRequestLink').on('click', function(e) {
+            e.preventDefault();
+            openFriendRequestDialog();
+        });
+        $('#friendRequestBack').on('click', function(e) {
+            e.preventDefault();
+            openFriendsDialog();
+        });
+        $('#friendRequestSubmit').on('click', function(e) {
+            e.preventDefault();
+            var name = String($('#friendRequestName').val() || '').trim();
+            var status = $('#friendRequestStatus');
+
+            if (!name) {
+                status
+                    .removeClass('text-muted text-success')
+                    .addClass('text-danger')
+                    .text('Nickname player wajib diisi.')
+                    .show();
+                return;
+            }
+
+            sendFriendRequest(name, '#friendRequestStatus', this);
+        });
+        $('#friendRequestName').on('keydown', function(e) {
+            if (e.which == 13 || e.key === 'Enter') {
+                e.preventDefault();
+                $('#friendRequestSubmit').click();
+            }
         });
         function syncModeButtons(selectedMode, resetSelection) {
             var gameMode = $('#gamemode').val();
@@ -3644,6 +4132,10 @@
             }
             var route = $(this).attr('data-route');
             closeCommunityDropup();
+            if (route == 'friends') {
+                openFriendsDialog();
+                return;
+            }
             window.location.hash = route;
             openSpaPage(route);
         });
@@ -3822,6 +4314,32 @@
         $('#playerSearchForm').on('submit', function(e) {
             e.preventDefault();
             searchPlayerProfile($('#playerSearchInput').val());
+        });
+        $('#playerProfileContent').on('click', '#playerAddFriendButton', function(e) {
+            e.preventDefault();
+            var playerName = $(this).attr('data-player-name') || 'player';
+            sendFriendRequest(playerName, '#playerAddFriendStatus', this);
+        });
+        $('#friendRequestsList').on('click', '.friend-accept, .friend-decline', function(e) {
+            e.preventDefault();
+            var button = $(this);
+            var action = button.hasClass('friend-accept') ? 'accept' : 'decline';
+            button.prop('disabled', true);
+            authPost('/api/friend/respond', {
+                requestId: button.attr('data-request-id'),
+                action: action
+            })
+                .done(function() {
+                    setFriendStatus(action == 'accept' ? 'Friend request accepted.' : 'Friend request declined.', false);
+                    loadFriends(true);
+                })
+                .fail(function(xhr) {
+                    var error = xhr && xhr.responseJSON && xhr.responseJSON.error ? xhr.responseJSON.error : 'Gagal mengubah friend request.';
+                    setFriendStatus(error, true);
+                })
+                .always(function() {
+                    button.prop('disabled', false);
+                });
         });
         $('#guildCreateLink').on('click', function(e) {
             e.preventDefault();

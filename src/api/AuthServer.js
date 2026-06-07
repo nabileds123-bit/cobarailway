@@ -212,6 +212,21 @@ function ensureMysql() {
             );
         })
         .then(function() {
+            return pool.query(
+                'CREATE TABLE IF NOT EXISTS friend_requests (' +
+                'id INT AUTO_INCREMENT PRIMARY KEY,' +
+                'requester_id VARCHAR(32) NOT NULL,' +
+                'target_user_id VARCHAR(32) NOT NULL,' +
+                'status VARCHAR(16) NOT NULL DEFAULT \'pending\',' +
+                'created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,' +
+                'updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,' +
+                'INDEX idx_friend_target_status (target_user_id, status),' +
+                'INDEX idx_friend_requester_status (requester_id, status),' +
+                'INDEX idx_friend_pair (requester_id, target_user_id)' +
+                ')'
+            );
+        })
+        .then(function() {
             console.log('[Auth] Using MySQL storage');
             return true;
         });
@@ -1823,6 +1838,185 @@ function createGuildInvite(actor, target, guild) {
     });
 }
 
+function publicFriendUser(user) {
+    return {
+        id: user.id,
+        username: user.username,
+        level: Number(user.level || 1),
+        guild: user.guild || '',
+        accountType: user.accountType || 'Free'
+    };
+}
+
+function applyAcceptedFriendPresence(friends) {
+    var onlineByUserId = getOnlinePlayersByUserId();
+    friends.forEach(function(friend) {
+        if (friend.status != 'accepted') {
+            friend.online = false;
+            return;
+        }
+
+        var online = onlineByUserId[String(friend.user.id || '')];
+        friend.online = !!online;
+        friend.mode = online && online.mode ? online.mode : '';
+        friend.modeLabel = online && online.modeLabel ? online.modeLabel : '';
+        friend.battleType = online && online.battleType ? online.battleType : '';
+    });
+    return friends;
+}
+
+function mapFriendRequestRow(row, otherUser, direction) {
+    return {
+        id: row.request_id || row.id,
+        status: row.status || 'pending',
+        direction: direction,
+        user: publicFriendUser(otherUser),
+        createdAt: row.created_at || row.createdAt || null,
+        updatedAt: row.updated_at || row.updatedAt || null
+    };
+}
+
+function listFriendsForUser(userId) {
+    userId = String(userId || '');
+    return ensureMysql().then(function(usingMysql) {
+        if (usingMysql) {
+            return getMysqlPool()
+                .query(
+                    'SELECT fr.id AS request_id, fr.requester_id, fr.target_user_id, fr.status, fr.created_at, fr.updated_at, u.* ' +
+                    'FROM friend_requests fr ' +
+                    'JOIN users u ON u.id = CASE WHEN fr.requester_id = ? THEN fr.target_user_id ELSE fr.requester_id END ' +
+                    'WHERE (fr.requester_id = ? OR fr.target_user_id = ?) AND fr.status IN (?, ?) ' +
+                    'ORDER BY fr.updated_at DESC, fr.created_at DESC',
+                    [userId, userId, userId, 'pending', 'accepted']
+                )
+                .then(function(result) {
+                    var rows = result[0].map(function(row) {
+                        var direction = String(row.requester_id) == userId ? 'outgoing' : 'incoming';
+                        row.request_id = row.request_id || row.id;
+                        return mapFriendRequestRow(row, mysqlUser(row), direction);
+                    });
+                    return applyAcceptedFriendPresence(rows);
+                });
+        }
+
+        var db = readJsonDb();
+        var usersById = {};
+        (db.users || []).forEach(function(user) {
+            usersById[String(user.id)] = user;
+        });
+
+        var rows = (db.friendRequests || []).filter(function(row) {
+            return (String(row.requesterId || row.requester_id) == userId || String(row.targetUserId || row.target_user_id) == userId) &&
+                ['pending', 'accepted'].indexOf(String(row.status || 'pending')) != -1;
+        }).map(function(row) {
+            var requesterId = String(row.requesterId || row.requester_id);
+            var targetId = String(row.targetUserId || row.target_user_id);
+            var direction = requesterId == userId ? 'outgoing' : 'incoming';
+            var otherUser = usersById[direction == 'outgoing' ? targetId : requesterId];
+            if (!otherUser) {
+                return null;
+            }
+            return mapFriendRequestRow(row, otherUser, direction);
+        }).filter(Boolean).sort(function(a, b) {
+            return new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0);
+        });
+
+        return applyAcceptedFriendPresence(rows);
+    });
+}
+
+function createFriendRequest(actor, target) {
+    if (String(actor.id) == String(target.id)) {
+        return Promise.reject(new Error('Tidak bisa menambahkan diri sendiri.'));
+    }
+
+    return ensureMysql().then(function(usingMysql) {
+        if (usingMysql) {
+            return getMysqlPool()
+                .query(
+                    'SELECT id, requester_id, target_user_id, status FROM friend_requests ' +
+                    'WHERE ((requester_id = ? AND target_user_id = ?) OR (requester_id = ? AND target_user_id = ?)) ' +
+                    'AND status IN (?, ?) LIMIT 1',
+                    [actor.id, target.id, target.id, actor.id, 'pending', 'accepted']
+                )
+                .then(function(result) {
+                    var existing = result[0][0];
+                    if (existing) {
+                        return { existing: true, status: existing.status, id: existing.id };
+                    }
+
+                    return getMysqlPool()
+                        .query('INSERT INTO friend_requests (requester_id, target_user_id, status) VALUES (?, ?, ?)', [actor.id, target.id, 'pending'])
+                        .then(function(insertResult) {
+                            return { existing: false, status: 'pending', id: insertResult[0].insertId };
+                        });
+                });
+        }
+
+        var db = readJsonDb();
+        db.friendRequests = db.friendRequests || [];
+        for (var i = 0; i < db.friendRequests.length; i++) {
+            var row = db.friendRequests[i];
+            var requesterId = String(row.requesterId || row.requester_id);
+            var targetId = String(row.targetUserId || row.target_user_id);
+            var status = String(row.status || 'pending');
+            if (((requesterId == String(actor.id) && targetId == String(target.id)) ||
+                (requesterId == String(target.id) && targetId == String(actor.id))) &&
+                (status == 'pending' || status == 'accepted')) {
+                return { existing: true, status: status, id: row.id };
+            }
+        }
+
+        var request = {
+            id: 'friend_' + Date.now() + '_' + Math.floor(Math.random() * 10000),
+            requesterId: actor.id,
+            targetUserId: target.id,
+            status: 'pending',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+        db.friendRequests.push(request);
+        writeJsonDb(db);
+        return { existing: false, status: 'pending', id: request.id };
+    });
+}
+
+function respondToFriendRequest(actor, requestId, action) {
+    var nextStatus = action == 'accept' ? 'accepted' : 'declined';
+    return ensureMysql().then(function(usingMysql) {
+        if (usingMysql) {
+            return getMysqlPool()
+                .query('SELECT id FROM friend_requests WHERE id = ? AND target_user_id = ? AND status = ? LIMIT 1', [requestId, actor.id, 'pending'])
+                .then(function(result) {
+                    if (!result[0][0]) {
+                        return false;
+                    }
+                    return getMysqlPool()
+                        .query('UPDATE friend_requests SET status = ? WHERE id = ?', [nextStatus, requestId])
+                        .then(function() {
+                            return true;
+                        });
+                });
+        }
+
+        var db = readJsonDb();
+        var found = false;
+        (db.friendRequests || []).forEach(function(row) {
+            if (String(row.id) == String(requestId) &&
+                String(row.targetUserId || row.target_user_id) == String(actor.id) &&
+                String(row.status || 'pending') == 'pending') {
+                row.status = nextStatus;
+                row.updatedAt = new Date().toISOString();
+                found = true;
+            }
+        });
+        if (found) {
+            writeJsonDb(db);
+        }
+        return found;
+    });
+}
+
 function acceptGuildInvite(userId, tag) {
     tag = normalizeGuildTag(tag);
     return ensureMysql().then(function(usingMysql) {
@@ -2615,6 +2809,120 @@ function handleNotificationList(req, res) {
     });
 }
 
+function handleFriendList(req, res) {
+    requireUser(req, res).then(function(user) {
+        if (!user) {
+            return null;
+        }
+
+        return listFriendsForUser(user.id).then(function(rows) {
+            var incoming = [];
+            var outgoing = [];
+            var friends = [];
+
+            rows.forEach(function(row) {
+                if (row.status == 'accepted') {
+                    friends.push(row);
+                } else if (row.direction == 'incoming') {
+                    incoming.push(row);
+                } else {
+                    outgoing.push(row);
+                }
+            });
+
+            sendJson(res, 200, {
+                ok: true,
+                friends: friends,
+                incoming: incoming,
+                outgoing: outgoing
+            });
+        });
+    }).catch(function(error) {
+        handleError(res, error);
+    });
+}
+
+function handleFriendRequest(req, res) {
+    readBody(req, function(err, body) {
+        if (err) {
+            sendJson(res, 400, { ok: false, error: 'JSON tidak valid.' });
+            return;
+        }
+
+        var playerName = String(body.playerName || body.username || '').trim();
+        if (!playerName) {
+            sendJson(res, 400, { ok: false, error: 'Player name wajib diisi.' });
+            return;
+        }
+
+        requireUser(req, res).then(function(actor) {
+            if (!actor) {
+                return null;
+            }
+
+            return findUserByLogin(playerName).then(function(target) {
+                if (!target) {
+                    sendJson(res, 404, { ok: false, error: 'Player not found.' });
+                    return null;
+                }
+
+                return createFriendRequest(actor, target).then(function(result) {
+                    if (result.existing && result.status == 'accepted') {
+                        sendJson(res, 200, { ok: true, status: 'accepted', message: 'Player sudah menjadi teman.' });
+                        return;
+                    }
+
+                    if (result.existing) {
+                        sendJson(res, 200, { ok: true, status: 'pending', message: 'Friend request masih pending.' });
+                        return;
+                    }
+
+                    sendJson(res, 200, { ok: true, status: 'pending', message: 'Friend request terkirim.' });
+                });
+            });
+        }).catch(function(error) {
+            if (error && error.message) {
+                sendJson(res, 400, { ok: false, error: error.message });
+                return;
+            }
+            handleError(res, error);
+        });
+    });
+}
+
+function handleFriendRespond(req, res) {
+    readBody(req, function(err, body) {
+        if (err) {
+            sendJson(res, 400, { ok: false, error: 'JSON tidak valid.' });
+            return;
+        }
+
+        var requestId = body.requestId || body.id;
+        var action = String(body.action || '').toLowerCase();
+        if (!requestId || (action != 'accept' && action != 'decline')) {
+            sendJson(res, 400, { ok: false, error: 'Request/action tidak valid.' });
+            return;
+        }
+
+        requireUser(req, res).then(function(actor) {
+            if (!actor) {
+                return null;
+            }
+
+            return respondToFriendRequest(actor, requestId, action).then(function(updated) {
+                if (!updated) {
+                    sendJson(res, 404, { ok: false, error: 'Friend request tidak ditemukan.' });
+                    return;
+                }
+
+                sendJson(res, 200, { ok: true, status: action == 'accept' ? 'accepted' : 'declined' });
+            });
+        }).catch(function(error) {
+            handleError(res, error);
+        });
+    });
+}
+
 function handleGuildJoin(req, res) {
     readBody(req, function(err, body) {
         if (err) {
@@ -2875,6 +3183,21 @@ function handleAuth(req, res) {
 
     if (req.method == 'GET' && req.url == '/api/notifications') {
         handleNotificationList(req, res);
+        return true;
+    }
+
+    if (req.method == 'GET' && req.url == '/api/friends') {
+        handleFriendList(req, res);
+        return true;
+    }
+
+    if (req.method == 'POST' && req.url == '/api/friend/request') {
+        handleFriendRequest(req, res);
+        return true;
+    }
+
+    if (req.method == 'POST' && req.url == '/api/friend/respond') {
+        handleFriendRespond(req, res);
         return true;
     }
 
