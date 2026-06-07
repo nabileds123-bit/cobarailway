@@ -3335,6 +3335,10 @@
             return $.trim(selected.text() || selected.val() || 'Oceania').replace(/\s*\(\d+\s+players\)\s*$/i, '');
         }
 
+        function isBattleModeBlocked() {
+            return !!window.battleModeBlocked;
+        }
+
         function requireLoginForBattle() {
             if (currentUser) {
                 return true;
@@ -3365,6 +3369,7 @@
             var isTwoVsTwo = tournamentMode == '2v2';
             var creatorName = getBattleCreatorName();
             var maxPlayers = isTwoVsTwo ? 4 : 2;
+            var battleBlocked = isBattleModeBlocked();
 
             closeSpaDialogs();
             $('#helloDialog').hide();
@@ -3375,8 +3380,8 @@
             $('#battleLobbyPlayerAvatar').text(creatorName.charAt(0).toUpperCase());
             $('#battleLobbyReward').text(isTwoVsTwo ? '3 pt.' : '1.5 pt.');
             $('#battleLobbyDefeated').text(isTwoVsTwo ? '-1.4 pt.' : '-0.7 pt.');
-            $('#battleLobbyStatus').text('Waiting for start');
-            $('#battleCreateStart').prop('disabled', false);
+            $('#battleLobbyStatus').text(battleBlocked ? 'Battle sedang ditutup sementara' : 'Waiting for start');
+            $('#battleCreateStart').prop('disabled', battleBlocked);
             $('#battleCreateStart').data('tournament', tournamentMode);
             $('.battle-type-btn').removeClass('btn-danger').addClass('btn-default');
             $('.battle-type-btn[data-battle-type="' + tournamentMode + '"]').removeClass('btn-default').addClass('btn-danger');
@@ -3483,6 +3488,11 @@
             localStorage.setItem('nick', nick);
             var tournamentMode = $('#battleCreateStart').data('tournament') || getSelectedTournamentMode();
             console.log("[BATTLE_START_CLICK]", tournamentMode);
+            if (isBattleModeBlocked()) {
+                $('#battleLobbyStatus').text('Battle sedang ditutup sementara');
+                $('#battleCreateStart').prop('disabled', true);
+                return;
+            }
             $('#battleLobbyStatus').text('Waiting for Players...');
             $('#battleLobbyPlayersTitle').text(tournamentMode == '2v2' ? 'Players 1/4' : 'Players 1/2');
             $('#battleCreateStart').prop('disabled', true);

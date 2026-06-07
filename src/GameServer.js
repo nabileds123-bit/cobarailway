@@ -44,6 +44,7 @@ function GameServer(mult, prt, gamemodeId) {
         serverOldColors: 0,// If the server uses colors from the original Ogar
         serverBots: 3, // Amount of player bots to spawn (Experimental)
         rainbowCells: 0,
+        battleEnabled: 0, // 0 = Battle disabled, 1 = Battle enabled
         serverViewBase: 1024, // Base view distance of players. Warning: high values may cause lag
         borderLeft: 0, // Left border of map (Vanilla value: 0)
         borderRight: 6000, // Right border of map (Vanilla value: 11180.3398875)
@@ -307,6 +308,72 @@ GameServer.prototype.getHub = function() {
     return this.parentServer || this;
 }
 
+GameServer.prototype.isBattleEnabled = function() {
+    var hub = this.getHub();
+    var value = hub.config ? hub.config.battleEnabled : 0;
+    return value === true || String(value).trim().toLowerCase() == 'true' || Number(value) == 1;
+}
+
+GameServer.prototype.isBattleModeName = function(modeName) {
+    modeName = String(modeName || '');
+    return modeName == 'Battle' || modeName == 'Tournament';
+}
+
+GameServer.prototype.isBattleRoom = function(room) {
+    if (!room) {
+        return false;
+    }
+
+    var roomName = String(room.roomName || '');
+    var gameModeName = room.gameMode ? String(room.gameMode.name || '') : '';
+    return roomName == 'Battle' ||
+        roomName == 'Tournament' ||
+        roomName.indexOf('BattleMatch-') === 0 ||
+        gameModeName == 'Tournament';
+}
+
+GameServer.prototype.resetBattlePlayerState = function(socket) {
+    var player = socket && socket.playerTracker;
+    if (!player) {
+        return;
+    }
+
+    player.battleState = 'idle';
+    player.battleTeam = null;
+    player.battleType = null;
+    player.matchId = null;
+    player.spectate = false;
+    player.battlePointSettled = false;
+    player.currentRoom = player.gameServer || null;
+    if (player.gameServer && !this.isBattleRoom(player.gameServer)) {
+        player.currentMode = player.gameServer.roomName || player.gameServer.gameMode.name;
+    }
+}
+
+GameServer.prototype.sendSocketMessage = function(socket, msg) {
+    if (socket && socket.sendPacket) {
+        socket.sendPacket(new Packet.Message(String(msg || '')));
+    }
+}
+
+GameServer.prototype.rejectBattleSocket = function(socket) {
+    var hub = this.getHub();
+    var player = socket && socket.playerTracker;
+    var battleType = player && player.battleMode ? player.battleMode : '1v1';
+
+    if (hub.battleQueues) {
+        hub.removeFromBattleQueues(socket);
+    }
+
+    if (player && hub.rooms && hub.rooms.FFA && hub.isBattleRoom(player.gameServer)) {
+        hub.joinSocketToRoom(socket, hub.rooms.FFA);
+    }
+
+    hub.resetBattlePlayerState(socket);
+    hub.sendBattleStatus(socket, 'disabled', battleType);
+    hub.sendSocketMessage(socket, 'Battle sedang ditutup sementara.');
+}
+
 GameServer.prototype.getAllClients = function() {
     var hub = this.getHub();
     if (!hub.rooms) {
@@ -433,6 +500,12 @@ GameServer.prototype.joinClientToMode = function(mode, socket) {
     var modeName = hub.normalizeModeName(mode);
     var room = hub.rooms ? hub.rooms[modeName] : hub;
 
+    if (hub.isBattleModeName(modeName) && !hub.isBattleEnabled()) {
+        console.log("[JOIN_MODE_BLOCKED] %s requested=%s reason=battle_disabled", socket.playerTracker ? socket.playerTracker.getName() || "(no nick)" : "(no player)", modeName);
+        hub.rejectBattleSocket(socket);
+        return socket.playerTracker;
+    }
+
     if (socket.playerTracker && (socket.playerTracker.battleState == 'finding' || socket.playerTracker.battleState == 'preparing' || socket.playerTracker.battleState == 'in_match')) {
         console.log("[JOIN_MODE_BLOCKED] %s state=%s requested=%s room=%s", socket.playerTracker.getName() || "(no nick)", socket.playerTracker.battleState, modeName, socket.playerTracker.currentMode || "");
         return socket.playerTracker;
@@ -531,6 +604,12 @@ GameServer.prototype.joinBattleQueue = function(socket, battleType) {
     }
 
     battleType = String(battleType || '').toLowerCase() == '2v2' ? '2v2' : '1v1';
+    if (!hub.isBattleEnabled()) {
+        console.log("[BATTLE_QUEUE_BLOCKED] %s %s reason=battle_disabled", battleType, socket.playerTracker ? socket.playerTracker.getName() || "(no nick)" : "(no player)");
+        hub.rejectBattleSocket(socket);
+        return;
+    }
+
     hub.removeFromBattleQueues(socket);
 
     var player = socket.playerTracker;
@@ -596,6 +675,13 @@ GameServer.prototype.configureBattleArena = function(match, battleType) {
 };
 
 GameServer.prototype.createBattleMatch = function(battleType, sockets) {
+    if (!this.isBattleEnabled()) {
+        for (var blockedIndex = 0; blockedIndex < sockets.length; blockedIndex++) {
+            this.rejectBattleSocket(sockets[blockedIndex]);
+        }
+        return;
+    }
+
     var matchId = 'battle_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
     var match = this.createInternalRoom('BattleMatch-' + matchId, 10);
     match.matchId = matchId;
@@ -684,6 +770,13 @@ GameServer.prototype.finishBattleMatch = function() {
 }
 
 GameServer.prototype.startPreparedBattleMatch = function(match, battleType, sockets) {
+    if (!this.isBattleEnabled()) {
+        for (var blockedIndex = 0; blockedIndex < sockets.length; blockedIndex++) {
+            this.rejectBattleSocket(sockets[blockedIndex]);
+        }
+        return;
+    }
+
     console.log("[BATTLE_MATCH_START] %s %s", match.matchId, battleType);
     console.log("[ROOM_GAMEMODE] %s", match.gameMode.name);
     for (var j = 0; j < sockets.length; j++) {
@@ -912,6 +1005,12 @@ var f = new Entity.Food(this.getNextNodeId(), null, this.getRandomPosition(), Ma
 GameServer.prototype.spawnPlayer = function(client) {
    if (!client || client.gameServer !== this) {
        console.log("[SPAWN_BLOCKED] %s requested=%s actual=%s", client && client.getName ? client.getName() : "(no client)", this.roomName || this.gameMode.name, client && client.gameServer ? (client.gameServer.roomName || client.gameServer.gameMode.name) : "(none)");
+       return;
+   }
+
+   if (this.isBattleRoom(this) && !this.isBattleEnabled()) {
+       console.log("[SPAWN_BLOCKED] %s requested=%s reason=battle_disabled", client && client.getName ? client.getName() : "(no client)", this.roomName || this.gameMode.name);
+       this.getHub().rejectBattleSocket(client.socket);
        return;
    }
 

@@ -1134,10 +1134,15 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
             if (wHandle.showBattleHomeFromGame) {
                 wHandle.showBattleHomeFromGame();
             }
+        } else if (status == 'disabled') {
+            label = 'Battle sedang ditutup sementara';
+            battleSessionActive = false;
+            wHandle.battleModeBlocked = true;
+            wHandle.isSpectating = false;
         }
 
         wjQuery('#battleLobbyStatus').text(label);
-        wjQuery('#battleCreateStart').prop('disabled', status == 'finding' || status == 'preparing' || status == 'in_match');
+        wjQuery('#battleCreateStart').prop('disabled', status == 'finding' || status == 'preparing' || status == 'in_match' || status == 'disabled');
         console.log("[BATTLE_LOBBY_STATE]", status || 'idle', battleType || '');
         if (battleType) {
             wjQuery('#battleLobbyMode').text(battleType == '2v2' ? '2 vs 2' : '1 vs 1');
