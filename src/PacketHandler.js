@@ -32,7 +32,7 @@ PacketHandler.prototype.handleMessage = function(message) {
     switch (packetId) {
         case 101:
             var token = "";
-            for (var i = 1; i < view.byteLength; i += 2) {
+            for (var i = 1; i + 1 < view.byteLength; i += 2) {
                 var charCode = view.getUint16(i, true);
                 if (charCode == 0) {
                     break;
@@ -45,7 +45,7 @@ PacketHandler.prototype.handleMessage = function(message) {
             break;
         case 102:
             var color = "";
-            for (var i = 1; i < view.byteLength; i += 2) {
+            for (var i = 1; i + 1 < view.byteLength; i += 2) {
                 var charCode = view.getUint16(i, true);
                 if (charCode == 0) {
                     break;
@@ -58,7 +58,7 @@ PacketHandler.prototype.handleMessage = function(message) {
             break;
         case 103:
             var battleMode = "";
-            for (var i = 1; i < view.byteLength; i += 2) {
+            for (var i = 1; i + 1 < view.byteLength; i += 2) {
                 var charCode = view.getUint16(i, true);
                 if (charCode == 0) {
                     break;
@@ -71,7 +71,7 @@ PacketHandler.prototype.handleMessage = function(message) {
             break;
         case 104:
             var mode = "";
-            for (var i = 1; i < view.byteLength; i += 2) {
+            for (var i = 1; i + 1 < view.byteLength; i += 2) {
                 var charCode = view.getUint16(i, true);
                 if (charCode == 0) {
                     break;
@@ -84,7 +84,7 @@ PacketHandler.prototype.handleMessage = function(message) {
             break;
         case 105:
             var queueMode = "";
-            for (var i = 1; i < view.byteLength; i += 2) {
+            for (var i = 1; i + 1 < view.byteLength; i += 2) {
                 var charCode = view.getUint16(i, true);
                 if (charCode == 0) {
                     break;
@@ -98,7 +98,7 @@ PacketHandler.prototype.handleMessage = function(message) {
         case 0:
             // Set Nickname
             var nick = "";
-            for (var i = 1; i < view.byteLength; i += 2) {
+            for (var i = 1; i + 1 < view.byteLength; i += 2) {
                 var charCode = view.getUint16(i, true);
                 if (charCode == 0) {
                     break;
@@ -117,6 +117,9 @@ PacketHandler.prototype.handleMessage = function(message) {
             break;
         case 16:
             // Mouse Move
+            if (view.byteLength < 17) {
+                break;
+            }
             var client = this.socket.playerTracker;
             client.mouse.x = view.getFloat64(1, true);
             client.mouse.y = view.getFloat64(9, true);
@@ -138,7 +141,7 @@ this.merg = true;
             break;
         case 42:
             var message = "";
-            for (var i = 1; i < view.byteLength; i += 2) {
+            for (var i = 1; i + 1 < view.byteLength; i += 2) {
                 var charCode = view.getUint16(i, true);
                 if (charCode == 0) {
                     break;
@@ -154,6 +157,9 @@ this.merg = true;
             this.socket.sendPacket(new Packet.SetBorder(c.borderLeft, c.borderRight, c.borderTop, c.borderBottom));
             break;
    case 99:
+    if (view.byteLength < 2) {
+        break;
+    }
     var message = "";
     var maxLen = 200 * 2;
     var offset = 2;
@@ -162,7 +168,7 @@ this.merg = true;
     if (flags & 4) offset += 8;
     if (flags & 8) offset += 16;
 
-    for (var i = offset; i < view.byteLength && i <= maxLen; i += 2) {
+    for (var i = offset; i + 1 < view.byteLength && i <= maxLen; i += 2) {
         var charCode = view.getUint16(i, true);
         if (charCode === 0) break;
         message += String.fromCharCode(charCode);
@@ -175,6 +181,33 @@ this.merg = true;
     }
 
     if (String(player.accountType || '').toLowerCase() != 'premium') {
+        break;
+    }
+
+    if (/^\/g(?:\s|$)/i.test(message)) {
+        var guildTag = player.getGuildTag ? player.getGuildTag() : String(player.guildTag || '').trim().toUpperCase();
+        var guildMessage = message.replace(/^\/g(?:\s+)?/i, '').trim();
+
+        if (!guildTag) {
+            this.socket.sendPacket(new Packet.Message("Kamu belum punya guild."));
+            break;
+        }
+
+        if (!guildMessage) {
+            this.socket.sendPacket(new Packet.Message("Gunakan: /g pesan"));
+            break;
+        }
+
+        var guildPacket = new Packet.Chat(player, guildMessage, null, 1);
+        for (var g = 0; g < this.gameServer.clients.length; g++) {
+            var guildReceiver = this.gameServer.clients[g];
+            var receiverPlayer = guildReceiver && guildReceiver.playerTracker;
+            var receiverGuildTag = receiverPlayer && receiverPlayer.getGuildTag ? receiverPlayer.getGuildTag() : '';
+            if (!guildReceiver || !receiverPlayer || receiverPlayer.gameServer != player.gameServer || receiverGuildTag != guildTag) {
+                continue;
+            }
+            guildReceiver.sendPacket(guildPacket);
+        }
         break;
     }
 

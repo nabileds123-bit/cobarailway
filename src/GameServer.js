@@ -1535,7 +1535,7 @@ WebSocket.prototype.sendPacket = function(packet) {
         var array = new Uint8Array(data.buffer || data);
         var l = data.byteLength || data.length;
         var o = data.byteOffset || 0;
-        var buffer = new Buffer(l);
+        var buffer = Buffer.alloc(l);
 
         for (var i = 0; i < l; i++) {
             buffer[i] = array[o + i];

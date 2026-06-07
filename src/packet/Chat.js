@@ -1,6 +1,8 @@
-function Chat(sender, message) {
+function Chat(sender, message, color, flags) {
     this.sender = sender;
     this.message = message;
+    this.color = color || null;
+    this.flags = flags || 0;
 }
 
 module.exports = Chat;
@@ -17,11 +19,13 @@ Chat.prototype.build = function () {
     var buf = new ArrayBuffer(9+2*nick.length+2*this.message.length);
     var view = new DataView(buf);
     var color = {'r': 153, 'g': 153, 'b': 153};
-    if (this.sender.cells.length > 0) {
+    if (this.color) {
+        color = this.color;
+    } else if (this.sender.cells.length > 0) {
         color = this.sender.cells[0].getColor();
     }
     view.setUint8(0, 99);
-    view.setUint8(1, 0); // flags for client; for future use
+    view.setUint8(1, this.flags); // flags for client; 1 = guild chat
     // Send color
     view.setUint8(2, color.r);
     view.setUint8(3, color.g);

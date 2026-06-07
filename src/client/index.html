@@ -29,7 +29,7 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
     <script src="https://code.jquery.com/jquery-1.11.3.min.js"></script>
     <script src="/client/Vector2.js"></script>
-    <script src="/client/main_out.js?578"></script>
+    <script src="/client/main_out.js?579"></script>
     <script>
     'use strict';
     // Hide overlays background (but not helloDialog) when ESC is pressed
@@ -1919,7 +1919,6 @@
                     <div>
                         <div id="guildDetailName" class="guild-detail-name">Guild</div>
                         <div id="guildDetailDescription" class="guild-detail-description"></div>
-                        <a href="#guild" id="guildDetailBack" class="text-primary">Back to Guilds</a>
                     </div>
                 </div>
                 <div class="guild-tabs">
@@ -2149,7 +2148,7 @@
 </div>
 <canvas id="canvas" width="800" height="600"></canvas>
 <div id="chatAccessError">Chat messaging is available for Premium users only. Upgrade your account to start chatting.</div>
-<input type="text" id="chat_textbox" maxlength="200" placeholder="Press Enter to chat!"/>
+<input type="text" id="chat_textbox" maxlength="200" placeholder="Press enter to chat!"/>
 <div style="font-family:'Ubuntu'">&nbsp;</div>
 <script type="text/javascript">
     // Simpan dan load nick dari localStorage
@@ -2260,6 +2259,7 @@
             localStorage.setItem('accountType', user.accountType || 'Free');
             localStorage.setItem('adminRole', user.adminRole || user.role || '');
             localStorage.setItem('registerEmail', user.email);
+            localStorage.setItem('guildTag', user.guild || '');
 
             $('#nick').val(user.username).prop('readonly', true);
             $('#loginName').val(user.username);
@@ -2337,6 +2337,7 @@
             $('#nick').prop('readonly', false);
             localStorage.removeItem('accountType');
             localStorage.removeItem('adminRole');
+            localStorage.removeItem('guildTag');
             $('#communityGuildShortcut').hide();
             $('#communityGuildShortcutText').text('');
             updateChatAccessControls();
@@ -2402,16 +2403,22 @@
             }, 2600);
         }
 
+        function hasGuildChatAccess() {
+            return !!((currentUser && currentUser.guild) || localStorage.getItem('guildTag'));
+        }
+
         function updateChatAccessControls() {
             var chat = $('#chat_textbox');
             var isGuest = !currentUser;
             var isPremium = isPremiumAccount();
             var noChat = localStorage.getItem('noChat') == 'true';
+            var guildChat = hasGuildChatAccess();
 
             chat.toggleClass('chat-hidden', isGuest || noChat);
             $('#chatAccessError').toggleClass('chat-hidden', isGuest || noChat).hide();
             chat.prop('readonly', false);
             chat.toggleClass('chat-locked', !!currentUser && !isPremium);
+            chat.attr('placeholder', guildChat ? 'Press Ctrl to chat guild /g' : 'Press enter to chat!');
         }
 
         window.canUsePremiumChat = function() {
@@ -2628,7 +2635,7 @@
             var members = Array.isArray(data.members) ? data.members : [];
             $('#guildListView').hide();
             $('#guildDetailView').addClass('is-open');
-            $('#guildDetailName').text((guild.name || 'Guild') + ' [' + (guild.tag || '-') + ']');
+            $('#guildDetailName').text(guild.name || 'Guild');
             $('#guildDetailDescription').text(guild.description || '').toggle(!!guild.description);
             $('#guildDetailLogoWrap').empty();
             if (guild.logo) {
@@ -3580,10 +3587,6 @@
                 loadGuildDetail(tag);
             }
         });
-        $('#guildDetailBack').on('click', function(e) {
-            e.preventDefault();
-            showGuildListView();
-        });
         $('.guild-tab').on('click', function(e) {
             e.preventDefault();
             guildDetailTab = $(this).attr('data-guild-tab') || 'members';
@@ -4252,6 +4255,52 @@
             }
         }
     });
+    function openGuildChatInput(e) {
+        e = e || window.event || {};
+        var target = e.target || e.srcElement || {};
+        var tagName = String(target.tagName || '').toUpperCase();
+        if (target.id != 'chat_textbox' && /^(INPUT|TEXTAREA|SELECT)$/.test(tagName)) {
+            return false;
+        }
+
+        var chat = $('#chat_textbox');
+        if (!chat.length || chat.hasClass('chat-hidden')) {
+            return false;
+        }
+
+        var value = String(chat.val() || '');
+        if (!value) {
+            chat.val('/g ');
+        } else if (!/^\/g(?:\s|$)/i.test(value)) {
+            chat.val('/g ' + value);
+        }
+        chat.focus();
+        var input = chat[0];
+        if (input && input.setSelectionRange) {
+            input.setSelectionRange(input.value.length, input.value.length);
+        }
+        if (e.preventDefault) {
+            e.preventDefault();
+        }
+        if (e.stopPropagation) {
+            e.stopPropagation();
+        }
+        return true;
+    }
+    window.openGuildChatInput = openGuildChatInput;
+
+    function handleGuildChatShortcut(e) {
+        e = e || window.event || {};
+        var code = e.which || e.keyCode;
+        if (code == 17 || e.key == 'Control' || e.code == 'ControlLeft' || e.code == 'ControlRight') {
+            openGuildChatInput(e);
+        }
+    }
+
+    document.addEventListener('keydown', handleGuildChatShortcut, true);
+    window.addEventListener('keydown', handleGuildChatShortcut, true);
+    document.addEventListener('keyup', handleGuildChatShortcut, true);
+    window.addEventListener('keyup', handleGuildChatShortcut, true);
     // Agar chat tetap bisa diakses saat overlay aktif
     $(function() {
         // Jika overlay aktif dan user klik di luar overlay, fokus ke chat

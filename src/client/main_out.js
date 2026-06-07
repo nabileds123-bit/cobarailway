@@ -214,6 +214,11 @@
 
         wHandle.onkeydown = function (event) {
             switch (event.keyCode) {
+                case 17:
+                    if (wHandle.openGuildChatInput && wHandle.openGuildChatInput(event)) {
+                        isTyping = true;
+                    }
+                    break;
                 case 32: // split
                     if ((!spacePressed) && (!isTyping)) {
                         sendMouseMove();
@@ -803,7 +808,8 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
             return text;
         }
 
-        var flags = view.getUint8(offset++);
+        var flags = view.getUint8(offset++),
+            isGuildChat = !!(flags & 1);
         // for future expansions
         if (flags & 2) {
             offset += 4;
@@ -827,6 +833,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         chatBoard.push({
             "name": playerName,
             "color": color,
+            "messageColor": isGuildChat ? "#FFA500" : "#DDDDDD",
             "message": getString(),
             "time": Date.now()
         });
@@ -950,7 +957,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
                         name: displayName,
                         nameColor: entry.color,
                         text: wrapped[j],
-                        color: '#DDDDDD',
+                        color: entry.messageColor || '#DDDDDD',
                         nameX: paddingX,
                         textX: firstTextX,
                         time: entry.time,
@@ -960,7 +967,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
                 } else {
                     lines.push({
                         text: wrapped[j],
-                        color: '#DDDDDD',
+                        color: entry.messageColor || '#DDDDDD',
                         x: continuationX,
                         time: entry.time,
                         first: false,
