@@ -224,7 +224,9 @@ function ensureMysql() {
                 'INDEX idx_friend_requester_status (requester_id, status),' +
                 'INDEX idx_friend_pair (requester_id, target_user_id)' +
                 ')'
-            );
+            ).catch(function(error) {
+                console.error('[Auth] Friend requests table setup failed:', error && error.message ? error.message : error);
+            });
         })
         .then(function() {
             console.log('[Auth] Using MySQL storage');
