@@ -579,6 +579,7 @@
             object-fit: cover;
             margin-right: 6px;
             background: #fff;
+            cursor: pointer;
         }
         .profile-skin.active {
             border: 2px solid #31b0d5;
@@ -2436,16 +2437,19 @@
 
             var hasSkin = !!user.skinUrl;
             var hasGuildSkin = !!user.guildSkinUrl;
+            var activeSkinMode = user.skinMode == 'guild' && hasGuildSkin ? 'guild' : 'player';
             if (user.skinUrl) {
-                $('#profilePlayerSkin').attr('src', user.skinUrl).show();
+                $('#profilePlayerSkin').attr('src', user.skinUrl).attr('title', 'Use player skin').show();
             } else {
                 $('#profilePlayerSkin').removeAttr('src').hide();
             }
             if (user.guildSkinUrl) {
-                $('#profileGuildSkin').attr('src', user.guildSkinUrl).show();
+                $('#profileGuildSkin').attr('src', user.guildSkinUrl).attr('title', 'Use guild skin').show();
             } else {
                 $('#profileGuildSkin').removeAttr('src').hide();
             }
+            $('#profilePlayerSkin').toggleClass('active', activeSkinMode == 'player');
+            $('#profileGuildSkin').toggleClass('active', activeSkinMode == 'guild');
             $('#profileSkinRow').toggle(hasSkin || hasGuildSkin);
             markSelectedFreeSkin();
         }
@@ -4045,6 +4049,34 @@
                     if (currentUser) {
                         applyCellColor(currentUser.cellColor);
                     }
+                });
+        });
+        $('#profilePlayerSkin, #profileGuildSkin').on('click', function(e) {
+            e.preventDefault();
+            var mode = this.id == 'profileGuildSkin' ? 'guild' : 'player';
+            var status = $('#uploadSkinStatus');
+
+            if (!currentUser) {
+                status.removeClass('text-success').addClass('text-danger').text('Login dulu untuk ganti skin.').show();
+                return;
+            }
+
+            if (mode == 'guild' && !currentUser.guildSkinUrl) {
+                status.removeClass('text-success').addClass('text-danger').text('Akun belum punya guild skin.').show();
+                return;
+            }
+
+            status.removeClass('text-danger').addClass('text-success').text('Mengganti skin...').show();
+            authPost('/api/account/skin-mode', { mode: mode })
+                .done(function(result) {
+                    applyLoggedInUser(result.user);
+                    if (window.refreshAccountSkin) {
+                        window.refreshAccountSkin();
+                    }
+                    status.removeClass('text-danger').addClass('text-success').text(result.message || 'Skin berhasil diganti.').show();
+                })
+                .fail(function(xhr) {
+                    showAuthError(status, xhr, 'Ganti skin gagal.');
                 });
         });
         $(document).on('click', function() {

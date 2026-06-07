@@ -95,6 +95,7 @@ function ensureMysql() {
                 'admin_role VARCHAR(20) NULL,' +
                 'skin_url VARCHAR(255) NULL,' +
                 'guild_skin_url VARCHAR(255) NULL,' +
+                'skin_mode VARCHAR(16) NOT NULL DEFAULT \'player\',' +
                 'cell_color VARCHAR(7) NOT NULL DEFAULT \'#6FCA36\',' +
                 'email_verified TINYINT(1) NOT NULL DEFAULT 0,' +
                 'verification_reward_claimed TINYINT(1) NOT NULL DEFAULT 0,' +
@@ -123,6 +124,7 @@ function ensureMysql() {
                 'ALTER TABLE users ADD COLUMN admin_role VARCHAR(20) NULL',
                 'ALTER TABLE users ADD COLUMN skin_url VARCHAR(255) NULL',
                 'ALTER TABLE users ADD COLUMN guild_skin_url VARCHAR(255) NULL',
+                'ALTER TABLE users ADD COLUMN skin_mode VARCHAR(16) NOT NULL DEFAULT \'player\'',
                 'ALTER TABLE users ADD COLUMN cell_color VARCHAR(7) NOT NULL DEFAULT \'#6FCA36\'',
                 'ALTER TABLE users ADD COLUMN email_verified TINYINT(1) NOT NULL DEFAULT 0',
                 'ALTER TABLE users ADD COLUMN verification_reward_claimed TINYINT(1) NOT NULL DEFAULT 0',
@@ -579,6 +581,7 @@ function publicUser(user) {
     var premiumExpiresAt = toPublicDate(user.premiumExpiresAt);
     var premiumActivatedAt = toPublicDate(user.premiumActivatedAt);
     var premiumRemainingMs = premiumExpiresAt ? Math.max(0, parseDateValue(premiumExpiresAt).getTime() - Date.now()) : 0;
+    var skinMode = normalizeSkinMode(user.skinMode);
 
     return {
         id: user.id,
@@ -602,9 +605,27 @@ function publicUser(user) {
         adminRole: user.adminRole || user.role || '',
         skinUrl: user.skinUrl || '',
         guildSkinUrl: user.guildSkinUrl || '',
+        skinMode: skinMode,
+        activeSkinUrl: getActiveSkinUrl(user),
         cellColor: normalizeCellColor(user.cellColor),
         lastLogin: user.lastLogin || null
     };
+}
+
+function normalizeSkinMode(mode) {
+    return String(mode || '').toLowerCase() == 'guild' ? 'guild' : 'player';
+}
+
+function getActiveSkinUrl(user) {
+    if (!user) {
+        return '';
+    }
+
+    if (normalizeSkinMode(user.skinMode) == 'guild' && user.guildSkinUrl) {
+        return user.guildSkinUrl;
+    }
+
+    return user.skinUrl || user.guildSkinUrl || '';
 }
 
 function mysqlUser(row) {
@@ -632,6 +653,7 @@ function mysqlUser(row) {
         adminRole: row.admin_role,
         skinUrl: row.skin_url,
         guildSkinUrl: row.guild_skin_url,
+        skinMode: row.skin_mode,
         cellColor: row.cell_color,
         lastLogin: row.last_login,
         createdAt: row.created_at,
@@ -1267,6 +1289,7 @@ function handleRegister(req, res) {
                     guild: '',
                     skinUrl: '',
                     guildSkinUrl: '',
+                    skinMode: 'player',
                     cellColor: '#6FCA36',
                     emailVerified: 0,
                     verificationRewardClaimed: 0,
@@ -1433,8 +1456,8 @@ function saveAccountFields(user) {
         if (usingMysql) {
             return getMysqlPool()
                 .query(
-                    'UPDATE users SET account_type = ?, premium_activated_at = ?, premium_expires_at = ?, points = ?, guild = ?, guild_name = ?, guild_description = ?, guild_type = ?, guild_role = ?, skin_url = ?, guild_skin_url = ? WHERE id = ?',
-                    [user.accountType || 'Free', toMysqlDate(parseDateValue(user.premiumActivatedAt)), toMysqlDate(parseDateValue(user.premiumExpiresAt)), Number(user.points || 0), user.guild || null, user.guildName || null, user.guildDescription || null, user.guildType || null, user.guildRole || null, user.skinUrl || null, user.guildSkinUrl || null, user.id]
+                    'UPDATE users SET account_type = ?, premium_activated_at = ?, premium_expires_at = ?, points = ?, guild = ?, guild_name = ?, guild_description = ?, guild_type = ?, guild_role = ?, skin_url = ?, guild_skin_url = ?, skin_mode = ? WHERE id = ?',
+                    [user.accountType || 'Free', toMysqlDate(parseDateValue(user.premiumActivatedAt)), toMysqlDate(parseDateValue(user.premiumExpiresAt)), Number(user.points || 0), user.guild || null, user.guildName || null, user.guildDescription || null, user.guildType || null, user.guildRole || null, user.skinUrl || null, user.guildSkinUrl || null, normalizeSkinMode(user.skinMode), user.id]
                 )
                 .then(function() {
                     return user;
@@ -1455,6 +1478,7 @@ function saveAccountFields(user) {
                 db.users[i].guildRole = user.guildRole || '';
                 db.users[i].skinUrl = user.skinUrl || '';
                 db.users[i].guildSkinUrl = user.guildSkinUrl || '';
+                db.users[i].skinMode = normalizeSkinMode(user.skinMode);
                 writeJsonDb(db);
                 return user;
             }
@@ -1983,6 +2007,41 @@ function handleAccountColor(req, res) {
     });
 }
 
+function handleAccountSkinMode(req, res) {
+    readBody(req, function(err, body) {
+        if (err) {
+            sendJson(res, 400, { ok: false, error: 'JSON tidak valid.' });
+            return;
+        }
+
+        var mode = normalizeSkinMode(body.mode || body.skinMode);
+
+        requireUser(req, res)
+            .then(function(user) {
+                if (!user) {
+                    return null;
+                }
+
+                if (mode == 'guild' && !user.guildSkinUrl) {
+                    sendJson(res, 400, { ok: false, error: 'Akun belum punya guild skin.' });
+                    return null;
+                }
+
+                user.skinMode = mode;
+                return saveAccountFields(user).then(function(savedUser) {
+                    sendJson(res, 200, {
+                        ok: true,
+                        message: mode == 'guild' ? 'Guild skin aktif.' : 'Player skin aktif.',
+                        user: publicUser(savedUser)
+                    });
+                });
+            })
+            .catch(function(error) {
+                handleError(res, error);
+            });
+    });
+}
+
 function handleChangePassword(req, res) {
     readBody(req, function(err, body) {
         if (err) {
@@ -2084,6 +2143,7 @@ function handleUploadSkin(req, res) {
                     }
 
                     user.skinUrl = '/skins/' + encodeURIComponent(fileName);
+                    user.skinMode = 'player';
                     return saveAccountFields(user).then(function(savedUser) {
                         sendJson(res, 200, {
                             ok: true,
@@ -2131,6 +2191,7 @@ function handleUploadSkin(req, res) {
                     return uploadPlayerSkin(user, file).then(function(skinUrl) {
                         spendPoints(user, UPLOAD_SKIN_COST);
                         user.skinUrl = skinUrl;
+                        user.skinMode = 'player';
                         return saveAccountFields(user).then(function(savedUser) {
                             sendJson(res, 200, { ok: true, message: 'Skin berhasil diupload.', user: publicUser(savedUser) });
                         });
@@ -2791,6 +2852,11 @@ function handleAuth(req, res) {
         return true;
     }
 
+    if (req.method == 'POST' && req.url == '/api/account/skin-mode') {
+        handleAccountSkinMode(req, res);
+        return true;
+    }
+
     if (req.method == 'POST' && req.url == '/api/account/change-password') {
         handleChangePassword(req, res);
         return true;
@@ -2883,6 +2949,7 @@ handleAuth.grantPointsByUsername = grantPointsByUsername;
 handleAuth.getNextLevelXp = getNextLevelXp;
 handleAuth.isAllowedCellColor = isAllowedCellColor;
 handleAuth.normalizeCellColor = normalizeCellColor;
+handleAuth.getActiveSkinUrl = getActiveSkinUrl;
 
 startPremiumExpiryRuntime();
 
