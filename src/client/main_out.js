@@ -191,10 +191,17 @@
             ePressed = false,
             eFeedInterval = null;
         var E_FEED_INTERVAL_MS = 25;
+        var E_FEED_BURST_COUNT = 5;
 
         function sendFeed() {
             sendMouseMove();
             sendUint8(21);
+        }
+
+        function sendFeedBurst() {
+            for (var i = 0; i < E_FEED_BURST_COUNT; i++) {
+                sendFeed();
+            }
         }
 
         function startEFeed() {
@@ -202,7 +209,7 @@
                 return;
             }
 
-            sendFeed();
+            sendFeedBurst();
             eFeedInterval = setInterval(sendFeed, E_FEED_INTERVAL_MS);
         }
 
