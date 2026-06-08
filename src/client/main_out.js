@@ -190,7 +190,7 @@
             wPressed = false,
             ePressed = false,
             eFeedInterval = null;
-        var E_FEED_INTERVAL_MS = 80;
+        var E_FEED_INTERVAL_MS = 25;
 
         function sendFeed() {
             sendMouseMove();

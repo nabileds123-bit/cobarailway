@@ -5,7 +5,7 @@ function PacketHandler(gameServer, socket) {
     this.gameServer = gameServer;
     this.socket = socket;
     this.merg = false;
-    this.pressW = false;
+    this.pressW = 0;
     this.pressSpace = false;
 	this.massSize = false;
 }
@@ -137,7 +137,7 @@ this.merg = true;
 		    break;
         case 21: 
             // W Press - Eject mass
-            this.pressW = true;
+            this.pressW = Math.min(this.pressW + 1, 5);
             break;
         case 42:
             var message = "";

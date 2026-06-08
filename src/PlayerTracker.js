@@ -133,9 +133,12 @@ PlayerTracker.prototype.update = function() {
         this.socket.packetHandler.merg = false;
     }
     if (this.socket.packetHandler.pressW) {
-        // Eject mass
-        this.gameServer.ejectMass(this);
-        this.socket.packetHandler.pressW = false;
+        var ejectCount = Math.min(this.socket.packetHandler.pressW, 3);
+        for (var ejectIndex = 0; ejectIndex < ejectCount; ejectIndex++) {
+            // Eject mass
+            this.gameServer.ejectMass(this);
+        }
+        this.socket.packetHandler.pressW -= ejectCount;
     }
     
 	// Remove nodes from visible nodes if possible
