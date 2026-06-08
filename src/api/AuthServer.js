@@ -2412,6 +2412,42 @@ function mapTop1HistoryRow(row) {
     };
 }
 
+function roundTop1ProfileSeconds(seconds) {
+    seconds = Math.max(0, Math.floor(Number(seconds || 0)));
+    return Math.floor(seconds / 600) * 600;
+}
+
+function groupTop1ProfileRows(rows) {
+    var grouped = {};
+    rows.forEach(function(row) {
+        var created = row.created_at || row.createdAt || null;
+        var dateKey = created ? String(created).slice(0, 10) : '';
+        if (created instanceof Date) {
+            dateKey = created.toISOString().slice(0, 10);
+        }
+        if (!dateKey) {
+            return;
+        }
+        var server = row.server_name || row.server || row.game_mode || row.gameMode || 'Top 1';
+        var key = dateKey + '|' + server;
+        grouped[key] = grouped[key] || {
+            createdAt: dateKey + 'T00:00:00.000Z',
+            server: server,
+            top1Time: 0
+        };
+        grouped[key].top1Time += Number(row.top1_time || row.top1Time || 0);
+    });
+
+    return Object.keys(grouped).map(function(key) {
+        grouped[key].top1Time = roundTop1ProfileSeconds(grouped[key].top1Time);
+        return grouped[key];
+    }).filter(function(row) {
+        return row.top1Time > 0;
+    }).sort(function(a, b) {
+        return new Date(b.createdAt) - new Date(a.createdAt);
+    }).slice(0, 100);
+}
+
 function mapBattleHistoryRow(row) {
     return {
         createdAt: row.created_at || row.createdAt || null,
@@ -2430,13 +2466,18 @@ function getPlayerProfile(search) {
         return ensureMysql().then(function(usingMysql) {
             if (usingMysql) {
                 return Promise.all([
-                    getMysqlPool().query('SELECT created_at, server_name, top1_time FROM top1_history WHERE player_id = ? ORDER BY created_at DESC LIMIT 100', [user.id]),
+                    getMysqlPool().query('SELECT DATE(created_at) AS created_at, server_name, SUM(top1_time) AS top1_time FROM top1_history WHERE player_id = ? GROUP BY DATE(created_at), server_name ORDER BY created_at DESC LIMIT 100', [user.id]),
                     getMysqlPool().query('SELECT created_at, server_name, result, duration FROM battle_match_history WHERE player_id = ? AND battle_type = ? ORDER BY created_at DESC LIMIT 100', [user.id, '2v2']),
                     getMysqlPool().query('SELECT created_at, server_name, result, duration FROM battle_match_history WHERE player_id = ? AND battle_type = ? ORDER BY created_at DESC LIMIT 100', [user.id, '1v1'])
                 ]).then(function(result) {
                     return {
                         player: publicPlayerProfile(user),
-                        top1: result[0][0].map(mapTop1HistoryRow),
+                        top1: result[0][0].map(mapTop1HistoryRow).map(function(row) {
+                            row.top1Time = roundTop1ProfileSeconds(row.top1Time);
+                            return row;
+                        }).filter(function(row) {
+                            return row.top1Time > 0;
+                        }),
                         battle2v2: result[1][0].map(mapBattleHistoryRow),
                         battle1v1: result[2][0].map(mapBattleHistoryRow)
                     };
@@ -2444,11 +2485,9 @@ function getPlayerProfile(search) {
             }
 
             var db = readJsonDb();
-            var top1 = (db.top1History || []).filter(function(row) {
+            var top1 = groupTop1ProfileRows((db.top1History || []).filter(function(row) {
                 return String(row.player_id || row.playerId || '') == String(user.id);
-            }).sort(function(a, b) {
-                return new Date(b.created_at || b.createdAt || 0) - new Date(a.created_at || a.createdAt || 0);
-            }).slice(0, 100).map(mapTop1HistoryRow);
+            }));
 
             function battleRows(type) {
                 return (db.battleMatchHistory || []).filter(function(row) {
