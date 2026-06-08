@@ -41,6 +41,7 @@
     var hasClickedPlay = false;
     var pendingStartNick = null;
     var pendingBattleQueue = null;
+    var pendingSpectate = false;
     var battleSessionActive = false;
 
     function requestFrame(callback) {
@@ -661,7 +662,11 @@ var TOP1_TIMER_MIN_MS = 60 * 1000;
         sendBattleMode();
         setTimeout(sendSavedAccountColor, 150);
         setTimeout(sendSavedAccountColor, 700);
-        if (pendingBattleQueue && null != pendingStartNick) {
+        if (pendingSpectate) {
+            pendingSpectate = false;
+            sendUint8(1);
+            hideOverlays();
+        } else if (pendingBattleQueue && null != pendingStartNick) {
             var battleMode = pendingBattleQueue;
             pendingBattleQueue = null;
             userNickName = pendingStartNick;
@@ -2209,6 +2214,11 @@ var TOP1_TIMER_MIN_MS = 60 * 1000;
         userNickName = null;
         wHandle.isSpectating = true;
         resetMatchStats();
+        if (!wsIsOpen()) {
+            pendingSpectate = true;
+            showConnecting();
+            return;
+        }
         sendUint8(1);
         hideOverlays()
     };
