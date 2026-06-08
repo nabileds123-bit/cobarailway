@@ -190,6 +190,7 @@
             wPressed = false,
             ePressed = false,
             eFeedInterval = null;
+        var E_FEED_INTERVAL_MS = 120;
 
         function sendFeed() {
             sendMouseMove();
@@ -202,7 +203,7 @@
             }
 
             sendFeed();
-            eFeedInterval = setInterval(sendFeed, 350);
+            eFeedInterval = setInterval(sendFeed, E_FEED_INTERVAL_MS);
         }
 
         function stopEFeed() {
