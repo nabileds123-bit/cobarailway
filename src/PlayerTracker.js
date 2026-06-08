@@ -28,6 +28,7 @@ function PlayerTracker(gameServer, socket) {
     this.currentRoom = gameServer || null;
     this.matchId = null;
     this.lastSplitTime = 0;
+    this.lastEjectTime = 0;
 
     this.mouse = {x: 0, y: 0};
     this.tickLeaderboard = 0; // 

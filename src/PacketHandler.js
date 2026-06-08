@@ -137,8 +137,14 @@ this.merg = true;
 		    break;
         case 21: 
             // Feed packet - eject one mass immediately.
-            if (this.socket.playerTracker) {
-                this.gameServer.ejectMass(this.socket.playerTracker);
+            var player = this.socket.playerTracker;
+            if (player) {
+                var now = Date.now();
+                var cooldown = this.gameServer.config.playerEjectCooldown || 0;
+                if (!player.lastEjectTime || now - player.lastEjectTime >= cooldown) {
+                    this.gameServer.ejectMass(player);
+                    player.lastEjectTime = now;
+                }
             }
             break;
         case 42:
