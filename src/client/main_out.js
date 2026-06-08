@@ -1722,6 +1722,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
     }
 
     function resetMatchStats() {
+        top1StartedAt = 0;
         playerStat = {
             active: false,
             finalized: false,
@@ -1832,11 +1833,26 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
             if (!playerStat.leaderboardStartedAt) {
                 playerStat.leaderboardStartedAt = now;
             }
+            if (position == 1) {
+                if (!top1StartedAt) {
+                    top1StartedAt = now;
+                }
+            } else {
+                top1StartedAt = 0;
+            }
             playerStat.topPosition = null == playerStat.topPosition ? position : Math.min(playerStat.topPosition, position);
         } else if (playerStat.leaderboardStartedAt) {
             playerStat.leaderboardTimeMs += now - playerStat.leaderboardStartedAt;
             playerStat.leaderboardStartedAt = 0;
+            top1StartedAt = 0;
         }
+    }
+
+    function formatTop1Timer(ms) {
+        var totalSeconds = Math.max(0, Math.floor(Number(ms || 0) / 1000));
+        var minutes = Math.floor(totalSeconds / 60);
+        var seconds = totalSeconds % 60;
+        return minutes + "m " + (seconds < 10 ? "0" : "") + seconds + "s";
     }
 
     function getFinalMatchStats() {
@@ -1896,6 +1912,9 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
                 var ctx = lbCanvas.getContext("2d"),
                     boardLength = 60;
                 boardLength = null == teamScores ? boardLength + 24 * leaderBoard.length : boardLength + 180;
+                if (top1StartedAt && null == teamScores) {
+                    boardLength += 24;
+                }
                 var scaleFactor = Math.min(0.22*canvasHeight, Math.min(200, .3 * canvasWidth)) / 200;
                 lbCanvas.width = 200 * scaleFactor;
                 lbCanvas.height = boardLength * scaleFactor;
@@ -1912,6 +1931,14 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
                 ctx.fillText(c, 100 - ctx.measureText(c).width / 2, 40);
                 var b;
                 if (null == teamScores) {
+                    var rowStartY = 70;
+                    if (top1StartedAt) {
+                        c = "Top 1 " + formatTop1Timer(Date.now() - top1StartedAt);
+                        ctx.font = "18px Ubuntu";
+                        ctx.fillStyle = "#FFD45A";
+                        ctx.fillText(c, 100 - ctx.measureText(c).width / 2, 64);
+                        rowStartY = 92;
+                    }
                     for (ctx.font = "20px Ubuntu", b = 0; b < leaderBoard.length; ++b) {
                         c = leaderBoard[b].name || "An unnamed cell";
                         if (!showName) {
@@ -1923,13 +1950,13 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
                             if (!noRanking) {
                                 c = b + 1 + ". " + c;
                             }
-                            ctx.fillText(c, 100 - ctx.measureText(c).width / 2, 70 + 24 * b);
+                            ctx.fillText(c, 100 - ctx.measureText(c).width / 2, rowStartY + 24 * b);
                         } else {
                             ctx.fillStyle = "#FFFFFF";
                             if (!noRanking) {
                                 c = b + 1 + ". " + c;
                             }
-                            ctx.fillText(c, 100 - ctx.measureText(c).width / 2, 70 + 24 * b);
+                            ctx.fillText(c, 100 - ctx.measureText(c).width / 2, rowStartY + 24 * b);
                         }
                     }
                 }
@@ -2031,6 +2058,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
     ejectIcon.src = "/client/feed.png";
     var wCanvas = document.createElement("canvas");
     var playerStat = null;
+    var top1StartedAt = 0;
     resetMatchStats();
     wHandle.isSpectating = false;
     wHandle.setNick = function (arg) {

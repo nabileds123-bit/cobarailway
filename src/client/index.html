@@ -1246,9 +1246,14 @@
         }
         .highscore-filters {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 10px;
             margin-bottom: 10px;
+        }
+        @media (max-width: 520px) {
+            .highscore-filters {
+                grid-template-columns: 1fr;
+            }
         }
         .highscore-filters .form-control {
             height: 34px;
@@ -2240,6 +2245,12 @@
                     <option value="asia">Asia</option>
                     <option value="europe">Europe</option>
                     <option value="america">America</option>
+                </select>
+                <select id="highScorePeriod" class="form-control">
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="global">Global</option>
                 </select>
             </div>
             <div class="highscore-table-head">
@@ -3293,9 +3304,10 @@
         function loadHighscores() {
             var mode = $('#highScoreMode').val() || 'ffa';
             var region = $('#highScoreRegion').val() || 'global';
+            var period = $('#highScorePeriod').val() || 'daily';
             $('#highScoreList').html('<div class="highscore-empty">Loading highscore...</div>');
 
-            authGet('/api/highscores?mode=' + encodeURIComponent(mode) + '&region=' + encodeURIComponent(region))
+            authGet('/api/highscores?mode=' + encodeURIComponent(mode) + '&region=' + encodeURIComponent(region) + '&period=' + encodeURIComponent(period))
                 .done(function(result) {
                     renderHighscores(result.highscores || []);
                 })
@@ -4297,7 +4309,7 @@
             openSpaPage('guild');
             loadGuildDetail(tag);
         });
-        $('#highScoreMode, #highScoreRegion').on('change', function() {
+        $('#highScoreMode, #highScoreRegion, #highScorePeriod').on('change', function() {
             loadHighscores();
         });
         $('#highScoreList').on('click', '.highscore-player', function(e) {

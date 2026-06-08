@@ -29,6 +29,11 @@ function GameServer(mult, prt, gamemodeId) {
     this.currentFood = 0;
     this.movingNodes = []; // For move engine
     this.leaderboard = [];
+    this.top1Tracker = {
+        playerId: null,
+        startedAt: 0,
+        lastSavedAt: 0
+    };
     
     // Main loop tick
     this.time = new Date();
@@ -976,6 +981,7 @@ GameServer.prototype.mainLoop = function() {
             // Update leaderboard with the gamemode's method
             this.leaderboard = []; 
             this.gameMode.updateLB(this);
+            this.updateTop1Timer();
             
             this.tickMain = 0; // Reset
         }
@@ -1000,6 +1006,74 @@ GameServer.prototype.sendMessage = function(msg) {
 
         this.clients[i].playerTracker.socket.sendPacket(new Packet.Message(msg));
     }
+}
+
+GameServer.prototype.getHighscoreModeName = function() {
+    var modeName = this.roomName || (this.gameMode && this.gameMode.name) || '';
+    var battleType = this.battleType || (this.gameMode && this.gameMode.battleMode) || '';
+    if (modeName.indexOf('Battle') === 0 || battleType) {
+        return battleType == '2v2' ? 'battle_2v2' : 'battle_1v1';
+    }
+    if (this.gameMode && this.gameMode.name == 'Hardcore') {
+        return 'hardcore';
+    }
+    return 'ffa';
+}
+
+GameServer.prototype.getHighscoreRegionName = function() {
+    return 'global';
+}
+
+GameServer.prototype.saveTop1Delta = function(player, seconds) {
+    if (!player || !player.authUserId || !seconds || !handleAuth.recordTop1Time) {
+        return;
+    }
+
+    handleAuth.recordTop1Time(
+        player.authUserId,
+        player.authUsername || player.getName() || 'Unknown',
+        this.getHighscoreModeName(),
+        this.getHighscoreRegionName(),
+        this.roomName || (this.gameMode && this.gameMode.name) || 'Server',
+        seconds
+    ).catch(function(error) {
+        console.log("[Auth] Top1 highscore save failed:", error && error.message ? error.message : error);
+    });
+}
+
+GameServer.prototype.updateTop1Timer = function() {
+    if (!this.leaderboard || !this.leaderboard.length) {
+        this.top1Tracker.playerId = null;
+        this.top1Tracker.startedAt = 0;
+        this.top1Tracker.lastSavedAt = 0;
+        return;
+    }
+
+    var player = this.leaderboard[0];
+    var now = Date.now();
+    if (!player || !player.authUserId || !player.cells || player.cells.length <= 0) {
+        this.top1Tracker.playerId = null;
+        this.top1Tracker.startedAt = 0;
+        this.top1Tracker.lastSavedAt = 0;
+        return;
+    }
+
+    if (this.top1Tracker.playerId != player.authUserId) {
+        this.top1Tracker.playerId = player.authUserId;
+        this.top1Tracker.startedAt = now;
+        this.top1Tracker.lastSavedAt = now;
+        player.top1StartedAt = now;
+        return;
+    }
+
+    var elapsed = Math.floor((now - this.top1Tracker.lastSavedAt) / 1000);
+    if (elapsed <= 0) {
+        return;
+    }
+
+    this.top1Tracker.lastSavedAt += elapsed * 1000;
+    player.top1StartedAt = this.top1Tracker.startedAt;
+    this.saveTop1Delta(player, elapsed);
 }
 
 GameServer.prototype.awardPlayerXp = function(client, amount, reason) {

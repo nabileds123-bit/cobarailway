@@ -162,6 +162,7 @@ function ensureMysql() {
                 'region VARCHAR(32) NOT NULL DEFAULT \'global\',' +
                 'top1_time BIGINT NOT NULL DEFAULT 0,' +
                 'updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,' +
+                'UNIQUE KEY uniq_highscore_player_mode_region (player_id, game_mode, region),' +
                 'INDEX idx_highscores_mode_region_time (game_mode, region, top1_time)' +
                 ')'
             );
@@ -173,6 +174,7 @@ function ensureMysql() {
                 'player_id VARCHAR(32) NOT NULL,' +
                 'player_name VARCHAR(32) NOT NULL,' +
                 'game_mode VARCHAR(24) NOT NULL,' +
+                'region VARCHAR(32) NOT NULL DEFAULT \'global\',' +
                 'server_name VARCHAR(64) NOT NULL,' +
                 'top1_time BIGINT NOT NULL DEFAULT 0,' +
                 'created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,' +
@@ -210,6 +212,15 @@ function ensureMysql() {
                 'INDEX idx_guild_invites_guild_target (guild, target_user_id)' +
                 ')'
             );
+        })
+        .then(function() {
+            return pool.query('ALTER TABLE top1_history ADD COLUMN region VARCHAR(32) NOT NULL DEFAULT \'global\' AFTER game_mode')
+                .catch(function(error) {
+                    if (error && error.code == 'ER_DUP_FIELDNAME') {
+                        return;
+                    }
+                    throw error;
+                });
         })
         .then(function() {
             return pool.query(
@@ -2068,19 +2079,79 @@ function normalizeHighscoreRegion(region) {
     return aliases[region] || 'global';
 }
 
-function listHighscores(mode, region) {
+function normalizeHighscorePeriod(period) {
+    period = String(period || '').trim().toLowerCase();
+    var aliases = {
+        daily: 'daily',
+        day: 'daily',
+        harian: 'daily',
+        weekly: 'weekly',
+        week: 'weekly',
+        mingguan: 'weekly',
+        monthly: 'monthly',
+        month: 'monthly',
+        bulanan: 'monthly',
+        global: 'global',
+        all: 'global',
+        alltime: 'global',
+        'all-time': 'global'
+    };
+    return aliases[period] || 'global';
+}
+
+function getHighscorePeriodStart(period) {
+    var now = new Date();
+    if (period == 'daily') {
+        return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    }
+    if (period == 'weekly') {
+        var day = now.getDay();
+        var diff = day === 0 ? 6 : day - 1;
+        return new Date(now.getFullYear(), now.getMonth(), now.getDate() - diff);
+    }
+    if (period == 'monthly') {
+        return new Date(now.getFullYear(), now.getMonth(), 1);
+    }
+    return null;
+}
+
+function mysqlDateTime(date) {
+    function pad(value) {
+        return value < 10 ? '0' + value : String(value);
+    }
+    return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) + ' ' +
+        pad(date.getHours()) + ':' + pad(date.getMinutes()) + ':' + pad(date.getSeconds());
+}
+
+function listHighscores(mode, region, period) {
     mode = normalizeHighscoreMode(mode);
     region = normalizeHighscoreRegion(region);
+    period = normalizeHighscorePeriod(period);
 
     return ensureMysql().then(function(usingMysql) {
         if (usingMysql) {
-            var sql = 'SELECT player_id, player_name, game_mode, region, top1_time FROM highscores WHERE game_mode = ?';
-            var params = [mode];
-            if (region != 'global') {
-                sql += ' AND region = ?';
-                params.push(region);
+            var periodStart = getHighscorePeriodStart(period);
+            var sql;
+            var params;
+            if (periodStart) {
+                sql = 'SELECT player_id, player_name, game_mode, region, SUM(top1_time) AS top1_time ' +
+                    'FROM top1_history WHERE game_mode = ?';
+                params = [mode];
+                if (region != 'global') {
+                    sql += ' AND region = ?';
+                    params.push(region);
+                }
+                sql += ' AND created_at >= ? GROUP BY player_id, player_name, game_mode, region ORDER BY top1_time DESC LIMIT 100';
+                params.push(mysqlDateTime(periodStart));
+            } else {
+                sql = 'SELECT player_id, player_name, game_mode, region, top1_time FROM highscores WHERE game_mode = ?';
+                params = [mode];
+                if (region != 'global') {
+                    sql += ' AND region = ?';
+                    params.push(region);
+                }
+                sql += ' ORDER BY top1_time DESC LIMIT 100';
             }
-            sql += ' ORDER BY top1_time DESC LIMIT 100';
 
             return getMysqlPool().query(sql, params).then(function(result) {
                 return result[0].map(function(row) {
@@ -2096,6 +2167,33 @@ function listHighscores(mode, region) {
         }
 
         var rows = readJsonDb().highscores || [];
+        var periodStartMs = getHighscorePeriodStart(period);
+        if (periodStartMs) {
+            var grouped = {};
+            (readJsonDb().top1History || []).forEach(function(row) {
+                var rowMode = normalizeHighscoreMode(row.game_mode || row.gameMode);
+                var rowRegion = normalizeHighscoreRegion(row.region);
+                var created = new Date(row.created_at || row.createdAt || 0).getTime();
+                if (rowMode != mode || (region != 'global' && rowRegion != region) || created < periodStartMs.getTime()) {
+                    return;
+                }
+                var key = String(row.player_id || row.playerId || '') + '|' + rowMode + '|' + rowRegion;
+                grouped[key] = grouped[key] || {
+                    playerId: row.player_id || row.playerId || '',
+                    playerName: row.player_name || row.playerName || '',
+                    gameMode: rowMode,
+                    region: rowRegion,
+                    top1Time: 0
+                };
+                grouped[key].top1Time += Number(row.top1_time || row.top1Time || 0);
+            });
+            return Object.keys(grouped).map(function(key) {
+                return grouped[key];
+            }).sort(function(a, b) {
+                return Number(b.top1Time || 0) - Number(a.top1Time || 0);
+            }).slice(0, 100);
+        }
+
         return rows.filter(function(row) {
             var rowMode = normalizeHighscoreMode(row.game_mode || row.gameMode);
             var rowRegion = normalizeHighscoreRegion(row.region);
@@ -2231,6 +2329,85 @@ function handleAccountColor(req, res) {
             .catch(function(error) {
                 handleError(res, error);
             });
+    });
+}
+
+function recordTop1Time(playerId, playerName, mode, region, serverName, seconds) {
+    playerId = String(playerId || '');
+    playerName = String(playerName || '').slice(0, 32) || 'Unknown';
+    mode = normalizeHighscoreMode(mode);
+    region = normalizeHighscoreRegion(region);
+    serverName = String(serverName || mode || 'Server').slice(0, 64);
+    seconds = Math.max(0, Math.floor(Number(seconds || 0)));
+    if (!playerId || !seconds) {
+        return Promise.resolve(false);
+    }
+
+    return ensureMysql().then(function(usingMysql) {
+        if (usingMysql) {
+            return getMysqlPool()
+                .query('SELECT id FROM highscores WHERE player_id = ? AND game_mode = ? AND region = ? LIMIT 1', [playerId, mode, region])
+                .then(function(result) {
+                    var existing = result[0][0];
+                    if (existing) {
+                        return getMysqlPool().query(
+                            'UPDATE highscores SET player_name = ?, top1_time = top1_time + ? WHERE id = ?',
+                            [playerName, seconds, existing.id]
+                        );
+                    }
+                    return getMysqlPool().query(
+                        'INSERT INTO highscores (player_id, player_name, game_mode, region, top1_time) VALUES (?, ?, ?, ?, ?)',
+                        [playerId, playerName, mode, region, seconds]
+                    );
+                })
+                .then(function() {
+                    return getMysqlPool().query(
+                        'INSERT INTO top1_history (player_id, player_name, game_mode, region, server_name, top1_time) VALUES (?, ?, ?, ?, ?, ?)',
+                        [playerId, playerName, mode, region, serverName, seconds]
+                    );
+                })
+                .then(function() {
+                    return true;
+                });
+        }
+
+        var db = readJsonDb();
+        db.highscores = db.highscores || [];
+        db.top1History = db.top1History || [];
+        var found = null;
+        for (var i = 0; i < db.highscores.length; i++) {
+            var row = db.highscores[i];
+            if (String(row.player_id || row.playerId || '') == playerId &&
+                normalizeHighscoreMode(row.game_mode || row.gameMode) == mode &&
+                normalizeHighscoreRegion(row.region) == region) {
+                found = row;
+                break;
+            }
+        }
+        if (!found) {
+            found = {
+                playerId: playerId,
+                playerName: playerName,
+                gameMode: mode,
+                region: region,
+                top1Time: 0
+            };
+            db.highscores.push(found);
+        }
+        found.playerName = playerName;
+        found.top1Time = Number(found.top1_time || found.top1Time || 0) + seconds;
+        found.updatedAt = new Date().toISOString();
+        db.top1History.push({
+            playerId: playerId,
+            playerName: playerName,
+            gameMode: mode,
+            region: region,
+            server: serverName,
+            top1Time: seconds,
+            createdAt: new Date().toISOString()
+        });
+        writeJsonDb(db);
+        return true;
     });
 }
 
@@ -2998,9 +3175,10 @@ function handleHighscoreList(req, res) {
 
     var mode = normalizeHighscoreMode(query.mode);
     var region = normalizeHighscoreRegion(query.region);
-    listHighscores(mode, region)
+    var period = normalizeHighscorePeriod(query.period);
+    listHighscores(mode, region, period)
         .then(function(highscores) {
-            sendJson(res, 200, { ok: true, mode: mode, region: region, highscores: highscores });
+            sendJson(res, 200, { ok: true, mode: mode, region: region, period: period, highscores: highscores });
         })
         .catch(function(error) {
             handleError(res, error);
@@ -3301,6 +3479,7 @@ handleAuth.getUserById = findUserById;
 handleAuth.getUserByUsername = findUserByUsername;
 handleAuth.awardXp = awardXp;
 handleAuth.adjustPoints = adjustPoints;
+handleAuth.recordTop1Time = recordTop1Time;
 handleAuth.grantPointsByUsername = grantPointsByUsername;
 handleAuth.getNextLevelXp = getNextLevelXp;
 handleAuth.isAllowedCellColor = isAllowedCellColor;
