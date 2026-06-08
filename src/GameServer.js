@@ -66,7 +66,7 @@ function GameServer(mult, prt, gamemodeId) {
         foodMaxMass: 2, // Maximum food size (In mass)
         virusMinAmount: 10, // Minimum amount of viruses on the map. 
         virusMaxAmount: 50, // Maximum amount of viruses on the map. If this amount is reached, then ejected cells will pass through viruses.
-        virusStartMass: 100, // Starting virus size (In mass)
+        virusStartMass: 140, // Starting virus size (In mass)
         virusBurstMass: 198, // Viruses explode past this size
         ejectMass: 16, // Mass of ejected cells
         ejectMassGain: 12, // Amount of mass gained from consuming ejected cells
@@ -84,7 +84,7 @@ function GameServer(mult, prt, gamemodeId) {
         playerSplitMoveTicks: 10, // Amount of ticks split cells keep boost
         playerSplitDecay: 0.82, // Split boost decay
         playerSplitCooldownMs: 80, // Minimum time between split commands per player
-        playerEjectCooldown: 8, // Minimum time between eject mass commands per player (milliseconds)
+        playerEjectCooldown: 2, // Minimum time between eject mass commands per player (milliseconds)
         playerEjectDebugLog: 1, // Logs manual W vs hold E eject/packet rate once per second
         playerRecombineTime: 15, // Base amount of ticks before a cell is allowed to recombine (1 tick = 2000 milliseconds)
         playerMassDecayRate: 4, // Amount of mass lost per tick (Multiplier) (1 tick = 2000 milliseconds)
