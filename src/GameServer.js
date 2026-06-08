@@ -11,6 +11,7 @@ var PacketHandler = require('./PacketHandler');
 var Entity = require('./entity');
 var Gamemode = require('./gamemodes');
 var handleAuth = require('./api/AuthServer');
+var TOP1_HIGHSCORE_MIN_MS = 60 * 1000;
 
 // GameServer implementation
 function GameServer(mult, prt, gamemodeId) {
@@ -1063,6 +1064,11 @@ GameServer.prototype.updateTop1Timer = function() {
         this.top1Tracker.startedAt = now;
         this.top1Tracker.lastSavedAt = now;
         player.top1StartedAt = now;
+        return;
+    }
+
+    if (now - this.top1Tracker.startedAt < TOP1_HIGHSCORE_MIN_MS) {
+        player.top1StartedAt = this.top1Tracker.startedAt;
         return;
     }
 

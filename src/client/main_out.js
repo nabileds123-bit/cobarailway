@@ -416,6 +416,7 @@
 // === Zoom options ===
 var USE_MASS_ZOOM = false;   // false = zoom murni dari wheel (tanpa pengaruh massa)
 var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
+var TOP1_TIMER_MIN_MS = 60 * 1000;
 
     function buildQTree() {
         if (.4 > viewZoom) qTree = null;
@@ -1857,16 +1858,25 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         return minutes + "m " + (seconds < 10 ? "0" : "") + seconds + "s";
     }
 
+    function getVisibleTop1Time() {
+        if (!top1StartedAt) {
+            return 0;
+        }
+        var elapsed = Date.now() - top1StartedAt;
+        return elapsed >= TOP1_TIMER_MIN_MS ? elapsed : 0;
+    }
+
     function updateTop1OverlayTimer() {
         var timer = wjQuery("#top1OverlayTimer");
+        var visibleTime = getVisibleTop1Time();
         if (!timer.length) {
             return;
         }
-        if (!top1StartedAt || !playerStat || playerStat.finalized || wHandle.isSpectating) {
+        if (!visibleTime || !playerStat || playerStat.finalized || wHandle.isSpectating) {
             timer.hide();
             return;
         }
-        timer.text("Top 1 " + formatTop1Timer(Date.now() - top1StartedAt)).show();
+        timer.text("Top 1 " + formatTop1Timer(visibleTime)).show();
     }
 
     function getFinalMatchStats() {
@@ -1926,7 +1936,8 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
                 var ctx = lbCanvas.getContext("2d"),
                     boardLength = 60;
                 boardLength = null == teamScores ? boardLength + 24 * leaderBoard.length : boardLength + 180;
-                if (top1StartedAt && null == teamScores) {
+                var visibleTop1Time = getVisibleTop1Time();
+                if (visibleTop1Time && null == teamScores) {
                     boardLength += 24;
                 }
                 var scaleFactor = Math.min(0.22*canvasHeight, Math.min(200, .3 * canvasWidth)) / 200;
@@ -1946,8 +1957,8 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
                 var b;
                 if (null == teamScores) {
                     var rowStartY = 70;
-                    if (top1StartedAt) {
-                        c = "Top 1 " + formatTop1Timer(Date.now() - top1StartedAt);
+                    if (visibleTop1Time) {
+                        c = "Top 1 " + formatTop1Timer(visibleTop1Time);
                         ctx.font = "18px Ubuntu";
                         ctx.fillStyle = "#FFD45A";
                         ctx.fillText(c, 100 - ctx.measureText(c).width / 2, 64);
