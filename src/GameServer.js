@@ -479,7 +479,7 @@ GameServer.prototype.copyPlayerSession = function(oldPlayer, newPlayer) {
     newPlayer.adminRole = oldPlayer.adminRole || '';
     newPlayer.accountPoints = Number(oldPlayer.accountPoints || 0);
     newPlayer.guildTag = oldPlayer.guildTag || '';
-    newPlayer.renderGuildPrefixInCell = oldPlayer.renderGuildPrefixInCell !== false;
+    newPlayer.renderGuildPrefixInCell = true;
     newPlayer.skinUrl = oldPlayer.skinUrl || null;
     newPlayer.cellColor = oldPlayer.cellColor || null;
     newPlayer.lastPassiveXpTime = oldPlayer.lastPassiveXpTime || Date.now();

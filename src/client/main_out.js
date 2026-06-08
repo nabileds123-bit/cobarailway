@@ -1246,6 +1246,7 @@ var TOP1_TIMER_MIN_MS = 60 * 1000;
                 guildPrefixRenderMissedOnce = true;
                 renderGuildPrefixInCell = false;
             }
+            guildPrefixReady = true;
 
             var msg = prepareData(2 + 2 * userNickName.length);
             msg.setUint8(0, 0);
