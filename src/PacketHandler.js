@@ -5,7 +5,7 @@ function PacketHandler(gameServer, socket) {
     this.gameServer = gameServer;
     this.socket = socket;
     this.merg = false;
-    this.pressW = 0;
+    this.pressW = false;
     this.pressSpace = false;
 	this.massSize = false;
 }
@@ -136,8 +136,10 @@ this.massSize = true;
 this.merg = true;
 		    break;
         case 21: 
-            // W Press - Eject mass
-            this.pressW = Math.min(this.pressW + 1, 5);
+            // Feed packet - eject one mass immediately.
+            if (this.socket.playerTracker) {
+                this.gameServer.ejectMass(this.socket.playerTracker);
+            }
             break;
         case 42:
             var message = "";
