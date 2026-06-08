@@ -2718,9 +2718,16 @@
                 }
             }).done(function(result) {
                 applyLoggedInUser(result.user);
-            }).fail(function() {
-                localStorage.removeItem('authToken');
-                clearLoggedInUser();
+            }).fail(function(xhr) {
+                if (xhr && (xhr.status == 401 || xhr.status == 403)) {
+                    localStorage.removeItem('authToken');
+                    clearLoggedInUser();
+                    return;
+                }
+
+                if (window.setGuildPrefixReady) {
+                    window.setGuildPrefixReady(true);
+                }
             });
         }
 
