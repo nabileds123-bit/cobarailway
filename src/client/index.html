@@ -849,9 +849,27 @@
             height: 34px;
             margin-bottom: 10px;
         }
+        .guild-period-tabs {
+            display: flex;
+            justify-content: center;
+            gap: 4px;
+            margin: 0 0 8px 0;
+            color: #aaa;
+            font-size: 12px;
+        }
+        .guild-period-tab {
+            border: 0;
+            background: transparent;
+            color: #999;
+            padding: 0;
+        }
+        .guild-period-tab.active {
+            color: #337ab7;
+            font-weight: bold;
+        }
         .guild-table-head {
             display: grid;
-            grid-template-columns: 34px 1fr 46px 30px;
+            grid-template-columns: 34px 1fr 34px 48px;
             align-items: center;
             min-height: 28px;
             border-bottom: 1px solid #e5e5e5;
@@ -861,7 +879,7 @@
             text-align: center;
         }
         .guild-table-name {
-            text-align: left;
+            text-align: center;
         }
         .guild-list {
             height: 282px;
@@ -870,7 +888,7 @@
         }
         .guild-row {
             display: grid;
-            grid-template-columns: 34px 1fr 46px 30px;
+            grid-template-columns: 34px 1fr 34px 48px;
             align-items: center;
             min-height: 54px;
             border-bottom: 1px solid #eee;
@@ -909,6 +927,13 @@
             text-align: center;
             color: #777;
             font-size: 13px;
+        }
+        .guild-top1-time {
+            text-align: right;
+            color: #777;
+            font-size: 13px;
+            padding-right: 2px;
+            white-space: nowrap;
         }
         .guild-empty {
             padding: 24px 8px;
@@ -1033,6 +1058,12 @@
             width: 40px;
             color: #888;
             text-align: center;
+        }
+        .guild-member-top1-time {
+            width: 54px;
+            color: #777;
+            text-align: right;
+            white-space: nowrap;
         }
         .guild-member-role {
             display: flex;
@@ -2174,10 +2205,17 @@
         <div class="spa-page-body">
             <div id="guildListView">
                 <input id="guildSearch" type="text" class="form-control guild-search" placeholder="Search">
+                <div class="guild-period-tabs">
+                    <button type="button" class="guild-period-tab active" data-guild-period="week">This Week</button>
+                    <span>|</span>
+                    <button type="button" class="guild-period-tab" data-guild-period="month">This Month</button>
+                    <span>|</span>
+                    <button type="button" class="guild-period-tab" data-guild-period="global">Global</button>
+                </div>
                 <div class="guild-table-head">
                     <span></span>
                     <span class="guild-table-name">Guild name</span>
-                    <span class="glyphicon glyphicon-user"></span>
+                    <span>*</span>
                     <span>?</span>
                 </div>
                 <div id="guildList" class="guild-list">
@@ -2441,6 +2479,7 @@
         var guildRefreshTimer = null;
         var guildDetailState = null;
         var guildDetailTab = 'members';
+        var guildPeriod = 'week';
         var friendsRefreshTimer = null;
         var playerProfileState = null;
         var playerProfileTab = 'profile';
@@ -3042,20 +3081,15 @@
         }
 
         function renderGuilds() {
-            var query = String($('#guildSearch').val() || '').trim().toLowerCase();
             var list = $('#guildList');
-            var guilds = guildsCache.filter(function(guild) {
-                if (!query) {
-                    return true;
-                }
-                return String(guild.name || '').toLowerCase().indexOf(query) != -1 ||
-                    String(guild.tag || '').toLowerCase().indexOf(query) != -1;
-            });
+            var guilds = guildsCache;
+            $('.guild-period-tab').removeClass('active');
+            $('.guild-period-tab[data-guild-period="' + guildPeriod + '"]').addClass('active');
 
             list.empty();
             if (!guilds.length) {
                 $('<div class="guild-empty"></div>')
-                    .text(guildsCache.length ? 'Guild tidak ditemukan.' : 'Belum ada guild.')
+                    .text(String($('#guildSearch').val() || '').trim() ? 'Guild tidak ditemukan.' : 'Belum ada guild.')
                     .appendTo(list);
                 return;
             }
@@ -3077,8 +3111,8 @@
                     .appendTo(row);
 
                 iconWrap.prependTo(row);
-                $('<div class="guild-members"></div>').text(Number(guild.members || 0)).appendTo(row);
-                $('<div class="guild-status"></div>').text(guild.status || '-').appendTo(row);
+                $('<div class="guild-members"></div>').text(Number(guild.memberCount || guild.members || 0)).appendTo(row);
+                $('<div class="guild-top1-time"></div>').text(guild.top1Label || '0m').appendTo(row);
                 row.attr('data-guild-tag', guild.tag || '');
                 row.appendTo(list);
             });
@@ -3127,8 +3161,27 @@
             var content = $('#guildDetailContent').empty();
             var actions = $('#guildDetailActions').empty();
 
-            if (guildDetailTab != 'members') {
-                $('<div class="guild-empty"></div>').text(guildDetailTab == 'info' ? (guild.description || 'No guild info.') : 'No statistics available.').appendTo(content);
+            if (guildDetailTab == 'statistics') {
+                var rows = Array.isArray(data.top1Contributions) ? data.top1Contributions : [];
+                $('<div class="guild-members-head"><div class="guild-member-rank">#</div><div class="guild-member-nick">Player Name</div><div class="guild-member-top1-time">Top 1 Time</div></div>').appendTo(content);
+                if (!rows.length) {
+                    $('<div class="guild-empty"></div>').text('No Top 1 contribution yet.').appendTo(content);
+                } else {
+                    rows.forEach(function(item, index) {
+                        var row = $('<div class="guild-member-row"></div>');
+                        $('<div class="guild-member-rank"></div>').text((index + 1) + '.').appendTo(row);
+                        var nickCell = $('<div class="guild-member-nick"></div>');
+                        $('<a href="#player-search" class="guild-member-profile"></a>')
+                            .attr('data-player-name', item.username || '')
+                            .text(item.username || '-')
+                            .appendTo(nickCell);
+                        nickCell.appendTo(row);
+                        $('<div class="guild-member-top1-time"></div>').text(item.top1Label || '0m').appendTo(row);
+                        row.appendTo(content);
+                    });
+                }
+            } else if (guildDetailTab != 'members') {
+                $('<div class="guild-empty"></div>').text(guild.description || 'No guild info.').appendTo(content);
             } else {
                 $('<div class="guild-members-head"><div class="guild-member-rank">#</div><div class="guild-member-nick">Name</div><div class="guild-member-level">Level</div><div class="guild-member-status-dot" style="visibility:hidden"></div></div>').appendTo(content);
                 members.forEach(function(member, index) {
@@ -3191,12 +3244,14 @@
             }
         }
 
-        function loadGuildDetail(tag) {
+        function loadGuildDetail(tag, keepTab) {
             $('#guildDetailContent').html('<div class="guild-empty">Loading guild...</div>');
-            authGet('/api/guild/detail?tag=' + encodeURIComponent(tag))
+            authGet('/api/guild/detail?tag=' + encodeURIComponent(tag) + '&period=' + encodeURIComponent(guildPeriod))
                 .done(function(result) {
                     guildDetailState = result;
-                    guildDetailTab = 'members';
+                    if (!keepTab) {
+                        guildDetailTab = 'members';
+                    }
                     renderGuildDetail();
                 })
                 .fail(function() {
@@ -3250,7 +3305,7 @@
                 $('#guildList').html('<div class="guild-empty">Loading guilds...</div>');
             }
 
-            authGet('/api/guilds')
+            authGet('/api/guilds?period=' + encodeURIComponent(guildPeriod) + '&search=' + encodeURIComponent($('#guildSearch').val() || ''))
                 .done(function(result) {
                     guildsCache = Array.isArray(result.guilds) ? result.guilds : [];
                     renderGuilds();
@@ -4170,8 +4225,21 @@
             window.location.hash = route;
             openSpaPage(route);
         });
+        var guildSearchTimer = null;
         $('#guildSearch').on('input', function() {
-            renderGuilds();
+            clearTimeout(guildSearchTimer);
+            guildSearchTimer = setTimeout(function() {
+                loadGuilds(true);
+            }, 200);
+        });
+        $('.guild-period-tab').on('click', function(e) {
+            e.preventDefault();
+            guildPeriod = $(this).attr('data-guild-period') || 'week';
+            if (guildDetailState && guildDetailState.guild && guildDetailState.guild.tag) {
+                loadGuildDetail(guildDetailState.guild.tag, true);
+            } else {
+                loadGuilds();
+            }
         });
         $('#guildList').on('click', '.guild-row', function() {
             var tag = $(this).attr('data-guild-tag');

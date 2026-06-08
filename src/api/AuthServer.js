@@ -214,6 +214,26 @@ function ensureMysql() {
             );
         })
         .then(function() {
+            return pool.query(
+                'CREATE TABLE IF NOT EXISTS guild_top1_sessions (' +
+                'id INT AUTO_INCREMENT PRIMARY KEY,' +
+                'user_id VARCHAR(64) NOT NULL,' +
+                'username VARCHAR(64) NOT NULL,' +
+                'guild_id INT NULL,' +
+                'guild_tag VARCHAR(8) NULL,' +
+                'started_at DATETIME NOT NULL,' +
+                'ended_at DATETIME NULL,' +
+                'duration_seconds INT DEFAULT 0,' +
+                'created_at DATETIME DEFAULT CURRENT_TIMESTAMP,' +
+                'INDEX idx_user_id (user_id),' +
+                'INDEX idx_guild_id (guild_id),' +
+                'INDEX idx_started_at (started_at),' +
+                'INDEX idx_guild_started (guild_id, started_at),' +
+                'INDEX idx_guild_tag_started (guild_tag, started_at)' +
+                ')'
+            );
+        })
+        .then(function() {
             return pool.query('ALTER TABLE top1_history ADD COLUMN region VARCHAR(32) NOT NULL DEFAULT \'global\' AFTER game_mode')
                 .catch(function(error) {
                     if (error && error.code == 'ER_DUP_FIELDNAME') {
@@ -1656,7 +1676,103 @@ function summarizeGuildUsers(users) {
     });
 }
 
-function listGuilds() {
+function normalizeGuildPeriod(period) {
+    period = String(period || '').trim().toLowerCase();
+    if (period == 'month' || period == 'monthly' || period == 'this-month') {
+        return 'month';
+    }
+    if (period == 'global' || period == 'all' || period == 'alltime') {
+        return 'global';
+    }
+    return 'week';
+}
+
+function formatTop1Time(seconds) {
+    seconds = Math.max(0, Number(seconds) || 0);
+    var minutes = Math.floor(seconds / 60);
+    var hours = Math.floor(minutes / 60);
+    var days = Math.floor(hours / 24);
+    if (days > 0) return days + 'd ' + (hours % 24) + 'h';
+    if (hours > 0) return hours + 'h';
+    if (minutes > 0) return minutes + 'm';
+    return '0m';
+}
+
+function getGuildPeriodStart(period) {
+    period = normalizeGuildPeriod(period);
+    if (period == 'global') {
+        return null;
+    }
+    return getHighscorePeriodStart(period == 'month' ? 'monthly' : 'weekly');
+}
+
+function applyGuildSearch(guilds, search) {
+    search = String(search || '').trim().toLowerCase();
+    if (!search) {
+        return guilds;
+    }
+    return guilds.filter(function(guild) {
+        return String(guild.name || '').toLowerCase().indexOf(search) != -1 ||
+            String(guild.tag || '').toLowerCase().indexOf(search) != -1;
+    });
+}
+
+function sortGuildRankings(guilds) {
+    return guilds.sort(function(a, b) {
+        var timeDiff = Number(b.top1Seconds || 0) - Number(a.top1Seconds || 0);
+        if (timeDiff) return timeDiff;
+        var memberDiff = Number(b.members || b.memberCount || 0) - Number(a.members || a.memberCount || 0);
+        if (memberDiff) return memberDiff;
+        return String(a.name || '').localeCompare(String(b.name || ''));
+    });
+}
+
+function getGuildTop1Totals(period) {
+    period = normalizeGuildPeriod(period);
+    var start = getGuildPeriodStart(period);
+    return ensureMysql().then(function(usingMysql) {
+        if (usingMysql) {
+            var sql = 'SELECT guild_tag, SUM(duration_seconds) AS top1_seconds FROM guild_top1_sessions WHERE guild_tag IS NOT NULL AND guild_tag <> \'\'';
+            var params = [];
+            if (start) {
+                sql += ' AND started_at >= ?';
+                params.push(mysqlDateTime(start));
+            }
+            sql += ' GROUP BY guild_tag';
+            return getMysqlPool().query(sql, params).then(function(result) {
+                var totals = {};
+                result[0].forEach(function(row) {
+                    totals[normalizeGuildTag(row.guild_tag)] = Number(row.top1_seconds || 0);
+                });
+                return totals;
+            });
+        }
+
+        var totals = {};
+        (readJsonDb().guildTop1Sessions || []).forEach(function(row) {
+            var tag = normalizeGuildTag(row.guildTag || row.guild_tag);
+            var started = new Date(row.startedAt || row.started_at || 0).getTime();
+            if (!tag || (start && started < start.getTime())) {
+                return;
+            }
+            totals[tag] = Number(totals[tag] || 0) + Number(row.durationSeconds || row.duration_seconds || 0);
+        });
+        return totals;
+    });
+}
+
+function decorateGuildRanking(guilds, totals) {
+    guilds.forEach(function(guild) {
+        var seconds = Number(totals[normalizeGuildTag(guild.tag)] || 0);
+        guild.memberCount = Number(guild.members || 0);
+        guild.top1Seconds = seconds;
+        guild.top1Label = formatTop1Time(seconds);
+        guild.iconUrl = guild.logo || '';
+    });
+    return sortGuildRankings(guilds);
+}
+
+function listGuilds(period, search) {
     return ensureMysql().then(function(usingMysql) {
         if (usingMysql) {
             return getMysqlPool()
@@ -1675,6 +1791,10 @@ function listGuilds() {
         }
 
         return summarizeGuildUsers(readJsonDb().users || []);
+    }).then(function(guilds) {
+        return getGuildTop1Totals(period).then(function(totals) {
+            return decorateGuildRanking(applyGuildSearch(guilds, search), totals);
+        });
     });
 }
 
@@ -1848,6 +1968,63 @@ function createGuildInvite(actor, target, guild) {
             createdAt: new Date().toISOString()
         });
         writeJsonDb(db);
+    });
+}
+
+function listGuildTop1Contributions(tag, period) {
+    tag = normalizeGuildTag(tag);
+    period = normalizeGuildPeriod(period);
+    var start = getGuildPeriodStart(period);
+    return ensureMysql().then(function(usingMysql) {
+        if (usingMysql) {
+            var sql = 'SELECT user_id, username, SUM(duration_seconds) AS top1_seconds FROM guild_top1_sessions WHERE guild_tag = ?';
+            var params = [tag];
+            if (start) {
+                sql += ' AND started_at >= ?';
+                params.push(mysqlDateTime(start));
+            }
+            sql += ' GROUP BY user_id, username HAVING top1_seconds > 0 ORDER BY top1_seconds DESC, username ASC LIMIT 100';
+            return getMysqlPool().query(sql, params).then(function(result) {
+                return result[0].map(function(row) {
+                    var seconds = Number(row.top1_seconds || 0);
+                    return {
+                        userId: row.user_id,
+                        username: row.username,
+                        top1Seconds: seconds,
+                        top1Label: formatTop1Time(seconds)
+                    };
+                });
+            });
+        }
+
+        var grouped = {};
+        (readJsonDb().guildTop1Sessions || []).forEach(function(row) {
+            var rowTag = normalizeGuildTag(row.guildTag || row.guild_tag);
+            var started = new Date(row.startedAt || row.started_at || 0).getTime();
+            if (rowTag != tag || (start && started < start.getTime())) {
+                return;
+            }
+            var userId = String(row.userId || row.user_id || '');
+            if (!userId) {
+                return;
+            }
+            grouped[userId] = grouped[userId] || {
+                userId: userId,
+                username: row.username || '',
+                top1Seconds: 0
+            };
+            grouped[userId].top1Seconds += Number(row.durationSeconds || row.duration_seconds || 0);
+        });
+        return Object.keys(grouped).map(function(key) {
+            var item = grouped[key];
+            item.top1Label = formatTop1Time(item.top1Seconds);
+            return item;
+        }).filter(function(item) {
+            return item.top1Seconds > 0;
+        }).sort(function(a, b) {
+            var diff = Number(b.top1Seconds || 0) - Number(a.top1Seconds || 0);
+            return diff || String(a.username || '').localeCompare(String(b.username || ''));
+        });
     });
 }
 
@@ -2411,6 +2588,47 @@ function recordTop1Time(playerId, playerName, mode, region, serverName, seconds)
     });
 }
 
+function recordGuildTop1Session(session) {
+    session = session || {};
+    var userId = String(session.userId || session.user_id || '');
+    var username = String(session.username || '').slice(0, 64) || 'Unknown';
+    var guildTag = normalizeGuildTag(session.guildTag || session.guild_tag || '');
+    var startedAt = parseDateValue(session.startedAt || session.started_at);
+    var endedAt = parseDateValue(session.endedAt || session.ended_at);
+    var durationSeconds = Math.max(0, Math.floor(Number(session.durationSeconds || session.duration_seconds || 0)));
+    if (!userId || !startedAt || !endedAt || durationSeconds <= 0) {
+        return Promise.resolve(false);
+    }
+
+    return ensureMysql().then(function(usingMysql) {
+        if (usingMysql) {
+            return getMysqlPool()
+                .query(
+                    'INSERT INTO guild_top1_sessions (user_id, username, guild_id, guild_tag, started_at, ended_at, duration_seconds) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                    [userId, username, null, guildTag || null, mysqlDateTime(startedAt), mysqlDateTime(endedAt), durationSeconds]
+                )
+                .then(function() {
+                    return true;
+                });
+        }
+
+        var db = readJsonDb();
+        db.guildTop1Sessions = db.guildTop1Sessions || [];
+        db.guildTop1Sessions.push({
+            userId: userId,
+            username: username,
+            guildId: null,
+            guildTag: guildTag,
+            startedAt: startedAt.toISOString(),
+            endedAt: endedAt.toISOString(),
+            durationSeconds: durationSeconds,
+            createdAt: new Date().toISOString()
+        });
+        writeJsonDb(db);
+        return true;
+    });
+}
+
 function handleAccountSkinMode(req, res) {
     readBody(req, function(err, body) {
         if (err) {
@@ -2635,9 +2853,12 @@ function getFreeSkinFile(fileName) {
 }
 
 function handleGuildList(req, res) {
-    listGuilds()
+    var query = parseQuery(req);
+    var period = normalizeGuildPeriod(query.period);
+    var search = String(query.search || '').trim();
+    listGuilds(period, search)
         .then(function(guilds) {
-            sendJson(res, 200, { ok: true, guilds: guilds });
+            sendJson(res, 200, { ok: true, period: period, guilds: guilds });
         })
         .catch(function(error) {
             handleError(res, error);
@@ -2647,12 +2868,13 @@ function handleGuildList(req, res) {
 function handleGuildDetail(req, res) {
     var query = parseQuery(req);
     var tag = normalizeGuildTag(query.tag || query.guild || '');
+    var period = normalizeGuildPeriod(query.period);
     if (!tag) {
         sendJson(res, 400, { ok: false, error: 'Guild tidak valid.' });
         return;
     }
 
-    Promise.all([listGuilds(), listGuildMembers(tag), optionalUser(req)])
+    Promise.all([listGuilds(period, ''), listGuildMembers(tag), optionalUser(req), listGuildTop1Contributions(tag, period)])
         .then(function(result) {
             var guild = null;
             for (var i = 0; i < result[0].length; i++) {
@@ -2682,6 +2904,8 @@ function handleGuildDetail(req, res) {
                     ok: true,
                     guild: guild,
                     members: result[1],
+                    top1Contributions: result[3],
+                    period: period,
                     viewer: viewer,
                     canJoin: !!(currentUser && !currentUser.guild && (isPublicGuild || hasInvite))
                 });
@@ -3406,7 +3630,7 @@ function handleAuth(req, res) {
         return true;
     }
 
-    if (req.method == 'GET' && req.url == '/api/guilds') {
+    if (req.method == 'GET' && String(req.url || '').split('?')[0] == '/api/guilds') {
         handleGuildList(req, res);
         return true;
     }
@@ -3480,6 +3704,7 @@ handleAuth.getUserByUsername = findUserByUsername;
 handleAuth.awardXp = awardXp;
 handleAuth.adjustPoints = adjustPoints;
 handleAuth.recordTop1Time = recordTop1Time;
+handleAuth.recordGuildTop1Session = recordGuildTop1Session;
 handleAuth.grantPointsByUsername = grantPointsByUsername;
 handleAuth.getNextLevelXp = getNextLevelXp;
 handleAuth.isAllowedCellColor = isAllowedCellColor;

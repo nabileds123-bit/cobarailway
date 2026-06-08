@@ -32,6 +32,8 @@ function GameServer(mult, prt, gamemodeId) {
     this.leaderboard = [];
     this.top1Tracker = {
         playerId: null,
+        username: '',
+        guildTag: '',
         startedAt: 0,
         lastSavedAt: 0
     };
@@ -1025,61 +1027,82 @@ GameServer.prototype.getHighscoreRegionName = function() {
     return 'global';
 }
 
-GameServer.prototype.saveTop1Delta = function(player, seconds) {
-    if (!player || !player.authUserId || !seconds || !handleAuth.recordTop1Time) {
+GameServer.prototype.resetTop1Tracker = function() {
+    this.top1Tracker.playerId = null;
+    this.top1Tracker.username = '';
+    this.top1Tracker.guildTag = '';
+    this.top1Tracker.startedAt = 0;
+    this.top1Tracker.lastSavedAt = 0;
+}
+
+GameServer.prototype.startTop1Session = function(player, now) {
+    this.top1Tracker.playerId = player.authUserId;
+    this.top1Tracker.username = player.authUsername || player.getName() || 'Unknown';
+    this.top1Tracker.guildTag = player.getGuildTag ? player.getGuildTag() : String(player.guildTag || '').trim().toUpperCase();
+    this.top1Tracker.startedAt = now;
+    this.top1Tracker.lastSavedAt = now;
+    player.top1StartedAt = now;
+}
+
+GameServer.prototype.closeTop1Session = function(now) {
+    if (!this.top1Tracker.playerId || !this.top1Tracker.startedAt) {
+        this.resetTop1Tracker();
         return;
     }
 
-    handleAuth.recordTop1Time(
-        player.authUserId,
-        player.authUsername || player.getName() || 'Unknown',
-        this.getHighscoreModeName(),
-        this.getHighscoreRegionName(),
-        this.roomName || (this.gameMode && this.gameMode.name) || 'Server',
-        seconds
-    ).catch(function(error) {
-        console.log("[Auth] Top1 highscore save failed:", error && error.message ? error.message : error);
-    });
+    now = now || Date.now();
+    var durationSeconds = Math.floor((now - this.top1Tracker.startedAt) / 1000);
+    if (durationSeconds >= Math.floor(TOP1_HIGHSCORE_MIN_MS / 1000)) {
+        if (handleAuth.recordTop1Time) {
+            handleAuth.recordTop1Time(
+                this.top1Tracker.playerId,
+                this.top1Tracker.username || 'Unknown',
+                this.getHighscoreModeName(),
+                this.getHighscoreRegionName(),
+                this.roomName || (this.gameMode && this.gameMode.name) || 'Server',
+                durationSeconds
+            ).catch(function(error) {
+                console.log("[Auth] Top1 highscore save failed:", error && error.message ? error.message : error);
+            });
+        }
+
+        if (handleAuth.recordGuildTop1Session) {
+            handleAuth.recordGuildTop1Session({
+                userId: this.top1Tracker.playerId,
+                username: this.top1Tracker.username || 'Unknown',
+                guildTag: this.top1Tracker.guildTag || '',
+                startedAt: new Date(this.top1Tracker.startedAt),
+                endedAt: new Date(now),
+                durationSeconds: durationSeconds
+            }).catch(function(error) {
+                console.log("[Auth] Guild top1 session save failed:", error && error.message ? error.message : error);
+            });
+        }
+    }
+
+    this.resetTop1Tracker();
 }
 
 GameServer.prototype.updateTop1Timer = function() {
+    var now = Date.now();
     if (!this.leaderboard || !this.leaderboard.length) {
-        this.top1Tracker.playerId = null;
-        this.top1Tracker.startedAt = 0;
-        this.top1Tracker.lastSavedAt = 0;
+        this.closeTop1Session(now);
         return;
     }
 
     var player = this.leaderboard[0];
-    var now = Date.now();
     if (!player || !player.authUserId || !player.cells || player.cells.length <= 0) {
-        this.top1Tracker.playerId = null;
-        this.top1Tracker.startedAt = 0;
-        this.top1Tracker.lastSavedAt = 0;
+        this.closeTop1Session(now);
         return;
     }
 
     if (this.top1Tracker.playerId != player.authUserId) {
-        this.top1Tracker.playerId = player.authUserId;
-        this.top1Tracker.startedAt = now;
-        this.top1Tracker.lastSavedAt = now;
-        player.top1StartedAt = now;
+        this.closeTop1Session(now);
+        this.startTop1Session(player, now);
         return;
     }
 
-    if (now - this.top1Tracker.startedAt < TOP1_HIGHSCORE_MIN_MS) {
-        player.top1StartedAt = this.top1Tracker.startedAt;
-        return;
-    }
-
-    var elapsed = Math.floor((now - this.top1Tracker.lastSavedAt) / 1000);
-    if (elapsed <= 0) {
-        return;
-    }
-
-    this.top1Tracker.lastSavedAt += elapsed * 1000;
     player.top1StartedAt = this.top1Tracker.startedAt;
-    this.saveTop1Delta(player, elapsed);
 }
 
 GameServer.prototype.awardPlayerXp = function(client, amount, reason) {
