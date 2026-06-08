@@ -215,6 +215,24 @@ function ensureMysql() {
         })
         .then(function() {
             return pool.query(
+                'CREATE TABLE IF NOT EXISTS top1_daily_history (' +
+                'id INT AUTO_INCREMENT PRIMARY KEY,' +
+                'player_id VARCHAR(32) NOT NULL,' +
+                'player_name VARCHAR(32) NOT NULL,' +
+                'game_mode VARCHAR(24) NOT NULL,' +
+                'region VARCHAR(32) NOT NULL DEFAULT \'global\',' +
+                'server_name VARCHAR(64) NOT NULL,' +
+                'day_date DATE NOT NULL,' +
+                'top1_time BIGINT NOT NULL DEFAULT 0,' +
+                'updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,' +
+                'UNIQUE KEY uniq_top1_daily_player_mode_region_server_day (player_id, game_mode, region, server_name, day_date),' +
+                'INDEX idx_top1_daily_player_day (player_id, day_date),' +
+                'INDEX idx_top1_daily_mode_region_day (game_mode, region, day_date)' +
+                ')'
+            );
+        })
+        .then(function() {
+            return pool.query(
                 'CREATE TABLE IF NOT EXISTS guild_top1_sessions (' +
                 'id INT AUTO_INCREMENT PRIMARY KEY,' +
                 'user_id VARCHAR(64) NOT NULL,' +
@@ -2300,6 +2318,13 @@ function mysqlDateTime(date) {
         pad(date.getHours()) + ':' + pad(date.getMinutes()) + ':' + pad(date.getSeconds());
 }
 
+function mysqlDateOnly(date) {
+    function pad(value) {
+        return value < 10 ? '0' + value : String(value);
+    }
+    return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate());
+}
+
 function listHighscores(mode, region, period) {
     mode = normalizeHighscoreMode(mode);
     region = normalizeHighscoreRegion(region);
@@ -2466,7 +2491,7 @@ function getPlayerProfile(search) {
         return ensureMysql().then(function(usingMysql) {
             if (usingMysql) {
                 return Promise.all([
-                    getMysqlPool().query('SELECT DATE(created_at) AS created_at, server_name, SUM(top1_time) AS top1_time FROM top1_history WHERE player_id = ? GROUP BY DATE(created_at), server_name ORDER BY created_at DESC LIMIT 100', [user.id]),
+                    getMysqlPool().query('SELECT day_date AS created_at, server_name, top1_time FROM top1_daily_history WHERE player_id = ? ORDER BY day_date DESC LIMIT 100', [user.id]),
                     getMysqlPool().query('SELECT created_at, server_name, result, duration FROM battle_match_history WHERE player_id = ? AND battle_type = ? ORDER BY created_at DESC LIMIT 100', [user.id, '2v2']),
                     getMysqlPool().query('SELECT created_at, server_name, result, duration FROM battle_match_history WHERE player_id = ? AND battle_type = ? ORDER BY created_at DESC LIMIT 100', [user.id, '1v1'])
                 ]).then(function(result) {
@@ -2485,9 +2510,26 @@ function getPlayerProfile(search) {
             }
 
             var db = readJsonDb();
-            var top1 = groupTop1ProfileRows((db.top1History || []).filter(function(row) {
-                return String(row.player_id || row.playerId || '') == String(user.id);
-            }));
+            var top1 = [];
+            if ((db.top1DailyHistory || []).length) {
+                top1 = (db.top1DailyHistory || []).filter(function(row) {
+                    return String(row.player_id || row.playerId || '') == String(user.id);
+                }).map(function(row) {
+                    return {
+                        createdAt: (row.dayDate || row.day_date || '') + 'T00:00:00.000Z',
+                        server: row.server || row.serverName || row.server_name || row.gameMode || row.game_mode || '',
+                        top1Time: roundTop1ProfileSeconds(row.top1_time || row.top1Time || 0)
+                    };
+                }).filter(function(row) {
+                    return row.top1Time > 0;
+                }).sort(function(a, b) {
+                    return new Date(b.createdAt) - new Date(a.createdAt);
+                }).slice(0, 100);
+            } else {
+                top1 = groupTop1ProfileRows((db.top1History || []).filter(function(row) {
+                    return String(row.player_id || row.playerId || '') == String(user.id);
+                }));
+            }
 
             function battleRows(type) {
                 return (db.battleMatchHistory || []).filter(function(row) {
@@ -2555,6 +2597,7 @@ function recordTop1Time(playerId, playerName, mode, region, serverName, seconds)
     region = normalizeHighscoreRegion(region);
     serverName = String(serverName || mode || 'Server').slice(0, 64);
     seconds = Math.max(0, Math.floor(Number(seconds || 0)));
+    var dayDate = mysqlDateOnly(new Date());
     if (!playerId || !seconds) {
         return Promise.resolve(false);
     }
@@ -2580,6 +2623,13 @@ function recordTop1Time(playerId, playerName, mode, region, serverName, seconds)
                     return getMysqlPool().query(
                         'INSERT INTO top1_history (player_id, player_name, game_mode, region, server_name, top1_time) VALUES (?, ?, ?, ?, ?, ?)',
                         [playerId, playerName, mode, region, serverName, seconds]
+                    );
+                })
+                .then(function() {
+                    return getMysqlPool().query(
+                        'INSERT INTO top1_daily_history (player_id, player_name, game_mode, region, server_name, day_date, top1_time) VALUES (?, ?, ?, ?, ?, ?, ?) ' +
+                        'ON DUPLICATE KEY UPDATE player_name = VALUES(player_name), top1_time = top1_time + VALUES(top1_time)',
+                        [playerId, playerName, mode, region, serverName, dayDate, seconds]
                     );
                 })
                 .then(function() {
@@ -2622,6 +2672,34 @@ function recordTop1Time(playerId, playerName, mode, region, serverName, seconds)
             top1Time: seconds,
             createdAt: new Date().toISOString()
         });
+        db.top1DailyHistory = db.top1DailyHistory || [];
+        var daily = null;
+        for (var d = 0; d < db.top1DailyHistory.length; d++) {
+            var dailyRow = db.top1DailyHistory[d];
+            if (String(dailyRow.playerId || dailyRow.player_id || '') == playerId &&
+                normalizeHighscoreMode(dailyRow.gameMode || dailyRow.game_mode) == mode &&
+                normalizeHighscoreRegion(dailyRow.region) == region &&
+                String(dailyRow.server || dailyRow.serverName || dailyRow.server_name || '') == serverName &&
+                String(dailyRow.dayDate || dailyRow.day_date || '') == dayDate) {
+                daily = dailyRow;
+                break;
+            }
+        }
+        if (!daily) {
+            daily = {
+                playerId: playerId,
+                playerName: playerName,
+                gameMode: mode,
+                region: region,
+                server: serverName,
+                dayDate: dayDate,
+                top1Time: 0
+            };
+            db.top1DailyHistory.push(daily);
+        }
+        daily.playerName = playerName;
+        daily.top1Time = Number(daily.top1_time || daily.top1Time || 0) + seconds;
+        daily.updatedAt = new Date().toISOString();
         writeJsonDb(db);
         return true;
     });
