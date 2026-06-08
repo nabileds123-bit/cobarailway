@@ -44,6 +44,7 @@
     var pendingSpectate = false;
     var guildPrefixReady = false;
     var guildPrefixRenderMissedOnce = false;
+    var guildPrefixSessionRenderInCell = true;
     var battleSessionActive = false;
 
     function requestFrame(callback) {
@@ -686,6 +687,7 @@ var TOP1_TIMER_MIN_MS = 60 * 1000;
 
     function onWsClose() {
         console.log("socket close");
+        resetGuildPrefixVisualSession();
         setTimeout(showConnecting, delay);
         delay *= 1.5
     }
@@ -1241,12 +1243,12 @@ var TOP1_TIMER_MIN_MS = 60 * 1000;
 
     function sendNickName() {
         if (wsIsOpen() && null != userNickName) {
-            var renderGuildPrefixInCell = guildPrefixReady;
+            var renderGuildPrefixInCell = guildPrefixSessionRenderInCell;
             if (!guildPrefixReady && !guildPrefixRenderMissedOnce) {
                 guildPrefixRenderMissedOnce = true;
+                guildPrefixSessionRenderInCell = false;
                 renderGuildPrefixInCell = false;
             }
-            guildPrefixReady = true;
 
             var msg = prepareData(2 + 2 * userNickName.length);
             msg.setUint8(0, 0);
@@ -2201,6 +2203,18 @@ var TOP1_TIMER_MIN_MS = 60 * 1000;
     wHandle.setGuildPrefixReady = function(arg) {
         guildPrefixReady = !!arg;
     };
+    function resetGuildPrefixVisualSession() {
+        guildPrefixSessionRenderInCell = true;
+        guildPrefixRenderMissedOnce = true;
+    }
+
+    wHandle.resetGuildPrefixVisualSession = resetGuildPrefixVisualSession;
+
+    function resetGuildPrefixVisualSessionAfterStart() {
+        if (hasClickedPlay || guildPrefixRenderMissedOnce) {
+            resetGuildPrefixVisualSession();
+        }
+    }
     wHandle.setShowLeaderboard = function (arg) {
         showLeaderboard = arg;
         if (!showLeaderboard) {
@@ -2265,6 +2279,7 @@ var TOP1_TIMER_MIN_MS = 60 * 1000;
             if (arg != ':tournament') {
                 battleSessionActive = false;
             }
+            resetGuildPrefixVisualSessionAfterStart();
             gameMode = arg;
             resetWorldState();
             sendJoinMode(gameMode);
@@ -2275,6 +2290,7 @@ var TOP1_TIMER_MIN_MS = 60 * 1000;
             if (arg != ':tournament') {
                 battleSessionActive = false;
             }
+            resetGuildPrefixVisualSessionAfterStart();
             pendingStartNick = nick;
             gameMode = arg;
             resetWorldState();
@@ -2293,6 +2309,7 @@ var TOP1_TIMER_MIN_MS = 60 * 1000;
     wHandle.joinBattleQueue = function(battleMode, nick) {
         battleMode = battleMode == '2v2' ? '2v2' : '1v1';
         battleSessionActive = false;
+        resetGuildPrefixVisualSessionAfterStart();
         gameMode = ':tournament';
         resetWorldState();
         if (!wsIsOpen()) {

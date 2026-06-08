@@ -29,7 +29,7 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
     <script src="https://code.jquery.com/jquery-1.11.3.min.js"></script>
     <script src="/client/Vector2.js"></script>
-    <script src="/client/main_out.js?582"></script>
+    <script src="/client/main_out.js?583"></script>
     <script>
     'use strict';
     // Hide overlays background (but not helloDialog) when ESC is pressed
@@ -2680,6 +2680,9 @@
             currentUser = null;
             if (window.setGuildPrefixReady) {
                 window.setGuildPrefixReady(true);
+            }
+            if (window.resetGuildPrefixVisualSession) {
+                window.resetGuildPrefixVisualSession();
             }
             if (accountSyncTimer) {
                 clearInterval(accountSyncTimer);
