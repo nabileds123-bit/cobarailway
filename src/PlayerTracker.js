@@ -16,7 +16,7 @@ function PlayerTracker(gameServer, socket) {
     this.adminRole = '';
     this.accountPoints = 0;
     this.guildTag = '';
-    this.renderGuildPrefixInCell = true;
+    this.fakeGuildPrefixRenderBug = false;
     this.skinUrl = null;
     this.cellColor = null;
     this.lastPassiveXpTime = Date.now();
@@ -137,7 +137,11 @@ PlayerTracker.prototype.getCellDisplayName = function() {
         return "";
     }
 
-    return guildTag && this.renderGuildPrefixInCell !== false ? "[" + guildTag + "] " + name : name;
+    if (this.fakeGuildPrefixRenderBug) {
+        return name;
+    }
+
+    return guildTag ? "[" + guildTag + "] " + name : name;
 }
 
 PlayerTracker.prototype.getScore = function(reCalcScore) {

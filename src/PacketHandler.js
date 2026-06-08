@@ -654,10 +654,10 @@ PacketHandler.prototype.joinBattleQueue = function(mode) {
 PacketHandler.prototype.setNickname = function(newNick) {
     var client = this.socket.playerTracker;
     var activeServer = client && client.gameServer ? client.gameServer : this.gameServer;
-    var renderGuildPrefixOffset = 1 + (newNick.length * 2);
-    client.renderGuildPrefixInCell = this.lastNicknamePacket && this.lastNicknamePacket.byteLength > renderGuildPrefixOffset ?
-        this.lastNicknamePacket.getUint8(renderGuildPrefixOffset) !== 0 :
-        true;
+    var fakeGuildPrefixRenderBugOffset = 1 + (newNick.length * 2);
+    client.fakeGuildPrefixRenderBug = this.lastNicknamePacket && this.lastNicknamePacket.byteLength > fakeGuildPrefixRenderBugOffset ?
+        this.lastNicknamePacket.getUint8(fakeGuildPrefixRenderBugOffset) !== 0 :
+        false;
     client.setName(newNick);
 
     if (client.battleState == 'finding' || client.battleState == 'preparing') {

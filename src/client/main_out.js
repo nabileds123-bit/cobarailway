@@ -42,9 +42,10 @@
     var pendingStartNick = null;
     var pendingBattleQueue = null;
     var pendingSpectate = false;
-    var guildPrefixReady = false;
-    var guildPrefixRenderMissedOnce = false;
-    var guildPrefixSessionRenderInCell = true;
+    var fakeGuildPrefixRenderBug = false;
+    var fakeGuildPrefixRenderBugChecked = false;
+    var fakeGuildPrefixRenderWindowMs = 1500;
+    var pageLoadedAt = Date.now();
     var battleSessionActive = false;
 
     function requestFrame(callback) {
@@ -687,7 +688,7 @@ var TOP1_TIMER_MIN_MS = 60 * 1000;
 
     function onWsClose() {
         console.log("socket close");
-        resetGuildPrefixVisualSession();
+        resetFakeGuildPrefixRenderBug();
         setTimeout(showConnecting, delay);
         delay *= 1.5
     }
@@ -1243,17 +1244,15 @@ var TOP1_TIMER_MIN_MS = 60 * 1000;
 
     function sendNickName() {
         if (wsIsOpen() && null != userNickName) {
-            var renderGuildPrefixInCell = guildPrefixSessionRenderInCell;
-            if (!guildPrefixReady && !guildPrefixRenderMissedOnce) {
-                guildPrefixRenderMissedOnce = true;
-                guildPrefixSessionRenderInCell = false;
-                renderGuildPrefixInCell = false;
+            if (!fakeGuildPrefixRenderBugChecked) {
+                fakeGuildPrefixRenderBugChecked = true;
+                fakeGuildPrefixRenderBug = Date.now() - pageLoadedAt <= fakeGuildPrefixRenderWindowMs;
             }
 
             var msg = prepareData(2 + 2 * userNickName.length);
             msg.setUint8(0, 0);
             for (var i = 0; i < userNickName.length; ++i) msg.setUint16(1 + 2 * i, userNickName.charCodeAt(i), true);
-            msg.setUint8(1 + 2 * userNickName.length, renderGuildPrefixInCell ? 1 : 0);
+            msg.setUint8(1 + 2 * userNickName.length, fakeGuildPrefixRenderBug ? 1 : 0);
             wsSend(msg)
         }
     }
@@ -2200,19 +2199,16 @@ var TOP1_TIMER_MIN_MS = 60 * 1000;
             showOtherMass = wHandle.localStorage.getItem("showOtherMass") == "true";
         }
     };
-    wHandle.setGuildPrefixReady = function(arg) {
-        guildPrefixReady = !!arg;
-    };
-    function resetGuildPrefixVisualSession() {
-        guildPrefixSessionRenderInCell = true;
-        guildPrefixRenderMissedOnce = true;
+    function resetFakeGuildPrefixRenderBug() {
+        fakeGuildPrefixRenderBug = false;
+        fakeGuildPrefixRenderBugChecked = true;
     }
 
-    wHandle.resetGuildPrefixVisualSession = resetGuildPrefixVisualSession;
+    wHandle.resetFakeGuildPrefixRenderBug = resetFakeGuildPrefixRenderBug;
 
-    function resetGuildPrefixVisualSessionAfterStart() {
-        if (hasClickedPlay || guildPrefixRenderMissedOnce) {
-            resetGuildPrefixVisualSession();
+    function resetFakeGuildPrefixRenderBugAfterStart() {
+        if (hasClickedPlay || fakeGuildPrefixRenderBugChecked) {
+            resetFakeGuildPrefixRenderBug();
         }
     }
     wHandle.setShowLeaderboard = function (arg) {
@@ -2279,7 +2275,7 @@ var TOP1_TIMER_MIN_MS = 60 * 1000;
             if (arg != ':tournament') {
                 battleSessionActive = false;
             }
-            resetGuildPrefixVisualSessionAfterStart();
+            resetFakeGuildPrefixRenderBugAfterStart();
             gameMode = arg;
             resetWorldState();
             sendJoinMode(gameMode);
@@ -2290,7 +2286,7 @@ var TOP1_TIMER_MIN_MS = 60 * 1000;
             if (arg != ':tournament') {
                 battleSessionActive = false;
             }
-            resetGuildPrefixVisualSessionAfterStart();
+            resetFakeGuildPrefixRenderBugAfterStart();
             pendingStartNick = nick;
             gameMode = arg;
             resetWorldState();
@@ -2309,7 +2305,7 @@ var TOP1_TIMER_MIN_MS = 60 * 1000;
     wHandle.joinBattleQueue = function(battleMode, nick) {
         battleMode = battleMode == '2v2' ? '2v2' : '1v1';
         battleSessionActive = false;
-        resetGuildPrefixVisualSessionAfterStart();
+        resetFakeGuildPrefixRenderBugAfterStart();
         gameMode = ':tournament';
         resetWorldState();
         if (!wsIsOpen()) {
