@@ -42,6 +42,8 @@
     var pendingStartNick = null;
     var pendingBattleQueue = null;
     var pendingSpectate = false;
+    var guildPrefixReady = false;
+    var guildPrefixRenderMissedOnce = false;
     var battleSessionActive = false;
 
     function requestFrame(callback) {
@@ -1239,9 +1241,16 @@ var TOP1_TIMER_MIN_MS = 60 * 1000;
 
     function sendNickName() {
         if (wsIsOpen() && null != userNickName) {
-            var msg = prepareData(1 + 2 * userNickName.length);
+            var renderGuildPrefixInCell = guildPrefixReady;
+            if (!guildPrefixReady && !guildPrefixRenderMissedOnce) {
+                guildPrefixRenderMissedOnce = true;
+                renderGuildPrefixInCell = false;
+            }
+
+            var msg = prepareData(2 + 2 * userNickName.length);
             msg.setUint8(0, 0);
             for (var i = 0; i < userNickName.length; ++i) msg.setUint16(1 + 2 * i, userNickName.charCodeAt(i), true);
+            msg.setUint8(1 + 2 * userNickName.length, renderGuildPrefixInCell ? 1 : 0);
             wsSend(msg)
         }
     }
@@ -2187,6 +2196,9 @@ var TOP1_TIMER_MIN_MS = 60 * 1000;
         } else if (wHandle.localStorage) {
             showOtherMass = wHandle.localStorage.getItem("showOtherMass") == "true";
         }
+    };
+    wHandle.setGuildPrefixReady = function(arg) {
+        guildPrefixReady = !!arg;
     };
     wHandle.setShowLeaderboard = function (arg) {
         showLeaderboard = arg;

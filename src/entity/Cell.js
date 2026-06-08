@@ -28,7 +28,7 @@ module.exports = Cell;
 
 Cell.prototype.getName = function() {
 	if (this.owner) {
-		return this.owner.getDisplayName ? this.owner.getDisplayName() : this.owner.name;
+		return this.owner.getCellDisplayName ? this.owner.getCellDisplayName() : (this.owner.getDisplayName ? this.owner.getDisplayName() : this.owner.name);
 	} else {
 		return "";
 	}
