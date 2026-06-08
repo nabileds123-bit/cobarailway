@@ -279,7 +279,27 @@ PlayerTracker.prototype.calcViewBox = function() {
             this.socket.sendPacket(new Packet.UpdatePosition(this.spectatedPlayer.centerPos.x,this.spectatedPlayer.centerPos.y,specZoom));
             return this.spectatedPlayer.visibleNodes;
         } else {
-            return []; // Nothing
+            var specCenter = {
+                x: (this.gameServer.config.borderLeft + this.gameServer.config.borderRight) / 2,
+                y: (this.gameServer.config.borderTop + this.gameServer.config.borderBottom) / 2
+            };
+            var specRange = this.gameServer.config.serverViewBase;
+            var specViewBox = {
+                topY: specCenter.y - specRange,
+                bottomY: specCenter.y + specRange,
+                leftX: specCenter.x - specRange,
+                rightX: specCenter.x + specRange,
+                width: specRange
+            };
+            var specVisible = [];
+            this.socket.sendPacket(new Packet.UpdatePosition(specCenter.x,specCenter.y,1));
+            for (var specIndex = 0; specIndex < this.gameServer.nodes.length; specIndex++) {
+                var specNode = this.gameServer.nodes[specIndex];
+                if (specNode && specNode.visibleCheck(specViewBox,specCenter)) {
+                    specVisible.push(specNode);
+                }
+            }
+            return specVisible;
         }
     }
 		

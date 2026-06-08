@@ -2210,10 +2210,35 @@ var TOP1_TIMER_MIN_MS = 60 * 1000;
     wHandle.setAccountCellColor = function (arg) {
         sendAccountColor(arg);
     };
+    function getSelectedSpectateMode() {
+        var modeSelect = document.getElementById("gamemode");
+        var selectedMode = modeSelect ? modeSelect.value : gameMode;
+
+        if (selectedMode === "") {
+            var activeModeButton = document.querySelector(".mode-btn.active");
+            var ffaVariant = activeModeButton ? activeModeButton.getAttribute("data-mode") : "";
+            if (ffaVariant == "hc") {
+                return ":hardcore";
+            }
+            if (ffaVariant == "ms") {
+                return ":x5";
+            }
+        }
+
+        return selectedMode || "";
+    }
     wHandle.spectate = function () {
         userNickName = null;
         wHandle.isSpectating = true;
         resetMatchStats();
+        var selectedMode = getSelectedSpectateMode();
+        if (selectedMode != gameMode) {
+            gameMode = selectedMode;
+            resetWorldState();
+            if (wsIsOpen()) {
+                sendJoinMode(gameMode);
+            }
+        }
         if (!wsIsOpen()) {
             pendingSpectate = true;
             showConnecting();
