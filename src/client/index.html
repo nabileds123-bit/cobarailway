@@ -4292,9 +4292,6 @@
         $('#guildDetailContent').on('click', '.guild-member-action', function(e) {
             e.preventDefault();
             e.stopPropagation();
-            if (!confirm('Are you sure you want to remove this player from the guild?')) {
-                return;
-            }
             authPost('/api/guild/member/kick', { userId: $(this).attr('data-user-id') })
                 .done(function(result) {
                     if (guildDetailState) {
@@ -4308,9 +4305,6 @@
             e.preventDefault();
             e.stopPropagation();
             var nextRole = $(this).attr('data-role');
-            if (!confirm(nextRole == 'Staff' ? 'Promote member to Staff?' : 'Demote Staff to Member?')) {
-                return;
-            }
             authPost('/api/guild/member/role', {
                 userId: $(this).attr('data-user-id'),
                 role: nextRole
