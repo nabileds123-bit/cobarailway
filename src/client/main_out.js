@@ -192,28 +192,70 @@
             eFeedInterval = null;
         var E_FEED_INTERVAL_MS = 2;
         var E_FEED_BURST_COUNT = 1;
+        var eFeedRunning = false;
+        var lastEFeedTime = 0;
+        var eFeedChannel = typeof MessageChannel != "undefined" ? new MessageChannel() : null;
+
+        if (eFeedChannel) {
+            eFeedChannel.port1.onmessage = runEFeedLoop;
+        }
+
+        function sendFeedPacket(source) {
+            sendMouseMove();
+            if (wsIsOpen()) {
+                var msg = prepareData(2);
+                msg.setUint8(0, 21);
+                msg.setUint8(1, source || 0);
+                wsSend(msg);
+            }
+        }
 
         function sendEFeedTick() {
-            sendMouseMove();
-            sendUint8(21);
+            sendFeedPacket(2);
         }
 
         function sendFeed() {
-            sendEFeedTick();
+            sendFeedPacket(1);
         }
 
-        function startEFeed() {
-            if (eFeedInterval || isTyping) {
+        function queueEFeedLoop() {
+            if (eFeedChannel) {
+                eFeedChannel.port2.postMessage(0);
+            } else {
+                eFeedInterval = setTimeout(runEFeedLoop, E_FEED_INTERVAL_MS);
+            }
+        }
+
+        function runEFeedLoop() {
+            if (!eFeedRunning) {
                 return;
             }
 
+            var now = Date.now();
+            if (!lastEFeedTime || now - lastEFeedTime >= E_FEED_INTERVAL_MS) {
+                sendEFeedTick();
+                lastEFeedTime = now;
+            }
+
+            queueEFeedLoop();
+        }
+
+        function startEFeed() {
+            if (eFeedRunning || isTyping) {
+                return;
+            }
+
+            eFeedRunning = true;
             sendEFeedTick();
-            eFeedInterval = setInterval(sendEFeedTick, E_FEED_INTERVAL_MS);
+            lastEFeedTime = Date.now();
+            queueEFeedLoop();
         }
 
         function stopEFeed() {
+            eFeedRunning = false;
+            lastEFeedTime = 0;
             if (eFeedInterval) {
-                clearInterval(eFeedInterval);
+                clearTimeout(eFeedInterval);
                 eFeedInterval = null;
             }
         }

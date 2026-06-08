@@ -141,9 +141,16 @@ this.merg = true;
             if (player) {
                 var now = Date.now();
                 var cooldown = this.gameServer.config.playerEjectCooldown || 0;
+                var source = view.byteLength > 1 ? view.getUint8(1) : 0;
+                var sourceName = source == 2 ? 'Hold E' : (source == 1 ? 'Manual W' : 'Feed');
+                var accepted = false;
                 if (!player.lastEjectTime || now - player.lastEjectTime >= cooldown) {
                     this.gameServer.ejectMass(player);
                     player.lastEjectTime = now;
+                    accepted = true;
+                }
+                if (player.trackEjectPacket) {
+                    player.trackEjectPacket(sourceName, accepted, now);
                 }
             }
             break;

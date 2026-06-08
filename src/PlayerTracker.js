@@ -29,6 +29,7 @@ function PlayerTracker(gameServer, socket) {
     this.matchId = null;
     this.lastSplitTime = 0;
     this.lastEjectTime = 0;
+    this.ejectDebugStats = {};
 
     this.mouse = {x: 0, y: 0};
     this.tickLeaderboard = 0; // 
@@ -57,6 +58,42 @@ function PlayerTracker(gameServer, socket) {
 }
 
 module.exports = PlayerTracker;
+
+PlayerTracker.prototype.trackEjectPacket = function(sourceName, accepted, now) {
+    if (!this.gameServer || !this.gameServer.config.playerEjectDebugLog) {
+        return;
+    }
+
+    var source = sourceName || 'Feed';
+    var stats = this.ejectDebugStats[source];
+    if (!stats) {
+        stats = this.ejectDebugStats[source] = {
+            startedAt: now,
+            packets: 0,
+            ejects: 0
+        };
+    }
+
+    stats.packets++;
+    if (accepted) {
+        stats.ejects++;
+    }
+
+    if (now - stats.startedAt >= 1000) {
+        var seconds = Math.max((now - stats.startedAt) / 1000, 1);
+        var name = this.getName ? this.getName() : this.name;
+        console.log(
+            "[FeedDebug]",
+            source + ":",
+            Math.round(stats.ejects / seconds) + " eject/sec,",
+            Math.round(stats.packets / seconds) + " packet/sec,",
+            "player=" + (name || "unknown")
+        );
+        stats.startedAt = now;
+        stats.packets = 0;
+        stats.ejects = 0;
+    }
+};
 
 // Setters/Getters
 

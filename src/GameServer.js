@@ -85,6 +85,7 @@ function GameServer(mult, prt, gamemodeId) {
         playerSplitDecay: 0.82, // Split boost decay
         playerSplitCooldownMs: 80, // Minimum time between split commands per player
         playerEjectCooldown: 8, // Minimum time between eject mass commands per player (milliseconds)
+        playerEjectDebugLog: 1, // Logs manual W vs hold E eject/packet rate once per second
         playerRecombineTime: 15, // Base amount of ticks before a cell is allowed to recombine (1 tick = 2000 milliseconds)
         playerMassDecayRate: 4, // Amount of mass lost per tick (Multiplier) (1 tick = 2000 milliseconds)
         playerMinMassDecay: 9, // Minimum mass for decay to occur
