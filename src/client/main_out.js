@@ -1723,6 +1723,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
 
     function resetMatchStats() {
         top1StartedAt = 0;
+        updateTop1OverlayTimer();
         playerStat = {
             active: false,
             finalized: false,
@@ -1846,6 +1847,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
             playerStat.leaderboardStartedAt = 0;
             top1StartedAt = 0;
         }
+        updateTop1OverlayTimer();
     }
 
     function formatTop1Timer(ms) {
@@ -1853,6 +1855,18 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
         var minutes = Math.floor(totalSeconds / 60);
         var seconds = totalSeconds % 60;
         return minutes + "m " + (seconds < 10 ? "0" : "") + seconds + "s";
+    }
+
+    function updateTop1OverlayTimer() {
+        var timer = wjQuery("#top1OverlayTimer");
+        if (!timer.length) {
+            return;
+        }
+        if (!top1StartedAt || !playerStat || playerStat.finalized || wHandle.isSpectating) {
+            timer.hide();
+            return;
+        }
+        timer.text("Top 1 " + formatTop1Timer(Date.now() - top1StartedAt)).show();
     }
 
     function getFinalMatchStats() {
@@ -2060,6 +2074,7 @@ var INVERT_WHEEL  = false;   // true kalau mau kebalik (scroll up = zoom in)
     var playerStat = null;
     var top1StartedAt = 0;
     resetMatchStats();
+    setInterval(updateTop1OverlayTimer, 500);
     wHandle.isSpectating = false;
     wHandle.setNick = function (arg) {
         hasClickedPlay = true;

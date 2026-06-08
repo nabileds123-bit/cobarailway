@@ -318,6 +318,24 @@
             font-weight: bold;
             text-shadow: 0 1px 2px rgba(0,0,0,.65);
         }
+        #top1OverlayTimer {
+            position: absolute;
+            top: 14px;
+            left: 50%;
+            z-index: 250;
+            display: none;
+            min-width: 156px;
+            transform: translateX(-50%);
+            padding: 7px 12px;
+            border-radius: 4px;
+            background: rgba(0,0,0,.48);
+            color: #ffd45a;
+            font-size: 15px;
+            font-weight: 900;
+            text-align: center;
+            text-shadow: 0 1px 2px rgba(0,0,0,.65);
+            pointer-events: none;
+        }
         #a300x250 { width:300px; height:250px; background-repeat:no-repeat; background-size:contain; background-position:center center; }
         #overlays {
     /* Atur tingkat kegelapan overlay di sini: semakin besar alpha, semakin gelap */
@@ -1803,6 +1821,7 @@
 </head>
 <body>
 <div id="fb-root"></div>
+<div id="top1OverlayTimer">Top 1 0m 00s</div>
 <div id="overlays" style="display:none; position:absolute; left:0; right:0; top:0; bottom:0; background-color:rgba(0,0,0,0.7); z-index:300; background-image:linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url('../img/bg.png'); background-size:cover; background-position:center;">
         <div id="helloDialog">
         <form role="form">
