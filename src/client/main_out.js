@@ -1985,12 +1985,163 @@ var TOP1_TIMER_MIN_MS = 60 * 1000;
         return true;
     }
 
+    function isBattleLeaderBoard() {
+        return leaderBoard && leaderBoard.length && leaderBoard[0] && leaderBoard[0].name == "__BATTLE_LB__";
+    }
+
+    function parseBattleLeaderBoard() {
+        var data = {
+            title: "Leaderboard",
+            label: "Players Remaining",
+            alive: 0,
+            max: 2,
+            round: "",
+            scores: [],
+            spectators: "Spectators: 0",
+            countdown: "",
+            countdownNumber: "",
+            winnerTitle: "",
+            winnerName: "",
+            winnerScore: "",
+            separators: []
+        };
+
+        for (var i = 1; i < leaderBoard.length; i++) {
+            var raw = String(leaderBoard[i] && leaderBoard[i].name || "");
+            var parts = raw.split("|");
+            var type = parts.shift();
+            var value = parts.join("|");
+
+            if (type == "title") data.title = value || data.title;
+            else if (type == "label") data.label = value || data.label;
+            else if (type == "alive") {
+                data.alive = Math.max(0, parseInt(parts[0] || value, 10) || 0);
+                data.max = Math.max(1, parseInt(parts[1], 10) || data.max);
+            } else if (type == "round") data.round = value;
+            else if (type == "score") data.scores.push(value);
+            else if (type == "spectators") data.spectators = value || data.spectators;
+            else if (type == "countdown") data.countdown = value;
+            else if (type == "countdownNumber") data.countdownNumber = value;
+            else if (type == "winnerTitle") data.winnerTitle = value;
+            else if (type == "winnerName") data.winnerName = value;
+            else if (type == "winnerScore") data.winnerScore = value;
+            else if (type == "sep") data.separators.push(i);
+        }
+
+        return data;
+    }
+
+    function drawRoundedRect(ctx, x, y, width, height, radius) {
+        radius = Math.min(radius, width / 2, height / 2);
+        ctx.beginPath();
+        ctx.moveTo(x + radius, y);
+        ctx.lineTo(x + width - radius, y);
+        ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+        ctx.lineTo(x + width, y + height - radius);
+        ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+        ctx.lineTo(x + radius, y + height);
+        ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+        ctx.lineTo(x, y + radius);
+        ctx.quadraticCurveTo(x, y, x + radius, y);
+        ctx.closePath();
+    }
+
+    function drawCenteredCanvasText(ctx, text, y, size, weight, color, maxWidth) {
+        text = String(text || "");
+        size = size || 14;
+        weight = weight || "700";
+        ctx.fillStyle = color || "#FFFFFF";
+        do {
+            ctx.font = weight + " " + size + "px Ubuntu, Helvetica, Arial, sans-serif";
+            if (ctx.measureText(text).width <= maxWidth || size <= 10) {
+                break;
+            }
+            size--;
+        } while (true);
+        ctx.fillText(text, 100 - ctx.measureText(text).width / 2, y);
+    }
+
+    function drawBattleSeparator(ctx, y) {
+        ctx.globalAlpha = .32;
+        ctx.strokeStyle = "#FFFFFF";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(16, y);
+        ctx.lineTo(184, y);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+    }
+
+    function drawBattleLeaderBoard() {
+        var data = parseBattleLeaderBoard();
+        var isWinner = !!data.winnerTitle;
+        var rowCount = isWinner ? 6 : 8 + data.scores.length + (data.countdown ? 2 : 0);
+        var boardLength = Math.max(120, Math.min(220, 34 + rowCount * 17));
+        var scaleFactor = Math.min(0.24 * canvasHeight, Math.min(200, .32 * canvasWidth)) / 200;
+
+        lbCanvas = document.createElement("canvas");
+        lbCanvas.width = 200 * scaleFactor;
+        lbCanvas.height = boardLength * scaleFactor;
+
+        var ctx = lbCanvas.getContext("2d");
+        ctx.scale(scaleFactor, scaleFactor);
+        ctx.globalAlpha = .58;
+        ctx.fillStyle = "#000000";
+        drawRoundedRect(ctx, 0, 0, 200, boardLength, 7);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+
+        if (isWinner) {
+            drawCenteredCanvasText(ctx, data.winnerTitle || "Winner", 30, 22, "700", "#FFFFFF", 176);
+            drawCenteredCanvasText(ctx, data.winnerName || "No winner", 60, 18, "700", "#FFFFFF", 176);
+            drawCenteredCanvasText(ctx, data.winnerScore || "0 - 0", 84, 18, "700", "#FFFFFF", 176);
+            drawBattleSeparator(ctx, 102);
+            drawCenteredCanvasText(ctx, data.countdown || "Next Match In", 126, 15, "700", "#FFFFFF", 176);
+            drawCenteredCanvasText(ctx, data.countdownNumber || "", 154, 25, "700", "#FFFFFF", 176);
+            return;
+        }
+
+        var y = 28;
+        drawCenteredCanvasText(ctx, data.title, y, 23, "700", "#FFFFFF", 176);
+        y += 25;
+        drawCenteredCanvasText(ctx, data.label, y, 14, "700", "#FFFFFF", 176);
+        y += 18;
+        drawCenteredCanvasText(ctx, data.alive + "/" + data.max, y, 15, "700", "#FFFFFF", 176);
+        y += 18;
+        drawBattleSeparator(ctx, y);
+        y += 20;
+        drawCenteredCanvasText(ctx, data.round || "Round: 1", y, 16, "700", "#FFFFFF", 176);
+        y += 19;
+
+        if (data.countdown) {
+            drawCenteredCanvasText(ctx, data.countdown, y, 14, "700", "#FFFFFF", 176);
+            y += 24;
+            drawCenteredCanvasText(ctx, data.countdownNumber || "", y, 24, "700", "#FFFFFF", 176);
+            y += 9;
+        } else {
+            for (var i = 0; i < data.scores.length; i++) {
+                drawCenteredCanvasText(ctx, data.scores[i], y, 15, "700", "#FFFFFF", 176);
+                y += 17;
+            }
+        }
+
+        y += 4;
+        drawBattleSeparator(ctx, y);
+        y += 21;
+        drawCenteredCanvasText(ctx, data.spectators, y, 15, "700", "#FFFFFF", 176);
+    }
+
     function drawLeaderBoard() {
         lbCanvas = null;
         if (!showLeaderboard) {
             return;
         }
         if (!(0 < canvasWidth) || !(0 < canvasHeight)) {
+            return;
+        }
+
+        if (isBattleLeaderBoard()) {
+            drawBattleLeaderBoard();
             return;
         }
 

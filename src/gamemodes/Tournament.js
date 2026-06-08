@@ -470,14 +470,82 @@ Tournament.prototype.getScoreText = function() {
     return scores.join(" - ") || "0 - 0";
 };
 
-Tournament.prototype.writeActiveLeaderboard = function(lb) {
-    lb[0] = "Battle " + this.battleMode;
-    lb[1] = "Round " + this.currentRound + "/" + this.maxRounds;
-    lb[2] = this.getScoreText();
-    lb[3] = "Players Remaining";
-    lb[4] = this.contenders.length+"/"+this.maxContenders;
-    lb[5] = "Time Limit:";
-    lb[6] = this.formatTime(this.timeLimit);
+Tournament.prototype.getScoreRows = function() {
+    var rows = [];
+    var seen = {};
+
+    for (var i = 0; i < this.matchPlayers.length; i++) {
+        var player = this.matchPlayers[i];
+        var key = this.getPlayerWinKey(player);
+        if (!key || seen[key]) {
+            continue;
+        }
+
+        seen[key] = true;
+        rows.push(this.getWinNameByKey(key) + " - " + (this.roundWins[key] || 0));
+    }
+
+    while (rows.length < (this.battleMode == '2v2' ? 2 : this.maxContenders)) {
+        rows.push((this.battleMode == '2v2' ? "Team " + (rows.length ? "B" : "A") : "Waiting") + " - 0");
+    }
+
+    return rows.slice(0, this.battleMode == '2v2' ? 2 : this.maxContenders);
+};
+
+Tournament.prototype.getScoreLine = function() {
+    var scores = [];
+    var rows = this.getScoreRows();
+    for (var i = 0; i < rows.length; i++) {
+        var parts = rows[i].split(" - ");
+        scores.push(parts[parts.length - 1] || "0");
+    }
+    return scores.join(" - ") || "0 - 0";
+};
+
+Tournament.prototype.getAliveCount = function() {
+    return this.getAliveContenders().length;
+};
+
+Tournament.prototype.getSpectatorCount = function(gameServer) {
+    var count = 0;
+    var clients = gameServer && gameServer.clients ? gameServer.clients : [];
+    for (var i = 0; i < clients.length; i++) {
+        var player = clients[i] && clients[i].playerTracker;
+        if (!player || player.gameServer != gameServer) {
+            continue;
+        }
+
+        if (this.contenders.indexOf(player) != -1 && player.cells && player.cells.length > 0) {
+            continue;
+        }
+
+        if (player.spectate || player.battleState == 'spectating' || this.matchPlayers.indexOf(player) == -1) {
+            count++;
+        }
+    }
+    return count;
+};
+
+Tournament.prototype.writeBattleBaseLeaderboard = function(gameServer, lb) {
+    var alive = this.getAliveCount();
+    var maxPlayers = this.maxContenders;
+    var rows = this.getScoreRows();
+
+    lb.push("__BATTLE_LB__");
+    lb.push("title|Leaderboard");
+    lb.push("label|Players Remaining");
+    lb.push("alive|" + alive + "|" + maxPlayers);
+    lb.push("sep");
+    lb.push("round|Round: " + this.currentRound);
+    for (var i = 0; i < rows.length; i++) {
+        lb.push("score|" + rows[i]);
+    }
+    lb.push("sep");
+    lb.push("spectators|Spectators: " + this.getSpectatorCount(gameServer));
+};
+
+Tournament.prototype.writeActiveLeaderboard = function(gameServer, lb) {
+    this.writeBattleBaseLeaderboard(gameServer, lb);
 };
 
 // Override
@@ -560,9 +628,15 @@ Tournament.prototype.updateLB = function(gameServer) {
 
     switch (this.gamePhase) {
         case 0:
-            lb[0] = "Battle " + this.battleMode;
-            lb[1] = "Waiting for players:";
-            lb[2] = this.contenders.length+"/"+this.maxContenders;
+            lb.push("__BATTLE_LB__");
+            lb.push("title|Leaderboard");
+            lb.push("label|Players Remaining");
+            lb.push("alive|" + this.getAliveCount() + "|" + this.maxContenders);
+            lb.push("sep");
+            lb.push("round|Waiting for players");
+            lb.push("countdown|" + this.contenders.length + "/" + this.maxContenders);
+            lb.push("sep");
+            lb.push("spectators|Spectators: " + this.getSpectatorCount(gameServer));
             if (this.autoFill) {
                 if (this.timer <= 0) {
                     this.fillBots(gameServer);
@@ -573,18 +647,17 @@ Tournament.prototype.updateLB = function(gameServer) {
             break;
         case 1:
             this.timer = this.getCountdownSeconds(this.prepTime);
-            lb[0] = this.currentRound > 1 ? "Round " + this.currentRound + " Starting In" : "Game Starting In";
-            lb[1] = this.timer.toString();
-            lb[2] = "Good Luck!";
+            this.writeBattleBaseLeaderboard(gameServer, lb);
+            lb.splice(lb.length - 2, 0, "countdown|Starting In", "countdownNumber|" + this.timer.toString());
             if (this.timer <= 0) {
-                // Reset the game
                 this.startGame(gameServer);
                 lb.length = 0;
-                this.writeActiveLeaderboard(lb);
+                this.writeBattleBaseLeaderboard(gameServer, lb);
+                lb.splice(lb.length - 2, 0, "countdown|Fight!");
             }
             break;
         case 2:
-            this.writeActiveLeaderboard(lb);
+            this.writeActiveLeaderboard(gameServer, lb);
             if (this.timeLimit < 0) {
                 // Timed out
                 this.endGameTimeout(gameServer);
@@ -595,17 +668,19 @@ Tournament.prototype.updateLB = function(gameServer) {
         case 3:
             this.timer = this.getPhaseCountdownSeconds(this.endTime);
             if (this.matchWinner) {
-                lb[0] = "Congratulations";
-                lb[1] = this.getPlayerWinName(this.matchWinner);
-                lb[2] = "for winning!";
+                lb.push("__BATTLE_LB__");
+                lb.push("winnerTitle|Winner");
+                lb.push("winnerName|" + this.getPlayerWinName(this.matchWinner));
+                lb.push("winnerScore|" + this.getScoreLine());
+                lb.push("sep");
+                lb.push("countdown|Next Match In");
+                lb.push("countdownNumber|" + this.timer.toString());
                 if (this.timer <= 0) {
                     this.restartMatch(gameServer);
                 }
             } else {
-                lb[0] = "Congratulations";
-                lb[1] = this.getPlayerWinName(this.roundWinner);
-                lb[2] = "Next round in";
-                lb[3] = this.timer.toString();
+                this.writeBattleBaseLeaderboard(gameServer, lb);
+                lb.splice(lb.length - 2, 0, "countdown|Next Round In", "countdownNumber|" + this.timer.toString());
                 if (this.timer <= 0) {
                     this.startNextRound(gameServer);
                 }

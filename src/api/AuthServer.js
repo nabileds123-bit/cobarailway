@@ -1622,6 +1622,8 @@ function startPremiumExpiryRuntime() {
     premiumExpiryTimer = setInterval(expirePremiumAccounts, 60 * 1000);
 }
 
+var GUILD_TAG_REGEX = /^[A-Za-z0-9!@#$%^&*()_+=\-\[\]{}\\|;:'",.<>\/?~`]{1,4}$/;
+
 function normalizeGuildTag(tag) {
     return String(tag || '').trim().toUpperCase();
 }
@@ -3572,8 +3574,8 @@ function handleCreateGuild(req, res) {
         var guildName = normalizeGuildName(body.name, guild);
         var description = String(body.description || '').trim().slice(0, 240);
         var guildType = normalizeGuildType(body.type);
-        if (!/^[A-Za-z0-9]{1,4}$/.test(guild)) {
-            sendJson(res, 400, { ok: false, error: 'Prefix guild wajib A-Z atau 0-9, maksimal 4 karakter, tanpa spasi atau emoji.' });
+        if (!GUILD_TAG_REGEX.test(guild)) {
+            sendJson(res, 400, { ok: false, error: 'Prefix guild maksimal 4 karakter, boleh huruf, angka, dan simbol tanpa spasi atau emoji.' });
             return;
         }
 

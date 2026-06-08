@@ -52,7 +52,7 @@ function GameServer(mult, prt, gamemodeId) {
         serverOldColors: 0,// If the server uses colors from the original Ogar
         serverBots: 3, // Amount of player bots to spawn (Experimental)
         rainbowCells: 0,
-        battleEnabled: 0, // 0 = Battle disabled, 1 = Battle enabled
+        battleEnabled: 1, // 0 = Battle disabled, 1 = Battle enabled
         serverViewBase: 1024, // Base view distance of players. Warning: high values may cause lag
         borderLeft: 0, // Left border of map (Vanilla value: 0)
         borderRight: 6000, // Right border of map (Vanilla value: 11180.3398875)
@@ -855,9 +855,6 @@ GameServer.prototype.startPreparedBattleMatch = function(match, battleType, sock
         match.gameMode.onPlayerSpawn(match, sockets[j].playerTracker);
     }
 
-    if (match.gameMode && match.gameMode.gamePhase == 1 && match.gameMode.startGame) {
-        match.gameMode.startGame(match);
-    }
 }
 
 GameServer.prototype.getMode = function() {

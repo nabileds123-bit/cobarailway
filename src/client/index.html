@@ -29,7 +29,7 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
     <script src="https://code.jquery.com/jquery-1.11.3.min.js"></script>
     <script src="/client/Vector2.js"></script>
-    <script src="/client/main_out.js?584"></script>
+    <script src="/client/main_out.js?585"></script>
     <script>
     'use strict';
     // Hide overlays background (but not helloDialog) when ESC is pressed
@@ -4511,8 +4511,8 @@
                 return;
             }
 
-            if (!/^[A-Z0-9]{1,4}$/.test(tag)) {
-                status.removeClass('text-success').addClass('text-danger').text('Prefix guild wajib A-Z atau 0-9, maksimal 4 karakter, tanpa spasi atau emoji.').show();
+            if (!/^[A-Z0-9!@#$%^&*()_+=\-\[\]{}\\|;:'",.<>\/?~`]{1,4}$/.test(tag)) {
+                status.removeClass('text-success').addClass('text-danger').text('Prefix guild maksimal 4 karakter, boleh huruf, angka, dan simbol tanpa spasi atau emoji.').show();
                 return;
             }
 
