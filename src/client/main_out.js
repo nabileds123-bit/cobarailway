@@ -2391,10 +2391,10 @@ var TOP1_TIMER_MIN_MS = 60 * 1000;
         if (selectedMode === "") {
             var activeModeButton = document.querySelector(".mode-btn.active");
             var ffaVariant = activeModeButton ? activeModeButton.getAttribute("data-mode") : "";
-            if (ffaVariant == "hc") {
+            if (ffaVariant == "hardcore" || ffaVariant == "hc") {
                 return ":hardcore";
             }
-            if (ffaVariant == "ms") {
+            if (ffaVariant == "x5" || ffaVariant == "ms") {
                 return ":x5";
             }
         }
@@ -2415,7 +2415,8 @@ var TOP1_TIMER_MIN_MS = 60 * 1000;
         }
         if (!wsIsOpen()) {
             pendingSpectate = true;
-            showConnecting();
+            wjQuery("#connecting").show();
+            wsConnect();
             return;
         }
         sendUint8(1);
