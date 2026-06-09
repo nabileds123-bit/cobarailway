@@ -67,8 +67,8 @@ function GameServer(mult, prt, gamemodeId) {
         virusMaxAmount: 50, // Maximum amount of viruses on the map. If this amount is reached, then ejected cells will pass through viruses.
         virusStartMass: 160, // Starting virus size (In mass)
         virusBurstMass: 300, // Viruses explode past this size
-        ejectMass: 24, // Mass of ejected cells
-        ejectMassGain: 8, // Amount of mass gained from consuming ejected cells
+        ejectMass: 18, // Mass of ejected cells
+        ejectMassGain: 10, // Amount of mass gained from consuming ejected cells
         ejectSpeed: 120, // Base speed of ejected cells
         ejectSpawnPlayer: 50, // Chance for a player to spawn from ejected mass
         playerStartMass: 10, // Starting mass of the player cell.
@@ -1690,7 +1690,7 @@ GameServer.prototype.newCellVirused = function(client, parent, angle, mass, spee
     newCell.skinUrl = parent.skinUrl || "";
     newCell.setColor(parent.getColor());
     newCell.setAngle(angle);
-    newCell.setMoveEngineData(speed, 4);
+    newCell.setMoveEngineData(speed, 8);
     newCell.calcMergeTime(this.config.playerRecombineTime);
     newCell.setCollisionOff(true); // Turn off collision
     
