@@ -10,6 +10,7 @@ function Cell(nodeId, owner, position, mass, gameServer) {
     this.recombineTicks = 0; // Ticks until the cell can recombine with other cells 
     this.ignoreCollision = false;
     this.gameServer = gameServer;
+    this.skinUrl = owner && owner.skinUrl ? String(owner.skinUrl) : "";
     
     this.moveEngineTicks = 0; // Amount of times to loop the movement function
     this.moveEngineSpeed = 0;
@@ -161,6 +162,12 @@ Cell.prototype.calcMove = function(x2, y2, gameServer) {
         }
 
         if ((this.nodeId == cell.nodeId) || (this.ignoreCollision) || (cell.ignoreCollision)) {
+            continue;
+        }
+
+        if (gameServer.gameMode && gameServer.gameMode.name == "Tournament" &&
+            gameServer.gameMode.gamePhase == 1 &&
+            String(gameServer.roomName || '').indexOf('BattleMatch-') === 0) {
             continue;
         }
 		

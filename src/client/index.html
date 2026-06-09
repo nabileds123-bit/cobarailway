@@ -29,7 +29,7 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
     <script src="https://code.jquery.com/jquery-1.11.3.min.js"></script>
     <script src="/client/Vector2.js"></script>
-    <script src="/client/main_out.js?585"></script>
+    <script src="/client/main_out.js?587"></script>
     <script>
     'use strict';
     // Hide overlays background (but not helloDialog) when ESC is pressed
@@ -359,7 +359,7 @@
         #overlays.only-dialog > #helloDialog {
     display: flex;
 }
-        #overlays.only-dialog > *:not(#helloDialog):not(#loginDialog):not(#registerInfoDialog):not(#registerDialog):not(#forgotDialog):not(#accountDialog):not(#changePasswordDialog):not(#uploadSkinDialog):not(#notificationDialog):not(#friendsDialog):not(#friendRequestDialog):not(#guildDialog):not(#guildCreateDialog):not(#highScoreDialog):not(#playerSearchDialog):not(#matchResultDialog):not(#battleCreateDialog) {
+        #overlays.only-dialog > *:not(#helloDialog):not(#loginDialog):not(#registerInfoDialog):not(#registerDialog):not(#forgotDialog):not(#accountDialog):not(#changePasswordDialog):not(#uploadSkinDialog):not(#notificationDialog):not(#friendsDialog):not(#friendRequestDialog):not(#guildDialog):not(#guildCreateDialog):not(#highScoreDialog):not(#playerSearchDialog):not(#matchResultDialog):not(#battleCreateDialog):not(#battleSpectateDialog) {
     display: none !important;
 }
         #loginDialog,
@@ -376,7 +376,8 @@
         #highScoreDialog,
         #playerSearchDialog,
         #matchResultDialog,
-        #battleCreateDialog {
+        #battleCreateDialog,
+        #battleSpectateDialog {
             display: none;
             width: var(--dialog-width);
             background-color: #FFFFFF;
@@ -402,7 +403,8 @@
         #playerSearchDialog.spa-open,
         #changePasswordDialog.spa-open,
         #matchResultDialog.spa-open,
-        #battleCreateDialog.spa-open {
+        #battleCreateDialog.spa-open,
+        #battleSpectateDialog.spa-open {
             display: flex;
             flex-direction: column;
         }
@@ -1722,6 +1724,91 @@
             color: #999;
             font-weight: 400;
         }
+        #battleSpectateBtn {
+            background: #ff8a00;
+            border: 1px solid #ff8a00;
+            color: #fff;
+        }
+        #battleSpectateBtn:hover,
+        #battleSpectateBtn:focus {
+            background: #ff9f2a;
+            border-color: #ff9f2a;
+            color: #fff;
+        }
+        #battleSpectateBtn.active {
+            background: #ff7300;
+            border-color: #ff7300;
+            color: #fff;
+        }
+        #battleSpectateDialog {
+            width: min(750px, calc(100vw - 24px));
+            min-height: 260px;
+            border-radius: 7px;
+            padding: 0;
+            overflow: hidden;
+        }
+        #battleSpectateDialog.spa-open {
+            display: flex;
+            flex-direction: column;
+        }
+        .battle-spectate-list {
+            padding: 16px;
+            min-height: 130px;
+        }
+        .battle-spectate-empty {
+            padding: 34px 10px;
+            text-align: center;
+            color: #777;
+            font-weight: 700;
+        }
+        .battle-spectate-match {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 84px minmax(0, 1fr);
+            align-items: center;
+            width: 100%;
+            min-height: 60px;
+            margin: 0 0 10px 0;
+            padding: 8px 24px;
+            border: 1px solid #eee;
+            background: #fafafa;
+            color: #333;
+            cursor: pointer;
+        }
+        .battle-spectate-match:hover {
+            background: #fff3e4;
+            border-color: #ffd29a;
+        }
+        .battle-spectate-name {
+            font-size: 13px;
+            font-weight: 700;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .battle-spectate-left {
+            text-align: right;
+            padding-right: 8px;
+        }
+        .battle-spectate-right {
+            text-align: left;
+            padding-left: 8px;
+        }
+        .battle-spectate-score {
+            text-align: center;
+            font-size: 18px;
+            font-weight: 700;
+        }
+        .battle-spectate-meta {
+            grid-column: 1 / 4;
+            margin-top: 4px;
+            text-align: center;
+            color: #999;
+            font-size: 12px;
+            font-weight: 700;
+        }
+        .battle-spectate-actions {
+            padding: 0 16px 16px;
+        }
         #matchResultDialog.fade-in {
             animation: matchResultFadeIn .35s ease forwards;
         }
@@ -1899,10 +1986,11 @@
             <div id="tournament-buttons">
                 <button class="tournament-btn" type="button" data-tournament="1v1">Battle 1v1</button>
                 <button class="tournament-btn" type="button" data-tournament="2v2">Battle 2v2</button>
+                <button id="battleSpectateBtn" class="tournament-btn" type="button">Spectate</button>
             </div>
             <div id="mode-buttons">
-                <button class="mode-btn" type="button" data-mode="hc" data-server="bubbleam.site/hc" data-alt-server="bubbleam.site/hc">Hardcore</button>
-                <button class="mode-btn" type="button" data-mode="ms" data-server="bubbleam.site/hc2">x5</button>
+                <button class="mode-btn" type="button" data-mode="hardcore">Hardcore</button>
+                <button class="mode-btn" type="button" data-mode="x5">x5</button>
             </div>
             <div id="locationUnknown">
                 <script>connect();</script>
@@ -2433,13 +2521,6 @@
                     <span><i class="glyphicon glyphicon-cog"></i> Settings</span>
                 </div>
                 <div class="battle-settings-row"><span>Mode</span><strong id="battleLobbyMode">1 vs 1</strong></div>
-                <div class="battle-settings-row">
-                    <span>Battle Type</span>
-                    <strong>
-                        <button class="btn btn-xs btn-danger battle-type-btn" type="button" data-battle-type="1v1">1v1</button>
-                        <button class="btn btn-xs btn-default battle-type-btn" type="button" data-battle-type="2v2">2v2</button>
-                    </strong>
-                </div>
                 <div class="battle-settings-row"><span>Region</span><strong id="battleLobbyRegion">Ocenia</strong></div>
                 <div class="battle-settings-row"><span>Queue</span><strong>~1 minute</strong></div>
                 <div class="battle-settings-row"><span>Status</span><strong id="battleLobbyStatus">Waiting for start</strong></div>
@@ -2474,6 +2555,18 @@
                     <a id="battleInviteAllLink" href="#" class="battle-invite-link">Send invitation to all players</a>
                 </div>
             </section>
+        </div>
+    </div>
+    <div id="battleSpectateDialog">
+        <div class="battle-lobby-header">
+            <h2>Battle Spectate</h2>
+            <button id="battleSpectateClose" class="battle-lobby-close" type="button" aria-label="Close">&times;</button>
+        </div>
+        <div id="battleSpectateList" class="battle-spectate-list">
+            <div class="battle-spectate-empty">No active battles to spectate.</div>
+        </div>
+        <div class="battle-spectate-actions">
+            <button id="battleLeaveSpectate" type="button" class="btn btn-warning btn-block" style="display:none">Leave Spectate</button>
         </div>
     </div>
 </div>
@@ -2597,17 +2690,27 @@
             });
         }
 
+        function isActiveGameSession() {
+            return !!(window.isGameSessionActive && window.isGameSessionActive());
+        }
+
         function applyLoggedInUser(user) {
             var hadPremium = currentUser && String(currentUser.accountType || '').toLowerCase() == 'premium';
+            var keepCurrentNick = isActiveGameSession();
             currentUser = user;
             localStorage.setItem('loginName', user.username);
-            localStorage.setItem('nick', user.username);
+            if (!keepCurrentNick) {
+                localStorage.setItem('nick', user.username);
+            }
             localStorage.setItem('accountType', user.accountType || 'Free');
             localStorage.setItem('adminRole', user.adminRole || user.role || '');
             localStorage.setItem('registerEmail', user.email);
             localStorage.setItem('guildTag', user.guild || '');
 
-            $('#nick').val(user.username).prop('readonly', true);
+            if (!keepCurrentNick) {
+                $('#nick').val(user.username);
+            }
+            $('#nick').prop('readonly', true);
             $('#loginName').val(user.username);
             $('#loginLink, .account-menu-link').text('Account');
             $('#profileUsername').text(user.username);
@@ -2792,7 +2895,8 @@
             $('#accountDialog').removeClass('account-open');
             $('#uploadSkinDialog').removeClass('upload-open');
             $('#friendsDialog').removeClass('friend-side-open');
-            $('#notificationDialog, #friendRequestDialog, #guildDialog, #guildCreateDialog, #highScoreDialog, #playerSearchDialog, #changePasswordDialog, #matchResultDialog, #battleCreateDialog').removeClass('spa-open');
+            $('#notificationDialog, #friendRequestDialog, #guildDialog, #guildCreateDialog, #highScoreDialog, #playerSearchDialog, #changePasswordDialog, #matchResultDialog, #battleCreateDialog, #battleSpectateDialog').removeClass('spa-open');
+            stopBattleSpectateRefresh();
             closeCommunityDropup(true);
         }
 
@@ -2818,7 +2922,7 @@
         function updateFooterActiveFromVisible() {
             if ($('#communityDropup').hasClass('is-open') || $('#friendsDialog').hasClass('friend-side-open') || $('#notificationDialog, #friendRequestDialog, #guildDialog, #guildCreateDialog, #highScoreDialog, #playerSearchDialog').hasClass('spa-open')) {
                 setFooterActive('community');
-            } else if ($('#matchResultDialog, #battleCreateDialog').hasClass('spa-open')) {
+            } else if ($('#matchResultDialog, #battleCreateDialog, #battleSpectateDialog').hasClass('spa-open')) {
                 setFooterActive('home');
             } else if ($('#loginDialog, #registerInfoDialog, #registerDialog, #forgotDialog, #accountDialog, #changePasswordDialog, #uploadSkinDialog').filter(function() {
                 return $(this).hasClass('login-open') || $(this).hasClass('register-info-open') || $(this).hasClass('register-open') || $(this).hasClass('forgot-open') || $(this).hasClass('account-open') || $(this).hasClass('spa-open') || $(this).hasClass('upload-open');
@@ -3493,18 +3597,29 @@
                     skins.appendTo(content);
                 }
 
-                var actions = $('<div class="player-profile-actions"></div>');
-                $('<button id="playerAddFriendButton" type="button" class="btn btn-success btn-block"></button>')
-                    .attr('data-player-name', player.name || '')
-                    .text('Send Friend Request')
-                    .appendTo(actions);
-                $('<div id="playerAddFriendStatus" class="player-profile-status"></div>').appendTo(actions);
-                actions.appendTo(content);
                 return;
             }
 
             var rows = playerProfileTab == 'top1' ? data.top1 :
                 (playerProfileTab == 'battle2v2' ? data.battle2v2 : data.battle1v1);
+            var battleStats = playerProfileTab == 'battle2v2' ? data.battle2v2Stats :
+                (playerProfileTab == 'battle1v1' ? data.battle1v1Stats : null);
+
+            if (battleStats) {
+                var summary = $('<div class="player-profile-row"></div>');
+                $('<div class="player-profile-label"></div>').text('Stats:').appendTo(summary);
+                $('<div class="player-profile-value"></div>')
+                    .text(
+                        'Match ' + Number(battleStats.totalMatches || 0) +
+                        ' | W ' + Number(battleStats.wins || 0) +
+                        ' / L ' + Number(battleStats.losses || 0) +
+                        ' | K ' + Number(battleStats.kills || 0) +
+                        ' / D ' + Number(battleStats.deaths || 0) +
+                        ' | WR ' + Number(battleStats.winrate || 0) + '%'
+                    )
+                    .appendTo(summary);
+                summary.appendTo(content);
+            }
 
             rows = Array.isArray(rows) ? rows : [];
             if (!rows.length) {
@@ -3517,7 +3632,12 @@
                 $('<div class="player-history-age"></div>').text(formatRelativeTime(row.createdAt)).appendTo(item);
                 $('<div class="player-history-server"></div>').text(row.server || '-').appendTo(item);
                 $('<div class="player-history-time"></div>')
-                    .text(playerProfileTab == 'top1' ? formatHighscoreTime(row.top1Time) : (row.result || formatHighscoreTime(row.duration)))
+                    .text(playerProfileTab == 'top1' ? formatHighscoreTime(row.top1Time) :
+                        ((row.result || '-').toUpperCase() +
+                        (row.score ? ' ' + row.score : '') +
+                        ' | K ' + Number(row.kills || 0) +
+                        ' / D ' + Number(row.deaths || 0) +
+                        ' | ' + formatHighscoreTime(row.duration)))
                     .appendTo(item);
                 item.appendTo(content);
             });
@@ -3885,7 +4005,11 @@
         };
 
         function getSelectedFfaVariant() {
-            return $('.mode-btn.active').attr('data-mode') || '';
+            return normalizeFfaVariant($('.mode-btn.active').attr('data-mode') || '');
+        }
+
+        function normalizeFfaVariant(mode) {
+            return String(mode || '');
         }
 
         function getSelectedTournamentMode() {
@@ -3895,11 +4019,11 @@
         function getFfaGameMode() {
             var ffaVariant = getSelectedFfaVariant();
 
-            if (ffaVariant == 'hc') {
+            if (ffaVariant == 'hardcore') {
                 return ':hardcore';
             }
 
-            if (ffaVariant == 'ms') {
+            if (ffaVariant == 'x5') {
                 return ':x5';
             }
 
@@ -3982,20 +4106,72 @@
             $('#battleLobbyStatus').text(battleBlocked ? 'Battle sedang ditutup sementara' : 'Waiting for start');
             $('#battleCreateStart').prop('disabled', battleBlocked);
             $('#battleCreateStart').data('tournament', tournamentMode);
-            $('.battle-type-btn').removeClass('btn-danger').addClass('btn-default');
-            $('.battle-type-btn[data-battle-type="' + tournamentMode + '"]').removeClass('btn-default').addClass('btn-danger');
-            console.log("[SHOW_BATTLE_LOBBY]");
-            console.log("[BATTLE_LOBBY_STATE]", 'idle', tournamentMode);
             showNavigationOverlay();
             $('#battleCreateDialog').addClass('spa-open');
             setFooterActive('home');
+        }
+
+        var battleSpectateTimer = null;
+        function stopBattleSpectateRefresh() {
+            if (battleSpectateTimer) {
+                clearInterval(battleSpectateTimer);
+                battleSpectateTimer = null;
+            }
+        }
+
+        function renderBattleSpectateMatches(matches) {
+            var list = $('#battleSpectateList').empty();
+            matches = Array.isArray(matches) ? matches : [];
+            if (!matches.length) {
+                $('<div class="battle-spectate-empty"></div>').text('No active battles to spectate.').appendTo(list);
+                return;
+            }
+
+            matches.forEach(function(match) {
+                var row = $('<button type="button" class="battle-spectate-match"></button>')
+                    .attr('data-match-id', match.id || '');
+                $('<div class="battle-spectate-name battle-spectate-left"></div>').text(match.leftName || 'Player').appendTo(row);
+                $('<div class="battle-spectate-score"></div>').text((match.leftScore || 0) + ' : ' + (match.rightScore || 0)).appendTo(row);
+                $('<div class="battle-spectate-name battle-spectate-right"></div>').text(match.rightName || 'Player').appendTo(row);
+                $('<div class="battle-spectate-meta"></div>').text((match.status || 'Round 1') + '  ' + (match.elapsed || '00:00')).appendTo(row);
+                row.appendTo(list);
+            });
+        }
+
+        function loadBattleSpectateMatches() {
+            $.ajax({
+                dataType: 'json',
+                url: '/api/battle/matches',
+                cache: false
+            }).done(function(result) {
+                renderBattleSpectateMatches(result && result.matches || []);
+            }).fail(function() {
+                renderBattleSpectateMatches([]);
+            });
+        }
+
+        function showBattleSpectateDialog() {
+            stopBattleSpectateRefresh();
+            $('#battleSpectateDialog').removeClass('spa-open');
+            $('#battleLeaveSpectate').toggle(!!(window.isSpectating));
+            showNavigationOverlay();
+            $('#battleSpectateDialog').addClass('spa-open');
+            setFooterActive('home');
+            loadBattleSpectateMatches();
+            stopBattleSpectateRefresh();
+            battleSpectateTimer = setInterval(function() {
+                if ($('#battleSpectateDialog').hasClass('spa-open')) {
+                    loadBattleSpectateMatches();
+                } else {
+                    stopBattleSpectateRefresh();
+                }
+            }, 1000);
         }
 
         function playOrResumeGame() {
             var nick = $('#nick').val();
             var selectedGameMode = getSelectedGameMode();
             localStorage.setItem('nick', nick);
-            console.log("[PLAY_CLICK]", selectedGameMode);
 
             if (selectedGameMode == ':tournament') {
                 if (!requireLoginForBattle()) {
@@ -4057,9 +4233,9 @@
 
             $('#gamemode').val('');
             if (mode == ':hardcore') {
-                syncModeButtons('hc');
+                syncModeButtons('hardcore');
             } else if (mode == ':x5') {
-                syncModeButtons('ms');
+                syncModeButtons('x5');
             } else {
                 syncModeButtons('', true);
             }
@@ -4115,6 +4291,7 @@
             }
         });
         function syncModeButtons(selectedMode, resetSelection) {
+            selectedMode = normalizeFfaVariant(selectedMode);
             var gameMode = $('#gamemode').val();
             var isFfaMode = gameMode == '';
             var isBattleMode = gameMode == ':tournament';
@@ -4151,26 +4328,54 @@
         $('.mode-btn').on('click', function(e) {
             e.preventDefault();
             $('#gamemode').val('');
-            syncModeButtons($(this).attr('data-mode') || 'hc');
+            syncModeButtons($(this).attr('data-mode') || 'hardcore');
         });
         $('.tournament-btn').on('click', function(e) {
+            if (this.id == 'battleSpectateBtn') {
+                return;
+            }
             e.preventDefault();
             var tournamentMode = $(this).attr('data-tournament') || '1v1';
             $('#gamemode').val(':tournament');
             syncModeButtons(tournamentMode);
         });
-        $('.battle-type-btn').on('click', function(e) {
+        $('#battleSpectateBtn').on('click', function(e) {
             e.preventDefault();
-            var tournamentMode = $(this).attr('data-battle-type') || '1v1';
-            localStorage.setItem('tournamentMode', tournamentMode);
-            $('#battleCreateStart').data('tournament', tournamentMode);
-            showBattleCreateDialog(tournamentMode);
+            $('#gamemode').val(':tournament');
+            showBattleSpectateDialog();
+        });
+        $('#battleSpectateClose').on('click', function(e) {
+            e.preventDefault();
+            stopBattleSpectateRefresh();
+            showHomeDialog();
+            $('#gamemode').val(':tournament');
+            syncModeButtons(getSelectedTournamentMode());
+        });
+        $('#battleSpectateList').on('click', '.battle-spectate-match', function(e) {
+            e.preventDefault();
+            var matchId = $(this).attr('data-match-id') || '';
+            if (!matchId || !window.spectateBattleMatch) {
+                return;
+            }
+            stopBattleSpectateRefresh();
+            $('#battleSpectateList').html('<div class="battle-spectate-empty">Spectating Match...</div>');
+            window.spectateBattleMatch(matchId);
+        });
+        $('#battleLeaveSpectate').on('click', function(e) {
+            e.preventDefault();
+            if (window.leaveBattleSpectate) {
+                window.leaveBattleSpectate();
+            }
+            stopBattleSpectateRefresh();
+            showHomeDialog();
+            $('#gamemode').val(':tournament');
+            syncModeButtons(getSelectedTournamentMode());
         });
         $('#gamemode').on('change', function() {
             syncModeButtons(null, true);
         });
         $('#gamemode').val('');
-        syncModeButtons('hc');
+        syncModeButtons('hardcore');
         $('#battleCreateStart').on('click', function(e) {
             e.preventDefault();
             if (!requireLoginForBattle()) {
@@ -4179,16 +4384,14 @@
             var nick = $('#nick').val();
             localStorage.setItem('nick', nick);
             var tournamentMode = $('#battleCreateStart').data('tournament') || getSelectedTournamentMode();
-            console.log("[BATTLE_START_CLICK]", tournamentMode);
             if (isBattleModeBlocked()) {
                 $('#battleLobbyStatus').text('Battle sedang ditutup sementara');
                 $('#battleCreateStart').prop('disabled', true);
                 return;
             }
-            $('#battleLobbyStatus').text('Waiting for Players...');
+            $('#battleLobbyStatus').text('finding a game');
             $('#battleLobbyPlayersTitle').text(tournamentMode == '2v2' ? 'Players 1/4' : 'Players 1/2');
             $('#battleCreateStart').prop('disabled', true);
-            console.log("[BATTLE_LOBBY_STATE]", 'finding', tournamentMode);
             if (window.joinBattleQueue) {
                 window.joinBattleQueue(tournamentMode, nick);
             } else {
@@ -4446,11 +4649,6 @@
             e.preventDefault();
             searchPlayerProfile($('#playerSearchInput').val());
         });
-        $('#playerProfileContent').on('click', '#playerAddFriendButton', function(e) {
-            e.preventDefault();
-            var playerName = $(this).attr('data-player-name') || 'player';
-            sendFriendRequest(playerName, '#playerAddFriendStatus', this);
-        });
         $('#friendRequestsList').on('click', '.friend-accept, .friend-decline', function(e) {
             e.preventDefault();
             var button = $(this);
@@ -4679,9 +4877,12 @@
         });
         $('#logoutLink').on('click', function(e) {
             e.preventDefault();
+            var keepCurrentNick = isActiveGameSession();
             localStorage.removeItem('authToken');
             localStorage.removeItem('loginName');
-            localStorage.removeItem('nick');
+            if (!keepCurrentNick) {
+                localStorage.removeItem('nick');
+            }
             localStorage.removeItem('registerEmail');
             localStorage.removeItem('cellColor');
             if (window.clearAccountSession) {

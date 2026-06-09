@@ -17,7 +17,7 @@ UpdateNodes.prototype.build = function() {
             continue;
         }
 
-        var skinUrl = node.owner && node.owner.skinUrl ? String(node.owner.skinUrl) : "";
+        var skinUrl = node.skinUrl ? String(node.skinUrl) : "";
         nodesLength = nodesLength + 18 + (node.getName().length * 2) + (skinUrl.length * 2);
     }
     
@@ -82,7 +82,7 @@ UpdateNodes.prototype.build = function() {
         view.setUint16(offset, 0, true); // End of string
         offset += 2;
 
-        var skinUrl = node.owner && node.owner.skinUrl ? String(node.owner.skinUrl) : "";
+        var skinUrl = node.skinUrl ? String(node.skinUrl) : "";
         if (skinUrl) {
             for (var j = 0; j < skinUrl.length; j++) {
                 var c = skinUrl.charCodeAt(j);

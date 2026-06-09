@@ -95,6 +95,22 @@ PacketHandler.prototype.handleMessage = function(message) {
 
             this.joinBattleQueue(queueMode);
             break;
+        case 108:
+            var spectateMatchId = "";
+            for (var i = 1; i + 1 < view.byteLength; i += 2) {
+                var charCode = view.getUint16(i, true);
+                if (charCode == 0) {
+                    break;
+                }
+
+                spectateMatchId += String.fromCharCode(charCode);
+            }
+
+            this.joinBattleSpectate(spectateMatchId);
+            break;
+        case 109:
+            this.leaveBattleSpectate();
+            break;
         case 0:
             // Set Nickname
             var nick = "";
@@ -489,8 +505,7 @@ PacketHandler.prototype.handlePointCommand = function(message) {
     var adminName = (admin && (admin.authUsername || (admin.getName && admin.getName()))) || 'Unknown';
 
     if (!this.isPointAdmin(admin)) {
-        console.log('[ADMIN POINT] Unauthorized attempt by %s.', adminName);
-        this.sendPrivateSystemMessage('[POINT] You do not have permission to use this command.');
+                this.sendPrivateSystemMessage('[POINT] You do not have permission to use this command.');
         return;
     }
 
@@ -507,8 +522,7 @@ PacketHandler.prototype.handlePointCommand = function(message) {
 
     if (!Auth.grantPointsByUsername) {
         this.sendPrivateSystemMessage('[POINT] Failed to update Points.');
-        console.log('[ADMIN POINT] Point command unavailable for %s.', adminName);
-        return;
+                return;
     }
 
     Auth.grantPointsByUsername(parsed.targetName, parsed.amount, 'admin command by ' + adminName)
@@ -531,12 +545,10 @@ PacketHandler.prototype.handlePointCommand = function(message) {
                 this.sendPrivateSystemMessage('You received ' + amountText + ' Points from admin.', onlineSockets[i]);
             }
 
-            console.log('[ADMIN POINT] %s added %s Points to %s. Current Points: %s', adminName, amountText, target.username, pointsText);
-        }.bind(this))
+                    }.bind(this))
         .catch(function(error) {
             this.sendPrivateSystemMessage('[POINT] Failed to update Points.');
-            console.log('[ADMIN POINT] Failed for %s: %s', adminName, error && error.message ? error.message : error);
-        }.bind(this));
+                    }.bind(this));
 }
 
 PacketHandler.prototype.applyCellColor = function(color) {
@@ -548,6 +560,10 @@ PacketHandler.prototype.applyCellColor = function(color) {
     }
 
     client.cellColor = color;
+    if (client.gameServer && String(client.gameServer.roomName || '').indexOf('BattleMatch-') === 0) {
+        return;
+    }
+
     if (client.gameServer && client.gameServer.gameMode && client.gameServer.gameMode.haveTeams) {
         if (client.gameServer.gameMode.applyTeamColor) {
             var teamColor = client.gameServer.gameMode.applyTeamColor(client);
@@ -561,12 +577,6 @@ PacketHandler.prototype.applyCellColor = function(color) {
     }
 
     client.setColor(rgb);
-
-    for (var i = 0; i < client.cells.length; i++) {
-        if (client.cells[i] && client.cells[i].setColor) {
-            client.cells[i].setColor(rgb);
-        }
-    }
 }
 
 PacketHandler.prototype.setAuthToken = function(token) {
@@ -603,11 +613,9 @@ PacketHandler.prototype.setAuthToken = function(token) {
             client.skinUrl = Auth.getActiveSkinUrl(user) || null;
             client.lastPassiveXpTime = Date.now();
             this.applyCellColor(Auth.normalizeCellColor(user.cellColor));
-            console.log("[Auth] Bound player %s to account %s", client.getName() || "(no nick)", user.username);
-        }.bind(this))
+                    }.bind(this))
         .catch(function(error) {
-            console.log("[Auth] Token bind failed:", error && error.message ? error.message : error);
-        })
+                    })
         .then(function() {
             client.authPending = null;
         });
@@ -649,6 +657,24 @@ PacketHandler.prototype.joinBattleQueue = function(mode) {
     }
 
     this.gameServer.joinBattleQueue(this.socket, mode);
+}
+
+PacketHandler.prototype.joinBattleSpectate = function(matchId) {
+    var hub = this.gameServer && this.gameServer.getHub ? this.gameServer.getHub() : this.gameServer;
+    if (!hub || !hub.joinBattleSpectate) {
+        return;
+    }
+
+    hub.joinBattleSpectate(this.socket, String(matchId || ''));
+}
+
+PacketHandler.prototype.leaveBattleSpectate = function() {
+    var hub = this.gameServer && this.gameServer.getHub ? this.gameServer.getHub() : this.gameServer;
+    if (!hub || !hub.leaveBattleSpectate) {
+        return;
+    }
+
+    hub.leaveBattleSpectate(this.socket);
 }
 
 PacketHandler.prototype.setNickname = function(newNick) {
