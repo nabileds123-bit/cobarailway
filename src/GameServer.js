@@ -76,12 +76,12 @@ function GameServer(mult, prt, gamemodeId) {
         playerMinMassEject: 32, // Mass required to eject a cell
         playerMinMassSplit: 36, // Mass required to split
         playerMaxCells: 16, // Max cells the player is allowed to have
-        playerSplitSpeedBase: 50, // Base speed for player split boost
-        playerSplitSpeedMultiplier: 5, // Mouse speed influence for split boost
-        playerSplitMinSpeed: 90, // Minimum split boost speed
-        playerSplitMaxSpeed: 125, // Maximum split boost speed
-        playerSplitMoveTicks: 10, // Amount of ticks split cells keep boost
-        playerSplitDecay: 0.82, // Split boost decay
+        playerSplitSpeedBase: 15, // Base speed for player split boost
+        playerSplitSpeedMultiplier: 1.5, // Mouse speed influence for split boost
+        playerSplitMinSpeed: 15, // Minimum split boost speed
+        playerSplitMaxSpeed: 50, // Maximum split boost speed
+        playerSplitMoveTicks: 20, // Amount of ticks split cells keep boost
+        playerSplitDecay: 0.72, // Split boost decay
         playerSplitCooldownMs: 80, // Minimum time between split commands per player
         playerEjectCooldown: 120, // Minimum time between eject mass commands per player (milliseconds)
         playerEjectDebugLog: 1, // Logs manual W vs hold E eject/packet rate once per second
@@ -1497,19 +1497,17 @@ GameServer.prototype.updateMoveEngine = function() {
         }
     }
     // A system to move cells not controlled by players (ex. viruses, ejected mass)
-    len = this.movingNodes.length;
+    var movingSnapshot = this.movingNodes.slice(0);
+    var processedMovingNodes = [];
+    len = movingSnapshot.length;
     for (var i = 0; i < len; i++) {
-        var check = this.movingNodes[i];
-        
-        // Recycle unused nodes
-        while ((typeof check == "undefined") && (i < this.movingNodes.length)) {
-            // Remove moving cells that are undefined
-            this.movingNodes.splice(i, 1);
-            check = this.movingNodes[i];
-        } if (i >= this.movingNodes.length) {
+        var check = movingSnapshot[i];
+
+        if (!check || this.movingNodes.indexOf(check) == -1) {
             continue;
         }
-        
+
+        processedMovingNodes.push(check);
         if (check.getMoveTicks() > 0) {
             // If the cell has enough move ticks, then move it
             check.calcMovePhys(this.config);
@@ -1532,6 +1530,18 @@ GameServer.prototype.updateMoveEngine = function() {
                 this.movingNodes.splice(index, 1);
             }
         }
+    }
+
+    // Proses node baru yang muncul saat loop berjalan, termasuk pecahan virus split.
+    // Jangan pakai indeks panjang awal karena removeNode() bisa menggeser movingNodes.
+    for (var j = 0; j < this.movingNodes.length; j++) {
+        var newNode = this.movingNodes[j];
+        if (!newNode || processedMovingNodes.indexOf(newNode) != -1 || newNode.getMoveTicks() <= 0) continue;
+        if (newNode.skipFirstMovingPass) {
+            newNode.skipFirstMovingPass = false;
+            continue;
+        }
+        newNode.calcMovePhys(this.config);
     }
 }
 
@@ -1563,6 +1573,12 @@ GameServer.prototype.splitCells = function(client) {
         var angle = Math.atan2(deltaX, deltaY);
 
         var newMass = cell.mass / 2;
+
+        // Hitung splitSpeed dari total mass SEBELUM dibagi, dengan batas bawah
+        // agar split cell besar tidak langsung kehilangan dorongan.
+        var splitSpeed = Math.max(35, 160 * Math.pow(cell.mass, -0.110));
+        var sizeBeforeSplit = cell.getSize();
+
         cell.mass = newMass;
         cell.calcMergeTime(this.config.playerRecombineTime);
 
@@ -1571,7 +1587,8 @@ GameServer.prototype.splitCells = function(client) {
         var holdBattleSplit = this.gameMode && this.gameMode.name == "Tournament" &&
             this.gameMode.gamePhase == 1 &&
             String(this.roomName || '').indexOf('BattleMatch-') === 0;
-        var splitOffset = holdBattleSplit ? Math.max(8, Math.min(24, size * 0.18)) : (size + this.config.ejectMass);
+        // Batasi offset spawn agar cell besar tidak terlihat teleport terlalu jauh.
+        var splitOffset = holdBattleSplit ? Math.max(8, Math.min(24, size * 0.18)) : Math.min(sizeBeforeSplit * 0.75, 140);
         var startPos = {
             x: cell.position.x + (splitOffset * Math.sin(angle)),
             y: cell.position.y + (splitOffset * Math.cos(angle))
@@ -1582,16 +1599,11 @@ GameServer.prototype.splitCells = function(client) {
         split.skinUrl = cell.skinUrl || "";
         split.setColor(cell.getColor());
 
-        var splitSpeed = Number(this.config.playerSplitSpeedBase) + (cell.getSpeed() * Number(this.config.playerSplitSpeedMultiplier));
-        var minSplitSpeed = Number(this.config.playerSplitMinSpeed);
-        var maxSplitSpeed = Number(this.config.playerSplitMaxSpeed);
+        // (splitSpeed sudah dihitung di atas dari total mass)
         var splitMoveTicks = Number(this.config.playerSplitMoveTicks);
         var splitDecay = Number(this.config.playerSplitDecay);
-        if (isNaN(splitSpeed)) splitSpeed = 50 + (cell.getSpeed() * 5);
-        if (!isNaN(minSplitSpeed)) splitSpeed = Math.max(splitSpeed, minSplitSpeed);
-        if (!isNaN(maxSplitSpeed)) splitSpeed = Math.min(splitSpeed, maxSplitSpeed);
-        if (isNaN(splitMoveTicks)) splitMoveTicks = 25;
-        if (isNaN(splitDecay)) splitDecay = 0.75;
+        if (isNaN(splitMoveTicks)) splitMoveTicks = 13;
+        if (isNaN(splitDecay)) splitDecay = 0.72;
 
         if (holdBattleSplit) {
             split.pendingBattleSplitBoost = {
@@ -1679,24 +1691,36 @@ GameServer.prototype.ejectMass = function(client) {
 }
 
 GameServer.prototype.newCellVirused = function(client, parent, angle, mass, speed) {
-    // Starting position
+    // Offset spawn lebih besar agar tidak mulai terlalu dekat parent
+    var spawnOffset = Math.min(parent.getSize() * 0.3, 60);
     var startPos = {
-        x: parent.position.x, 
-        y: parent.position.y
+        x: parent.position.x + (spawnOffset * Math.sin(angle)),
+        y: parent.position.y + (spawnOffset * Math.cos(angle))
     };
-    
+
     // Create cell
     newCell = new Entity.PlayerCell(this.getNextNodeId(), client, startPos, mass);
     newCell.skinUrl = parent.skinUrl || "";
     newCell.setColor(parent.getColor());
     newCell.setAngle(angle);
-    newCell.setMoveEngineData(speed, 8);
+    newCell.setMoveEngineData(speed, 10, 0.80);
     newCell.calcMergeTime(this.config.playerRecombineTime);
     newCell.setCollisionOff(true); // Turn off collision
-    
-    // Add to moving cells list
+    newCell.calcMovePhys(this.config);
+    newCell.skipFirstMovingPass = true;
+
+    // Add to nodes dan moving list
+    // Posisi awal sudah digerakkan sekali agar pecahan langsung terlihat menyebar.
     this.addNode(newCell);
     this.setAsMovingNode(newCell);
+
+    // Inject ke forceInjectNodes agar masuk visibleNodes di tick ini via merge
+    if (client) {
+        if (!client.forceInjectNodes) client.forceInjectNodes = [];
+        client.forceInjectNodes.push(newCell);
+        client.forceViewUpdate = true;
+        client.tickViewBox = 0;
+    }
 }
 
 GameServer.prototype.shootVirus = function(parent) {

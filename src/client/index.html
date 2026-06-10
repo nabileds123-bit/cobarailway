@@ -318,6 +318,34 @@
             font-weight: bold;
             text-shadow: 0 1px 2px rgba(0,0,0,.65);
         }
+        #chat_selectable {
+            position: absolute;
+            left: 4px;
+            bottom: 44px;
+            z-index: 1000;
+            display: none;
+            width: 315px;
+            height: 450px;
+            max-height: 450px;
+            overflow: hidden;
+            padding: 6px;
+            color: #DDDDDD;
+            font-family: Helvetica, Arial, sans-serif;
+            font-size: 14px;
+            font-weight: 700;
+            line-height: 18px;
+            text-shadow: 0 1px 2px rgba(0,0,0,.75);
+            pointer-events: auto;
+            user-select: text;
+            -webkit-user-select: text;
+        }
+        #chat_selectable .chat-line {
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        }
+        #chat_selectable .chat-name {
+            margin-right: 2px;
+        }
         #top1OverlayTimer {
             position: absolute;
             top: 14px;
@@ -2585,6 +2613,7 @@
 </div>
 <canvas id="canvas" width="800" height="600"></canvas>
 <div id="chatAccessError">Chat messaging is available for Premium users only. Upgrade your account to start chatting.</div>
+<div id="chat_selectable" aria-label="Chat messages"></div>
 <input type="text" id="chat_textbox" maxlength="200" placeholder="Press enter to chat!"/>
 <div style="font-family:'Ubuntu'">&nbsp;</div>
 <script type="text/javascript">

@@ -35,6 +35,8 @@ function PlayerTracker(gameServer, socket) {
     this.mouse = {x: 0, y: 0};
     this.tickLeaderboard = 0; // 
     this.tickViewBox = 0;
+    this.forceViewUpdate = false; // Flag untuk force visible update saat virus/split
+    this.forceInjectNodes = []; // Cell baru dari virus split yang harus langsung visible
     
     this.team = 0;
     this.spectate = false;
@@ -194,27 +196,36 @@ PlayerTracker.prototype.update = function() {
         }
     }
 
-    // Get visible nodes every 200 ms
-    var nonVisibleNodes = []; // Nodes that are not visible
-    if (this.tickViewBox <= 0) {
+    // Get visible nodes
+    var nonVisibleNodes = [];
+    if (this.tickViewBox <= 0 || this.forceViewUpdate) {
         var newVisible = this.calcViewBox();
-        
-        // Compare and destroy nodes that are not seen
+
+        // Merge: pastikan cell yang di-inject manual (forceInject) tidak hilang
+        if (this.forceViewUpdate && this.forceInjectNodes && this.forceInjectNodes.length > 0) {
+            for (var fi = 0; fi < this.forceInjectNodes.length; fi++) {
+                var fn = this.forceInjectNodes[fi];
+                if (fn && newVisible.indexOf(fn) == -1) {
+                    newVisible.push(fn);
+                }
+            }
+            this.forceInjectNodes = [];
+        }
+
+        // Nodes yang tidak terlihat lagi
         for (var i = 0; i < this.visibleNodes.length; i++) {
-            var index = newVisible.indexOf(this.visibleNodes[i]);
-            if (index == -1) {
-                // Not seen by the client anymore
+            if (newVisible.indexOf(this.visibleNodes[i]) == -1) {
                 nonVisibleNodes.push(this.visibleNodes[i]);
             }
         }
-        
+
         this.visibleNodes = newVisible;
-        // Reset Ticks
+        this.forceViewUpdate = false;
         this.tickViewBox = 4;
     } else {
         this.tickViewBox--;
     }
-    
+
     // Send packet
     this.socket.sendPacket(new Packet.UpdateNodes(this.nodeDestroyQueue.slice(0), this.visibleNodes, nonVisibleNodes));
 

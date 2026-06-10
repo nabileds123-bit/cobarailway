@@ -190,6 +190,15 @@
             isTyping = true;
         };
 
+        var selectableChat = document.getElementById("chat_selectable");
+        if (selectableChat) {
+            ["mousedown", "mousemove", "mouseup", "click", "dblclick", "contextmenu"].forEach(function(eventName) {
+                selectableChat.addEventListener(eventName, function(event) {
+                    event.stopPropagation();
+                });
+            });
+        }
+
         var spacePressed = false,
             qPressed = false,
             wPressed = false,
@@ -1033,10 +1042,49 @@ var TOP1_TIMER_MIN_MS = 60 * 1000;
         return lines;
     }
 
+    function updateSelectableChatBoard() {
+        var chatElement = document.getElementById("chat_selectable");
+        if (!chatElement) return;
+        if (!showChat || chatBoard.length < 1) {
+            chatElement.style.display = "none";
+            chatElement.innerHTML = "";
+            return;
+        }
+
+        chatElement.innerHTML = "";
+        for (var i = 0; i < chatBoard.length; i++) {
+            var entry = chatBoard[i];
+            var line = document.createElement("div");
+            line.className = "chat-line";
+
+            if (entry.system) {
+                line.style.color = "#666666";
+                line.textContent = String(entry.message || "");
+                chatElement.appendChild(line);
+                continue;
+            }
+
+            var name = document.createElement("span");
+            name.className = "chat-name";
+            name.style.color = entry.color || "#FFFFFF";
+            name.textContent = String(entry.name || "") + ":";
+
+            var message = document.createElement("span");
+            message.style.color = entry.messageColor || "#DDDDDD";
+            message.textContent = String(entry.message || "");
+
+            line.appendChild(name);
+            line.appendChild(message);
+            chatElement.appendChild(line);
+        }
+        chatElement.style.display = "block";
+    }
+
     function drawChatBoard() {
         //chatCanvas = null;
         if (!showChat) {
             chatCanvas = null;
+            updateSelectableChatBoard();
             return;
         }
         if (!(0 < canvasWidth) || !(0 < canvasHeight)) {
@@ -1057,8 +1105,10 @@ var TOP1_TIMER_MIN_MS = 60 * 1000;
         }
         if (chatBoard.length < 1) {
             chatCanvas = null;
+            updateSelectableChatBoard();
             return;
         }
+        updateSelectableChatBoard();
 
         chatCanvas = document.createElement("canvas");
         var ctx = chatCanvas.getContext("2d");
@@ -1598,7 +1648,7 @@ var TOP1_TIMER_MIN_MS = 60 * 1000;
         }
         ctx.restore();
         lbCanvas && showLeaderboard && lbCanvas.width && safeDrawImage(ctx, lbCanvas, canvasWidth - lbCanvas.width - 10, 10); // draw Leader Board
-        if (showChat && chatCanvas != null) safeDrawImage(ctx, chatCanvas, 4, canvasHeight - chatCanvas.height - 44); // draw Chat
+        if (showChat && chatCanvas != null && !document.getElementById("chat_selectable")) safeDrawImage(ctx, chatCanvas, 4, canvasHeight - chatCanvas.height - 44); // draw Chat
 
         userScore = Math.max(userScore, calcUserScore());
         updateMatchMassStats();
