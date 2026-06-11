@@ -1336,6 +1336,11 @@ GameServer.prototype.spawnPlayer = function(client) {
               return;
    }
 
+   if (!client.authUserId) {
+       client.spectate = true;
+       return;
+   }
+
    if (this.isBattleRoom(this) && !this.isBattleEnabled()) {
               this.getHub().rejectBattleSocket(client.socket);
        return;

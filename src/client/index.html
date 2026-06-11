@@ -4111,6 +4111,27 @@
             return false;
         }
 
+        function requireLoginForPlay() {
+            if (currentUser) {
+                return true;
+            }
+
+            var nick = $.trim($('#nick').val() || '');
+            closeSpaDialogs();
+            $('#helloDialog').hide();
+            showNavigationOverlay();
+            $('#loginDialog').addClass('login-open');
+            $('#loginName').val(nick);
+            $('#loginStatus')
+                .removeClass('text-success')
+                .addClass('text-danger')
+                .text('Login dulu untuk bermain.')
+                .show();
+            setFooterActive('account');
+            $('#loginName').focus();
+            return false;
+        }
+
         function showBattleCreateDialog(tournamentMode) {
             if (!requireLoginForBattle()) {
                 return;
@@ -4200,6 +4221,10 @@
             var nick = $('#nick').val();
             var selectedGameMode = getSelectedGameMode();
             localStorage.setItem('nick', nick);
+
+            if (!requireLoginForPlay()) {
+                return;
+            }
 
             if (selectedGameMode == ':tournament') {
                 if (!requireLoginForBattle()) {

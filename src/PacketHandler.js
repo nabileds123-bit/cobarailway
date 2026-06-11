@@ -680,6 +680,13 @@ PacketHandler.prototype.leaveBattleSpectate = function() {
 PacketHandler.prototype.setNickname = function(newNick) {
     var client = this.socket.playerTracker;
     var activeServer = client && client.gameServer ? client.gameServer : this.gameServer;
+    if (!client || !client.authUserId) {
+        if (client) {
+            client.spectate = true;
+        }
+        this.sendPrivateSystemMessage('Login required to play.');
+        return;
+    }
     var fakeGuildPrefixRenderBugOffset = 1 + (newNick.length * 2);
     client.fakeGuildPrefixRenderBug = this.lastNicknamePacket && this.lastNicknamePacket.byteLength > fakeGuildPrefixRenderBugOffset ?
         this.lastNicknamePacket.getUint8(fakeGuildPrefixRenderBugOffset) !== 0 :
