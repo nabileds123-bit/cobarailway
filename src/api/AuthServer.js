@@ -13,7 +13,7 @@ var premiumExpiryTimer = null;
 var onlinePlayersProvider = null;
 var BUY_PREMIUM_COST = 2;
 var PREMIUM_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
-var EMAIL_VERIFICATION_REWARD = 152;
+var EMAIL_VERIFICATION_REWARD = 0;
 var UPLOAD_SKIN_COST = 150;
 var CREATE_GUILD_COST = 50;
 var PLAYER_SKIN_UPLOAD_SIZE = 500 * 1024;
@@ -1478,7 +1478,7 @@ function handleVerifyEmail(req, res) {
             var rewardPoints = Number(user.verificationRewardPoints || 0);
             var rewardText = rewardPoints > 0
                 ? '<h2>Congratulations!</h2><p>Your email has been verified.</p><p>You received ' + rewardPoints + ' Points.</p>'
-                : '<h2>Email sudah diverifikasi</h2><p>Akun ini sudah terverifikasi dan reward verifikasi sudah pernah diklaim.</p>';
+                : '<h2>Email sudah diverifikasi</h2><p>Akun ini sudah berhasil diverifikasi.</p>';
             sendHtml(res, 200, rewardText + '<p>Silakan kembali ke game dan login.</p><p><a href="/">Kembali ke Bubble.am</a></p>');
         })
         .catch(function(error) {
