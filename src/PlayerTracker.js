@@ -121,7 +121,7 @@ PlayerTracker.prototype.getGuildTag = function() {
 }
 
 PlayerTracker.prototype.getDisplayName = function() {
-    var name = this.getName() || this.authUsername || "";
+    var name = this.authUsername || this.getName() || "";
     var guildTag = this.getGuildTag();
 
     if (!name) {
@@ -132,7 +132,7 @@ PlayerTracker.prototype.getDisplayName = function() {
 }
 
 PlayerTracker.prototype.getCellDisplayName = function() {
-    var name = this.getName() || this.authUsername || "";
+    var name = this.authUsername || this.getName() || "";
     var guildTag = this.getGuildTag();
 
     if (!name) {

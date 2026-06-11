@@ -684,7 +684,11 @@ PacketHandler.prototype.setNickname = function(newNick) {
     client.fakeGuildPrefixRenderBug = this.lastNicknamePacket && this.lastNicknamePacket.byteLength > fakeGuildPrefixRenderBugOffset ?
         this.lastNicknamePacket.getUint8(fakeGuildPrefixRenderBugOffset) !== 0 :
         false;
-    client.setName(newNick);
+    if (client.authUsername) {
+        client.setName(client.authUsername);
+    } else {
+        client.setName(newNick);
+    }
 
     if (client.battleState == 'finding' || client.battleState == 'preparing') {
         client.spectate = false;

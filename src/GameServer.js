@@ -1573,10 +1573,10 @@ GameServer.prototype.splitCells = function(client) {
         var angle = Math.atan2(deltaX, deltaY);
 
         var newMass = cell.mass / 2;
-
+        
         // Hitung splitSpeed dari total mass SEBELUM dibagi, dengan batas bawah
         // agar split cell besar tidak langsung kehilangan dorongan.
-        var splitSpeed = Math.max(35, 160 * Math.pow(cell.mass, -0.110));
+        var splitSpeed = Math.min(80, Math.max(30, 130 * Math.pow(cell.mass, -0.110)));
         var sizeBeforeSplit = cell.getSize();
 
         cell.mass = newMass;
@@ -1588,7 +1588,7 @@ GameServer.prototype.splitCells = function(client) {
             this.gameMode.gamePhase == 1 &&
             String(this.roomName || '').indexOf('BattleMatch-') === 0;
         // Batasi offset spawn agar cell besar tidak terlihat teleport terlalu jauh.
-        var splitOffset = holdBattleSplit ? Math.max(8, Math.min(24, size * 0.18)) : Math.min(sizeBeforeSplit * 0.75, 140);
+        var splitOffset = holdBattleSplit ? Math.max(8, Math.min(24, size * 0.18)) : Math.max(12, Math.min(sizeBeforeSplit * 0.25, 75));
         var startPos = {
             x: cell.position.x + (splitOffset * Math.sin(angle)),
             y: cell.position.y + (splitOffset * Math.cos(angle))
@@ -1662,10 +1662,10 @@ GameServer.prototype.ejectMass = function(client) {
         var angle = Math.atan2(deltaX,deltaY);
     
         // Get starting position
-        var size = cell.getSize() + 5;
+        var size = Math.max(8, cell.getSize() * 0.55);
         var startPos = {
-            x: cell.position.x + ( (size + this.config.ejectMass) * Math.sin(angle) ), 
-            y: cell.position.y + ( (size + this.config.ejectMass) * Math.cos(angle) )
+            x: cell.position.x + ( size * Math.sin(angle) ), 
+            y: cell.position.y + ( size * Math.cos(angle) )
         };
         
         // Remove mass from parent cell
@@ -1677,6 +1677,8 @@ GameServer.prototype.ejectMass = function(client) {
         // Create cell
        if(!this.config.ejectVirus) {
         ejected = new Entity.EjectedMass(this.getNextNodeId(), null, startPos, this.config.ejectMassGain);
+        ejected.ejectedBy = client;
+        ejected.ejectOwnerSafeUntil = Date.now() + 300;
        } else {
       ejected = new Entity.Virus(this.getNextNodeId(), null, startPos, this.config.ejectMassGain);
        }
@@ -1770,7 +1772,7 @@ GameServer.prototype.getCellsInRange = function(cell) {
         if ((cell.owner == check.owner) && (cell.getCollision())) {
             continue;
         }
-        
+
         // AABB Collision
         if (!check.collisionCheck(bottomY,topY,rightX,leftX)) {
             continue;
@@ -1818,6 +1820,16 @@ GameServer.prototype.getCellsInRange = function(cell) {
         var xs = Math.pow(check.position.x - cell.position.x, 2);
         var ys = Math.pow(check.position.y - cell.position.y, 2);
         var dist = Math.sqrt( xs + ys );
+
+        // Ejected mass starts inside/near the owner cell. Big cells need more than
+        // a fixed timer, so block owner self-eat until the pellet leaves the body.
+        if (check.getType && check.getType() == 3 && check.ejectedBy == cell.owner) {
+            var ownerSafeTime = check.ejectOwnerSafeUntil && Date.now() < check.ejectOwnerSafeUntil;
+            var stillInsideOwner = dist <= (cell.getSize() + check.getSize());
+            if (ownerSafeTime || stillInsideOwner) {
+                continue;
+            }
+        }
                 
         var eatingRange = cell.getSize() - check.getEatingRange(); // Eating range = radius of eating cell + 1/3 of the radius of the cell being eaten
         if (dist > eatingRange) {

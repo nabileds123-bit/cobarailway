@@ -18,13 +18,13 @@
     },
     {
       "id": "e45af4f994b7ff83eeb4d0d1",
-      "username": "Epad",
+      "username": "Slowly",
       "email": "121233123@gmail.com",
       "salt": "66087a0bfe1126cbb61445478506b146",
       "passwordHash": "c309a94d7a31bcdb51c5521f4b67b60bdb32250697018ce8a522a47cc2d657662c5884f5167e279d9fabbdf3f8de15deecdffd6d3a60291c9ea549698564b68c",
       "accountType": "Premium",
-      "level": 7,
-      "xp": 1467,
+      "level": 11,
+      "xp": 346,
       "points": 24947.3,
       "guild": "COBA",
       "skinUrl": "",
@@ -32,7 +32,7 @@
       "cellColor": "#6FCA36",
       "emailVerified": 1,
       "verificationToken": "null",
-      "lastLogin": "2026-06-07T22:07:17.009Z",
+      "lastLogin": "2026-06-10T12:54:33.694Z",
       "createdAt": "2026-06-02T18:45:44.942Z",
       "guildName": "cobainaja",
       "guildDescription": "",
@@ -125,6 +125,213 @@
       "verificationToken": "4be67c7a2ddcf687d3c303b18011b2efcead02e52d474b3286765a2bad397dc7",
       "lastLogin": null,
       "createdAt": "2026-06-07T14:57:24.937Z"
+    }
+  ],
+  "highscores": [
+    {
+      "playerId": "e45af4f994b7ff83eeb4d0d1",
+      "playerName": "Slowly",
+      "gameMode": "hardcore",
+      "region": "global",
+      "top1Time": 8065,
+      "updatedAt": "2026-06-10T14:25:41.390Z"
+    }
+  ],
+  "top1History": [
+    {
+      "playerId": "e45af4f994b7ff83eeb4d0d1",
+      "playerName": "Slowly",
+      "gameMode": "hardcore",
+      "region": "global",
+      "server": "Hardcore",
+      "top1Time": 469,
+      "createdAt": "2026-06-09T09:48:01.100Z"
+    },
+    {
+      "playerId": "e45af4f994b7ff83eeb4d0d1",
+      "playerName": "Slowly",
+      "gameMode": "hardcore",
+      "region": "global",
+      "server": "Hardcore",
+      "top1Time": 119,
+      "createdAt": "2026-06-09T22:40:01.465Z"
+    },
+    {
+      "playerId": "e45af4f994b7ff83eeb4d0d1",
+      "playerName": "Slowly",
+      "gameMode": "hardcore",
+      "region": "global",
+      "server": "Hardcore",
+      "top1Time": 185,
+      "createdAt": "2026-06-09T22:48:28.606Z"
+    },
+    {
+      "playerId": "e45af4f994b7ff83eeb4d0d1",
+      "playerName": "Slowly",
+      "gameMode": "hardcore",
+      "region": "global",
+      "server": "Hardcore",
+      "top1Time": 94,
+      "createdAt": "2026-06-09T23:32:12.301Z"
+    },
+    {
+      "playerId": "e45af4f994b7ff83eeb4d0d1",
+      "playerName": "Slowly",
+      "gameMode": "hardcore",
+      "region": "global",
+      "server": "Hardcore",
+      "top1Time": 1046,
+      "createdAt": "2026-06-10T00:04:15.953Z"
+    },
+    {
+      "playerId": "e45af4f994b7ff83eeb4d0d1",
+      "playerName": "Slowly",
+      "gameMode": "hardcore",
+      "region": "global",
+      "server": "Hardcore",
+      "top1Time": 274,
+      "createdAt": "2026-06-10T00:10:10.029Z"
+    },
+    {
+      "playerId": "e45af4f994b7ff83eeb4d0d1",
+      "playerName": "Slowly",
+      "gameMode": "hardcore",
+      "region": "global",
+      "server": "Hardcore",
+      "top1Time": 269,
+      "createdAt": "2026-06-10T00:25:19.009Z"
+    },
+    {
+      "playerId": "e45af4f994b7ff83eeb4d0d1",
+      "playerName": "Slowly",
+      "gameMode": "hardcore",
+      "region": "global",
+      "server": "Hardcore",
+      "top1Time": 161,
+      "createdAt": "2026-06-10T01:08:38.331Z"
+    },
+    {
+      "playerId": "e45af4f994b7ff83eeb4d0d1",
+      "playerName": "Slowly",
+      "gameMode": "hardcore",
+      "region": "global",
+      "server": "Hardcore",
+      "top1Time": 5448,
+      "createdAt": "2026-06-10T14:25:41.390Z"
+    }
+  ],
+  "top1DailyHistory": [
+    {
+      "playerId": "e45af4f994b7ff83eeb4d0d1",
+      "playerName": "Slowly",
+      "gameMode": "hardcore",
+      "region": "global",
+      "server": "Hardcore",
+      "dayDate": "2026-06-09",
+      "top1Time": 469,
+      "updatedAt": "2026-06-09T09:48:01.100Z"
+    },
+    {
+      "playerId": "e45af4f994b7ff83eeb4d0d1",
+      "playerName": "Slowly",
+      "gameMode": "hardcore",
+      "region": "global",
+      "server": "Hardcore",
+      "dayDate": "2026-06-10",
+      "top1Time": 7596,
+      "updatedAt": "2026-06-10T14:25:41.390Z"
+    }
+  ],
+  "guildTop1Sessions": [
+    {
+      "userId": "e45af4f994b7ff83eeb4d0d1",
+      "username": "Slowly",
+      "guildId": null,
+      "guildTag": "COBA",
+      "startedAt": "2026-06-09T09:40:11.639Z",
+      "endedAt": "2026-06-09T09:48:01.099Z",
+      "durationSeconds": 469,
+      "createdAt": "2026-06-09T09:48:01.102Z"
+    },
+    {
+      "userId": "e45af4f994b7ff83eeb4d0d1",
+      "username": "Slowly",
+      "guildId": null,
+      "guildTag": "COBA",
+      "startedAt": "2026-06-09T22:38:02.268Z",
+      "endedAt": "2026-06-09T22:40:01.464Z",
+      "durationSeconds": 119,
+      "createdAt": "2026-06-09T22:40:01.466Z"
+    },
+    {
+      "userId": "e45af4f994b7ff83eeb4d0d1",
+      "username": "Slowly",
+      "guildId": null,
+      "guildTag": "COBA",
+      "startedAt": "2026-06-09T22:45:22.733Z",
+      "endedAt": "2026-06-09T22:48:28.605Z",
+      "durationSeconds": 185,
+      "createdAt": "2026-06-09T22:48:28.607Z"
+    },
+    {
+      "userId": "e45af4f994b7ff83eeb4d0d1",
+      "username": "Slowly",
+      "guildId": null,
+      "guildTag": "COBA",
+      "startedAt": "2026-06-09T23:30:37.698Z",
+      "endedAt": "2026-06-09T23:32:12.299Z",
+      "durationSeconds": 94,
+      "createdAt": "2026-06-09T23:32:12.302Z"
+    },
+    {
+      "userId": "e45af4f994b7ff83eeb4d0d1",
+      "username": "Slowly",
+      "guildId": null,
+      "guildTag": "COBA",
+      "startedAt": "2026-06-09T23:46:49.380Z",
+      "endedAt": "2026-06-10T00:04:15.952Z",
+      "durationSeconds": 1046,
+      "createdAt": "2026-06-10T00:04:15.955Z"
+    },
+    {
+      "userId": "e45af4f994b7ff83eeb4d0d1",
+      "username": "Slowly",
+      "guildId": null,
+      "guildTag": "COBA",
+      "startedAt": "2026-06-10T00:05:35.639Z",
+      "endedAt": "2026-06-10T00:10:10.028Z",
+      "durationSeconds": 274,
+      "createdAt": "2026-06-10T00:10:10.031Z"
+    },
+    {
+      "userId": "e45af4f994b7ff83eeb4d0d1",
+      "username": "Slowly",
+      "guildId": null,
+      "guildTag": "COBA",
+      "startedAt": "2026-06-10T00:20:49.640Z",
+      "endedAt": "2026-06-10T00:25:19.007Z",
+      "durationSeconds": 269,
+      "createdAt": "2026-06-10T00:25:19.013Z"
+    },
+    {
+      "userId": "e45af4f994b7ff83eeb4d0d1",
+      "username": "Slowly",
+      "guildId": null,
+      "guildTag": "COBA",
+      "startedAt": "2026-06-10T01:05:56.870Z",
+      "endedAt": "2026-06-10T01:08:38.330Z",
+      "durationSeconds": 161,
+      "createdAt": "2026-06-10T01:08:38.332Z"
+    },
+    {
+      "userId": "e45af4f994b7ff83eeb4d0d1",
+      "username": "Slowly",
+      "guildId": null,
+      "guildTag": "COBA",
+      "startedAt": "2026-06-10T12:54:52.425Z",
+      "endedAt": "2026-06-10T14:25:41.388Z",
+      "durationSeconds": 5448,
+      "createdAt": "2026-06-10T14:25:41.391Z"
     }
   ]
 }

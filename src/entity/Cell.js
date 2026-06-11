@@ -98,7 +98,7 @@ Cell.prototype.getCollision = function() {
 }
 
 Cell.prototype.getEatingRange = function() {
-    if (this.nodeType == 3) {
+    if (this.cellType == 3) {
         return 0;
     } else {
         return this.getSize() * .35;
