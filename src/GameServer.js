@@ -83,7 +83,7 @@ function GameServer(mult, prt, gamemodeId) {
         playerSplitMoveTicks: 20, // Amount of ticks split cells keep boost
         playerSplitDecay: 0.72, // Split boost decay
         playerSplitCooldownMs: 80, // Minimum time between split commands per player
-        playerEjectCooldown: 120, // Minimum time between eject mass commands per player (milliseconds)
+        playerEjectCooldown: 170, // Minimum time between eject mass commands per player (milliseconds)
         playerEjectDebugLog: 1, // Logs manual W vs hold E eject/packet rate once per second
         playerRecombineTime: 15, // Base amount of ticks before a cell is allowed to recombine (1 tick = 2000 milliseconds)
         playerMassDecayRate: 4, // Amount of mass lost per tick (Multiplier) (1 tick = 2000 milliseconds)
@@ -1661,10 +1661,10 @@ GameServer.prototype.ejectMass = function(client) {
         var deltaX = client.mouse.x - cell.position.x;
         var angle = Math.atan2(deltaX,deltaY);
     
-        // Get starting position just outside the parent cell. Spawning inside
-        // large cells makes the owner re-eat the pellet as soon as it stops.
+        // Spawn near the parent edge without placing the pellet far outside the cell.
+        // This keeps the first client frame close to the parent and avoids a visual pop.
         var ejectSize = Math.sqrt(100 * this.config.ejectMassGain + .25) >> 0;
-        var size = cell.getSize() + ejectSize + 4;
+        var size = cell.getSize() - (ejectSize * .25) + Math.max(10, ejectSize * .45);
         var startPos = {
             x: cell.position.x + ( size * Math.sin(angle) ), 
             y: cell.position.y + ( size * Math.cos(angle) )
@@ -1673,21 +1673,21 @@ GameServer.prototype.ejectMass = function(client) {
         // Remove mass from parent cell
         cell.mass -= this.config.ejectMass;
         
-        // Randomize angle
-        angle += (Math.random() * .5) - .25;
+        // Keep the ejection direction stable so the pellet flows out naturally.
+        angle += (Math.random() * .12) - .06;
         
         // Create cell
        var ejected;
        if(!this.config.ejectVirus) {
         ejected = new Entity.EjectedMass(this.getNextNodeId(), null, startPos, this.config.ejectMassGain);
         ejected.ejectedBy = client;
-        ejected.ejectOwnerSafeUntil = Date.now() + 300;
        } else {
       ejected = new Entity.Virus(this.getNextNodeId(), null, startPos, this.config.ejectMassGain);
-       }
+        }
         ejected.setAngle(angle);
-        ejected.setMoveEngineData(this.config.ejectSpeed, 20);
+        ejected.setMoveEngineData(Math.max(48, this.config.ejectSpeed * .70), 18, .86);
         ejected.setColor(cell.getColor());
+        ejected.skipFirstMovingPass = true;
        
         // Add to moving cells list
         this.addNode(ejected);
@@ -1824,16 +1824,6 @@ GameServer.prototype.getCellsInRange = function(cell) {
         var ys = Math.pow(check.position.y - cell.position.y, 2);
         var dist = Math.sqrt( xs + ys );
 
-        // Ejected mass starts inside/near the owner cell, so block instant
-        // self-eat only while the pellet is fresh or still moving.
-        if (check.getType && check.getType() == 3 && check.ejectedBy == cell.owner) {
-            var ownerSafeTime = check.ejectOwnerSafeUntil && Date.now() < check.ejectOwnerSafeUntil;
-            var stillMoving = check.getMoveTicks && check.getMoveTicks() > 0;
-            if (ownerSafeTime || stillMoving) {
-                continue;
-            }
-        }
-                
         var eatingRange = cell.getSize() - check.getEatingRange(); // Eating range = radius of eating cell + 1/3 of the radius of the cell being eaten
         if (dist > eatingRange) {
             // Not in eating range
