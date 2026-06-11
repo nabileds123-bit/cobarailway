@@ -1661,8 +1661,10 @@ GameServer.prototype.ejectMass = function(client) {
         var deltaX = client.mouse.x - cell.position.x;
         var angle = Math.atan2(deltaX,deltaY);
     
-        // Get starting position
-        var size = Math.max(8, cell.getSize() * 0.55);
+        // Get starting position just outside the parent cell. Spawning inside
+        // large cells makes the owner re-eat the pellet as soon as it stops.
+        var ejectSize = Math.sqrt(100 * this.config.ejectMassGain + .25) >> 0;
+        var size = cell.getSize() + ejectSize + 4;
         var startPos = {
             x: cell.position.x + ( size * Math.sin(angle) ), 
             y: cell.position.y + ( size * Math.cos(angle) )
@@ -1675,6 +1677,7 @@ GameServer.prototype.ejectMass = function(client) {
         angle += (Math.random() * .5) - .25;
         
         // Create cell
+       var ejected;
        if(!this.config.ejectVirus) {
         ejected = new Entity.EjectedMass(this.getNextNodeId(), null, startPos, this.config.ejectMassGain);
         ejected.ejectedBy = client;
@@ -1821,12 +1824,12 @@ GameServer.prototype.getCellsInRange = function(cell) {
         var ys = Math.pow(check.position.y - cell.position.y, 2);
         var dist = Math.sqrt( xs + ys );
 
-        // Ejected mass starts inside/near the owner cell. Big cells need more than
-        // a fixed timer, so block owner self-eat until the pellet leaves the body.
+        // Ejected mass starts inside/near the owner cell, so block instant
+        // self-eat only while the pellet is fresh or still moving.
         if (check.getType && check.getType() == 3 && check.ejectedBy == cell.owner) {
             var ownerSafeTime = check.ejectOwnerSafeUntil && Date.now() < check.ejectOwnerSafeUntil;
-            var stillInsideOwner = dist <= (cell.getSize() + check.getSize());
-            if (ownerSafeTime || stillInsideOwner) {
+            var stillMoving = check.getMoveTicks && check.getMoveTicks() > 0;
+            if (ownerSafeTime || stillMoving) {
                 continue;
             }
         }
