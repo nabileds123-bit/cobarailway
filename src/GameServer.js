@@ -68,8 +68,8 @@ function GameServer(mult, prt, gamemodeId) {
         virusStartMass: 160, // Starting virus size (In mass)
         virusBurstMass: 300, // Viruses explode past this size
         ejectMass: 18, // Mass of ejected cells
-        ejectMassGain: 10, // Amount of mass gained from consuming ejected cells
-        ejectSpeed: 120, // Base speed of ejected cells
+        ejectMassGain: 12, // Amount of mass gained from consuming ejected cells
+        ejectSpeed: 100, // Base speed of ejected cells
         ejectSpawnPlayer: 50, // Chance for a player to spawn from ejected mass
         playerStartMass: 10, // Starting mass of the player cell.
         playerMaxMass: 22500, // Maximum mass a player can have
