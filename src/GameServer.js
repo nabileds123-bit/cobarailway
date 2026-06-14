@@ -197,11 +197,20 @@ GameServer.prototype.start = function() {
     var self = this;
     var hserver = http.createServer(function(req, res){
       var pathname = req.url.split('?')[0];
-      if (pathname == '/' || pathname == '/index.html') {
+      if (pathname == '/' || pathname == '/index.html' || pathname == '/client' || pathname == '/client/' || pathname == '/client/index.html') {
+        req.url = '/client/maintenance.html';
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+      }
+
+      if (pathname == '/admin-game') {
         req.url = '/client/index.html';
         res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
         res.setHeader('Pragma', 'no-cache');
         res.setHeader('Expires', '0');
+        serve(req, res, finalhandler(req, res));
+        return;
       }
 
       if (req.url == '/info.php' || req.url == '/api/regions') {
